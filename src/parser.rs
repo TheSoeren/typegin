@@ -20,7 +20,8 @@ pub fn parse(tokens: &[&str]) -> Action {
             Some(d) => Action::Go(d),
             None => Action::Unknown(direction.to_string()),
         },
-        _ => Action::Unknown("".to_string()),
+        [action, _rest @ ..] => Action::Unknown(action.to_string()),
+        _ => Action::Unknown("do that".to_string()),
     }
 }
 
@@ -116,7 +117,7 @@ mod tests {
     // Fallbacks and malformed inputs
     #[case::unknown_verb(vec!["dance"], Action::Unknown("dance".to_string()))]
     #[case::unknown_direction(vec!["go", "sideways"], Action::Unknown("sideways".to_string()))]
-    #[case::empty_input(vec![], Action::Unknown("".to_string()))]
+    #[case::empty_input(vec![], Action::Unknown("do that".to_string()))]
     fn parses_tokens_into_actions(#[case] tokens: Vec<&str>, #[case] expected: Action) {
         assert_eq!(expected, parse(&tokens));
     }

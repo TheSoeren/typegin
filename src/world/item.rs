@@ -1,6 +1,8 @@
+use crate::world::EntityId;
+
 #[derive(Debug, Clone)]
 pub(crate) struct Item {
-    pub(crate) id: i32,
+    pub(crate) id: EntityId,
     pub(crate) primary_name: String,
     pub(crate) aliases: Vec<String>,
 }
