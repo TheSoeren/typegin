@@ -1,9 +1,14 @@
+[workspace]
+members = ["crates/input-parser"]
+resolver = "2"
+
 [package]
 name = "typegin"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+input-parser = { path = "crates/input-parser" }
 
 [dev-dependencies]
 rstest = "0.26"

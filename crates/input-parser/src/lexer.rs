@@ -3,7 +3,7 @@ use crate::direction::Direction;
 
 const USE_WORDS: &[&str] = &["on", "with"];
 
-pub fn parse(tokens: &[&str]) -> Action {
+pub fn lex(tokens: &[&str]) -> Action {
     match tokens {
         ["look" | "l"] => Action::Look,
         ["examine" | "x", rest @ ..] => Action::Examine(rest.join(" ")),
@@ -14,14 +14,13 @@ pub fn parse(tokens: &[&str]) -> Action {
         },
         ["go", direction] => match Direction::parse(direction) {
             Some(d) => Action::Go(d),
-            None => Action::Unknown(direction.to_string()),
+            None => Action::Unknown(tokens.join(" ")),
         },
         [direction] => match Direction::parse(direction) {
             Some(d) => Action::Go(d),
-            None => Action::Unknown(direction.to_string()),
+            None => Action::Unknown(tokens.join(" ")),
         },
-        [action, _rest @ ..] => Action::Unknown(action.to_string()),
-        _ => Action::Unknown("do that".to_string()),
+        _ => Action::Unknown(tokens.join(" ")),
     }
 }
 
@@ -56,9 +55,7 @@ fn get_use(rest: &[&str]) -> Option<Action> {
 mod tests {
     use rstest::rstest;
 
-    use crate::direction::Direction;
-
-    use super::*;
+    use crate::{Action, direction::Direction};
 
     #[rstest]
     // Single-word verb shortcuts
@@ -116,9 +113,11 @@ mod tests {
     #[case::use_alone(vec!["use"], Action::Unknown("use".to_string()))]
     // Fallbacks and malformed inputs
     #[case::unknown_verb(vec!["dance"], Action::Unknown("dance".to_string()))]
-    #[case::unknown_direction(vec!["go", "sideways"], Action::Unknown("sideways".to_string()))]
-    #[case::empty_input(vec![], Action::Unknown("do that".to_string()))]
+    #[case::unknown_direction(vec!["go", "sideways"], Action::Unknown("go sideways".to_string()))]
+    #[case::empty_input(vec![], Action::Unknown("".to_string()))]
     fn parses_tokens_into_actions(#[case] tokens: Vec<&str>, #[case] expected: Action) {
-        assert_eq!(expected, parse(&tokens));
+        use crate::lex;
+
+        assert_eq!(expected, lex(&tokens));
     }
 }

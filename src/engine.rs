@@ -1,4 +1,6 @@
-use crate::{Action, Resolution, WorldState, parse, tokenize, world::ActionResult};
+use input_parser::parse_input;
+
+use crate::{Action, Resolution, WorldState, world::ActionResult};
 
 pub type EntityId = i32;
 
@@ -15,9 +17,7 @@ impl GameEngine {
     }
 
     pub(crate) fn handle_input(&mut self, input: &str) -> String {
-        let tokens = tokenize(input);
-        let token_refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
-        let action = parse(&token_refs);
+        let action = parse_input(input);
 
         match action {
             Action::Look => "You look around.".to_string(),
@@ -86,7 +86,7 @@ mod integration_tests {
 
         let response = engine.handle_input("dance wildly");
 
-        assert_eq!(response, "I don't understand how to dance.");
+        assert_eq!(response, "I don't understand how to dance wildly.");
     }
 
     #[test]
@@ -95,7 +95,7 @@ mod integration_tests {
 
         let response = engine.handle_input("");
 
-        assert_eq!(response, "I don't understand how to do that.");
+        assert_eq!(response, "I don't understand how to .");
     }
 
     #[test]
