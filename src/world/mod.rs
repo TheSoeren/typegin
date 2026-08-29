@@ -84,3 +84,36 @@ pub enum Resolution {
     Ambiguous(Vec<EntityId>),
     NotFound,
 }
+
+#[cfg(test)]
+mod tests {
+    use rstest::rstest;
+
+    use super::*;
+
+    // Helper fixture setup for world items
+    fn sample_world() -> WorldState {
+        let mut world = WorldState::new();
+        // Adds items with an ID, primary name, and optional aliases
+        world.add_item_to_room(
+            1,
+            "glowing mysterious sword",
+            vec!["glowing sword", "sword"],
+        );
+        world.add_item_to_room(2, "heavy iron key", vec!["iron key", "key"]);
+        world.add_item_in_inventory(3, "brass key", vec!["key"]);
+        world
+    }
+
+    #[rstest]
+    #[case::exact_full_name("glowing mysterious sword", Resolution::Found(1))]
+    #[case::partial_alias_match("glowing sword", Resolution::Found(1))]
+    #[case::alias_match("iron key", Resolution::Found(2))]
+    #[case::ambiguous_key("key", Resolution::Ambiguous(vec![2, 3]))]
+    #[case::not_found("health potion", Resolution::NotFound)]
+    fn resolves_entities_in_world(#[case] target: &str, #[case] expected: Resolution) {
+        let world = sample_world();
+        let result = world.resolve_entity(target);
+        assert_eq!(expected, result);
+    }
+}
