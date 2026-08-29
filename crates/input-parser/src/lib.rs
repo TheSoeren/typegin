@@ -5,8 +5,8 @@ pub mod tokenizer;
 
 pub use action::Action;
 pub use direction::Direction;
-pub use lexer::lex;
-pub use tokenizer::tokenize;
+use lexer::lex;
+use tokenizer::tokenize;
 
 pub fn parse_input(input: &str) -> Action {
     let tokens = tokenize(input);
