@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core", "crates/input-parser"]
+members = ["crates/core"]
 resolver = "2"
 
 [package]

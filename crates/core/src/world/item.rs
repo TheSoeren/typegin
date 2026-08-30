@@ -17,3 +17,27 @@ impl Item {
         self.primary_name == name || self.aliases.split(';').any(|alias| alias == name)
     }
 }
+
+/// Public, plain-data view of an item in the world, handed to game rules so
+/// they can decide behaviour without reaching into the engine's internals.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ItemInfo {
+    pub id: EntityId,
+    pub name: String,
+    pub aliases: Vec<String>,
+}
+
+impl ItemInfo {
+    pub(crate) fn from_item(item: &Item) -> Self {
+        ItemInfo {
+            id: item.id,
+            name: item.primary_name.clone(),
+            aliases: item
+                .aliases
+                .split(';')
+                .filter(|a| !a.is_empty())
+                .map(str::to_string)
+                .collect(),
+        }
+    }
+}

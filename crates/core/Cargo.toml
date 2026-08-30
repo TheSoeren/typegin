@@ -10,7 +10,6 @@ diesel = { version = "2.3.12", features = [
 ] }
 diesel_migrations = "2.2.0"
 getset = "0.1.7"
-input-parser = { path = "../input-parser" }
 serde = { version = "1.0", features = ["derive"] }
 toml = "0.8"
 

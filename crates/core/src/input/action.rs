@@ -1,4 +1,4 @@
-use crate::direction::Direction;
+use super::direction::Direction;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Action {

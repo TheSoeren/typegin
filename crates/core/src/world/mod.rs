@@ -11,11 +11,13 @@ use room::Room;
 use crate::EntityId;
 use crate::data::WorldData;
 use crate::schema::{inventories, inventory_items, items, players, rooms, world_states};
+pub use crate::world::item::ItemInfo;
+
 use crate::world::item::Item;
 use crate::world::player::Player;
 
 #[derive(Debug, Getters)]
-#[getset(get = "pub(crate)")]
+#[getset(get = "pub")]
 pub struct WorldState {
     player: Player,
     current_room: Room,
@@ -128,6 +130,42 @@ impl WorldState {
             .map(|item| item.primary_name.clone())
     }
 
+    /// Details about an item visible to the player (in the room or inventory).
+    pub fn item_info(&self, id: EntityId) -> Option<ItemInfo> {
+        self.get_available_items()
+            .iter()
+            .find(|item| item.id == id)
+            .map(ItemInfo::from_item)
+    }
+
+    /// Whether the player is currently holding the given item.
+    pub fn player_has_item(&self, id: EntityId) -> bool {
+        self.player.has_item(id)
+    }
+
+    /// Whether the given item is currently in the room (not the inventory).
+    pub fn room_has_item(&self, id: EntityId) -> bool {
+        self.current_room.has_item(id)
+    }
+
+    /// Names of the items currently visible in the current room.
+    pub fn room_item_names(&self) -> Vec<String> {
+        self.current_room
+            .items()
+            .iter()
+            .map(|item| item.primary_name.clone())
+            .collect()
+    }
+
+    /// Names of the items currently held by the player.
+    pub fn inventory_item_names(&self) -> Vec<String> {
+        self.player
+            .items()
+            .iter()
+            .map(|item| item.primary_name.clone())
+            .collect()
+    }
+
     pub fn move_item_to_inventory(&mut self, id: EntityId) -> bool {
         if self.player.has_item(id) {
             return false;
@@ -164,18 +202,6 @@ impl WorldState {
         ]
         .concat()
     }
-
-    pub fn handle_resolution_failure(&self, resolution: &Resolution, item: &str) -> ActionResult {
-        match resolution {
-            Resolution::Ambiguous(_) => {
-                ActionResult::Failed(format!("Which {item} do you mean? Be more specific."))
-            }
-            Resolution::NotFound => ActionResult::Failed(format!("You don't see any {item} here.")),
-            Resolution::Found(_) => {
-                unreachable!("Found resolution should not reach failure handling")
-            }
-        }
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -183,12 +209,6 @@ pub enum Resolution {
     Found(EntityId),
     Ambiguous(Vec<EntityId>),
     NotFound,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum ActionResult {
-    Success(String),
-    Failed(String),
 }
 
 #[cfg(test)]
@@ -251,31 +271,5 @@ mod component_tests {
         assert!(loaded.current_room.has_item(2));
         assert!(!loaded.current_room.has_item(5));
         assert!(loaded.player.items().is_empty());
-    }
-
-    #[test]
-    fn test_handle_ambiguous_entity_resolution() {
-        let world = setup_game();
-
-        let resolution = Resolution::Ambiguous(vec![1, 2]);
-        let result = world.handle_resolution_failure(&resolution, "key");
-
-        assert_eq!(
-            result,
-            ActionResult::Failed("Which key do you mean? Be more specific.".to_string())
-        );
-    }
-
-    #[test]
-    fn test_handle_not_found_entity_resolution() {
-        let world = setup_game();
-
-        let resolution = Resolution::NotFound;
-        let result = world.handle_resolution_failure(&resolution, "dragon");
-
-        assert_eq!(
-            result,
-            ActionResult::Failed("You don't see any dragon here.".to_string())
-        );
     }
 }

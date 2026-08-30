@@ -1,5 +1,5 @@
-use crate::action::Action;
-use crate::direction::Direction;
+use super::action::Action;
+use super::direction::Direction;
 
 const USE_WORDS: &[&str] = &["on", "with"];
 
@@ -55,7 +55,7 @@ fn get_use(rest: &[&str]) -> Option<Action> {
 mod tests {
     use rstest::rstest;
 
-    use crate::{Action, direction::Direction};
+    use crate::input::{Action, direction::Direction};
 
     #[rstest]
     // Single-word verb shortcuts
@@ -116,7 +116,7 @@ mod tests {
     #[case::unknown_direction(vec!["go", "sideways"], Action::Unknown("go sideways".to_string()))]
     #[case::empty_input(vec![], Action::Unknown("".to_string()))]
     fn parses_tokens_into_actions(#[case] tokens: Vec<&str>, #[case] expected: Action) {
-        use crate::lex;
+        use super::lex;
 
         assert_eq!(expected, lex(&tokens));
     }
