@@ -9,7 +9,7 @@ use getset::Getters;
 use room::Room;
 
 use crate::EntityId;
-use crate::data::{WorldData, load_world_data};
+use crate::data::WorldData;
 use crate::schema::{inventories, inventory_items, items, players, rooms, world_states};
 use crate::world::item::Item;
 use crate::world::player::Player;
@@ -22,12 +22,13 @@ pub struct WorldState {
 }
 
 impl WorldState {
-    pub(crate) fn load_or_seed(conn: &mut SqliteConnection) -> Result<Self, DieselError> {
-        let data = load_world_data();
-
+    pub(crate) fn load_or_seed(
+        conn: &mut SqliteConnection,
+        data: &WorldData,
+    ) -> Result<Self, DieselError> {
         let count: i64 = world_states::table.count().get_result(conn)?;
         let world_id = if count == 0 {
-            Self::seed(conn, &data)?
+            Self::seed(conn, data)?
         } else {
             world_states::table.select(world_states::id).first(conn)?
         };
@@ -195,13 +196,13 @@ mod component_tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::data::load_world_data;
+    use crate::data::test_world_data;
     use crate::test_db::test_connection;
 
     fn setup_game() -> WorldState {
         let mut conn = test_connection();
 
-        WorldState::seed(&mut conn, &load_world_data())
+        WorldState::seed(&mut conn, &test_world_data())
             .and_then(|world_id| WorldState::load(&mut conn, world_id))
             .expect("seed and load world")
     }
@@ -242,7 +243,7 @@ mod component_tests {
     fn test_seed_populates_inventories() {
         let mut conn = test_connection();
 
-        let world_id = WorldState::seed(&mut conn, &load_world_data()).expect("seed world");
+        let world_id = WorldState::seed(&mut conn, &test_world_data()).expect("seed world");
 
         let loaded = WorldState::load(&mut conn, world_id).expect("load world");
 

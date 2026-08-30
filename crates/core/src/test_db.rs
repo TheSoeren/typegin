@@ -1,8 +1,8 @@
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use diesel_migrations::MigrationHarness;
 
-pub(crate) const MIGRATIONS: EmbeddedMigrations = embed_migrations!();
+use crate::migrations::MIGRATIONS;
 
 pub(crate) fn test_connection() -> SqliteConnection {
     let mut conn =

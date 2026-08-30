@@ -1,0 +1,25 @@
+[[items]]
+id = 1
+primary_name = "glowing mysterious sword"
+aliases = ["glowing sword", "sword"]
+
+[[items]]
+id = 2
+primary_name = "iron key"
+aliases = ["key", "rusty key"]
+
+[[items]]
+id = 3
+primary_name = "locked chest"
+aliases = ["chest"]
+
+[[items]]
+id = 4
+primary_name = "brass key"
+aliases = ["key"]
+
+[[items]]
+id = 5
+primary_name = "stale bread"
+aliases = ["bread"]
+

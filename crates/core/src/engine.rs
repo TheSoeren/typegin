@@ -1,7 +1,13 @@
+use std::error::Error;
+
+use diesel::Connection;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
+use diesel_migrations::MigrationHarness;
 use input_parser::parse_input;
 
+use crate::data::WorldData;
+use crate::migrations::MIGRATIONS;
 use crate::{Action, Resolution, WorldState, world::ActionResult};
 
 pub type EntityId = i32;
@@ -12,8 +18,20 @@ pub struct GameEngine {
 }
 
 impl GameEngine {
-    pub(crate) fn new(mut conn: SqliteConnection) -> Result<Self, DieselError> {
-        let world = WorldState::load_or_seed(&mut conn)?;
+    pub fn open(
+        db_path: &str,
+        data: &WorldData,
+    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
+        let mut conn = SqliteConnection::establish(db_path)?;
+        conn.run_pending_migrations(MIGRATIONS)?;
+
+        let world = WorldState::load_or_seed(&mut conn, data)?;
+
+        Ok(GameEngine { world, conn })
+    }
+
+    pub(crate) fn new(mut conn: SqliteConnection, data: &WorldData) -> Result<Self, DieselError> {
+        let world = WorldState::load_or_seed(&mut conn, data)?;
 
         Ok(GameEngine { world, conn })
     }
@@ -25,7 +43,7 @@ impl GameEngine {
         Ok(GameEngine { world, conn })
     }
 
-    pub(crate) fn handle_input(&mut self, input: &str) -> String {
+    pub fn handle_input(&mut self, input: &str) -> String {
         let action = parse_input(input);
 
         match action {
@@ -70,7 +88,7 @@ mod integration_tests {
 
     fn setup_integration_game() -> GameEngine {
         let conn = test_connection();
-        GameEngine::new(conn).expect("create engine")
+        GameEngine::new(conn, &crate::data::test_world_data()).expect("create engine")
     }
 
     #[test]
