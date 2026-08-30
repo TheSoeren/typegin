@@ -1,19 +1,28 @@
+use diesel::result::Error as DieselError;
+use diesel::sqlite::SqliteConnection;
 use input_parser::parse_input;
 
 use crate::{Action, Resolution, WorldState, world::ActionResult};
 
 pub type EntityId = i32;
 
-#[derive(Debug)]
 pub struct GameEngine {
     pub(crate) world: WorldState,
+    conn: SqliteConnection,
 }
 
 impl GameEngine {
-    pub(crate) fn new() -> Self {
-        let world_state = WorldState::new();
+    pub(crate) fn new(mut conn: SqliteConnection) -> Result<Self, DieselError> {
+        let world = WorldState::load_or_seed(&mut conn)?;
 
-        GameEngine { world: world_state }
+        Ok(GameEngine { world, conn })
+    }
+
+    pub(crate) fn load(conn: SqliteConnection, world_id: EntityId) -> Result<Self, DieselError> {
+        let mut conn = conn;
+        let world = WorldState::load(&mut conn, world_id)?;
+
+        Ok(GameEngine { world, conn })
     }
 
     pub(crate) fn handle_input(&mut self, input: &str) -> String {
@@ -33,21 +42,20 @@ impl GameEngine {
     }
 
     fn execute_take(&mut self, input: String) -> String {
-        let resolution = self.world.resolve_entity(&input);
-        match resolution {
+        match self.world.resolve_entity(&input) {
             Resolution::Found(id) => {
-                if self.world.is_item_in_inventory(id) {
+                if self.world.player().has_item(id) {
                     return "You are already holding that.".to_string();
                 }
 
-                if self.world.move_to_inventory(id) {
+                if self.world.move_item_to_inventory(id) {
                     let name = self.world.get_item_name(id);
                     format!("You take the {}.", name.unwrap_or_default())
                 } else {
                     "Not in room.".to_string()
                 }
             }
-            _ => match self.world.handle_resolution_failure(&resolution, &input) {
+            resolution => match self.world.handle_resolution_failure(&resolution, &input) {
                 ActionResult::Success(message) => message,
                 ActionResult::Failed(message) => message,
             },
@@ -58,16 +66,11 @@ impl GameEngine {
 #[cfg(test)]
 mod integration_tests {
     use crate::engine::GameEngine;
+    use crate::test_db::test_connection;
 
     fn setup_integration_game() -> GameEngine {
-        let mut engine = GameEngine::new();
-        // Setup room items: Entity 1 ("glowing mysterious sword")
-        engine.world.add_item_to_room(
-            1,
-            "glowing mysterious sword",
-            vec!["glowing sword", "sword"],
-        );
-        engine
+        let conn = test_connection();
+        GameEngine::new(conn).expect("create engine")
     }
 
     #[test]
@@ -77,7 +80,8 @@ mod integration_tests {
         let response = engine.handle_input("  TAKE the glowing, mysterious   sword! ");
 
         assert_eq!(response, "You take the glowing mysterious sword.");
-        assert!(engine.world.is_item_in_inventory(1));
+        assert!(engine.world.player().has_item(1));
+        assert!(!engine.world.current_room().has_item(1));
     }
 
     #[test]
