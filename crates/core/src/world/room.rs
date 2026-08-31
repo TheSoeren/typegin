@@ -1,8 +1,12 @@
+use std::collections::HashMap;
+
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
 use getset::Getters;
+use getset::Setters;
 
+use crate::Direction;
 use crate::EntityId;
 use crate::schema::inventory_items;
 use crate::schema::items;
@@ -10,12 +14,15 @@ use crate::schema::rooms;
 
 use super::item::Item;
 
-#[derive(Debug, Getters)]
+#[derive(Debug, Getters, Setters, Default, Clone)]
 #[getset(get = "pub(crate)")]
 pub struct Room {
     id: EntityId,
     items: Vec<Item>,
     hidden_items: Vec<Item>,
+    #[getset(set = "pub(crate)")]
+    exits: HashMap<Direction, EntityId>,
+    hidden_exits: HashMap<Direction, EntityId>,
 }
 
 impl Room {
@@ -39,10 +46,16 @@ impl Room {
             .select(Item::as_select())
             .load(conn)?;
 
+        // Exits are not loaded from the DB yet (see WorldState notes); they
+        // are populated from WorldData when room loading is wired up.
+        let exits = HashMap::new();
+
         Ok(Room {
             id,
             items,
             hidden_items,
+            exits,
+            hidden_exits: HashMap::new(),
         })
     }
 

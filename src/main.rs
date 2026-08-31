@@ -9,6 +9,8 @@ use typegin_core::{Event, GameEngine, Resolution, Rules, View, WorldData, WorldS
 mod view;
 
 fn main() -> ExitCode {
+    env_logger::init();
+
     let data_dir = env::args_os()
         .nth(1)
         .map(PathBuf::from)

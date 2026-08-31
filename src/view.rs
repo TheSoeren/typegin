@@ -22,6 +22,7 @@ impl TextView {
             Event::Looked => return render_look(world),
             Event::Went(direction) => format!("You go {:?}.", direction),
             Event::Took { item } => format!("You take the {item}."),
+            Event::Dropped { item } => format!("You dropped the {item}."),
             Event::Used { item, target } => match target {
                 Some(target) => format!("You use the {item} on the {target}."),
                 None => format!("You use the {item}."),
@@ -118,4 +119,3 @@ mod tests {
         assert_eq!(out, vec!["You take the iron key."]);
     }
 }
-

@@ -17,6 +17,9 @@ pub enum Event {
     /// The player took an item into inventory.
     Took { item: String },
 
+    /// The player dropped an item from inventory.
+    Dropped { item: String },
+
     /// The player used one item, optionally on a target.
     Used {
         item: String,

@@ -6,6 +6,7 @@ pub enum Action {
     Go(Direction),
     Examine(String),
     Take(String),
+    Drop(String),
     Use {
         item: String,
         target: Option<String>,

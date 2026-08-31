@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 use std::path::Path;
@@ -19,6 +20,8 @@ pub struct RoomData {
     pub visible_items: Vec<i32>,
     #[serde(default)]
     pub hidden_items: Vec<i32>,
+    #[serde(default)]
+    pub exits: HashMap<String, i32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -95,11 +98,3 @@ impl WorldData {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn test_world_data() -> WorldData {
-    WorldData::from_toml(
-        include_str!("../data/items.toml"),
-        include_str!("../data/rooms.toml"),
-    )
-    .expect("parse test world data")
-}

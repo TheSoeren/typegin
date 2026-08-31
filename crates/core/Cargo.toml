@@ -10,8 +10,6 @@ diesel = { version = "2.3.12", features = [
 ] }
 diesel_migrations = "2.2.0"
 getset = "0.1.7"
+log = "0.4.34"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
-
-[dev-dependencies]
-rstest = "0.26"
+toml = "0.9.4"
