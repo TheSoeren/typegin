@@ -22,6 +22,8 @@ pub struct RoomData {
     pub hidden_items: Vec<i32>,
     #[serde(default)]
     pub exits: HashMap<String, i32>,
+    #[serde(default)]
+    pub hidden_exits: HashMap<String, i32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -97,4 +99,3 @@ impl WorldData {
         Ok(Self::from_toml(&items_toml, &rooms_toml)?)
     }
 }
-

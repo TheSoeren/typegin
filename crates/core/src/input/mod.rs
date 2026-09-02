@@ -3,8 +3,8 @@ pub mod direction;
 pub mod lexer;
 pub mod tokenizer;
 
-pub use action::Action;
-pub use direction::Direction;
+pub use action::{Action, DropResult, MoveResult, TakeResult};
+pub use direction::{Direction, DirectionResolution};
 use lexer::lex;
 use tokenizer::tokenize;
 

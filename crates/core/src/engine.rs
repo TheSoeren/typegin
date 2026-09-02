@@ -7,28 +7,61 @@ use diesel_migrations::MigrationHarness;
 
 use crate::data::WorldData;
 use crate::event::Event;
-use crate::input::{Action, Direction, parse_input};
+use crate::input::{Action, Direction, action, parse_input};
 use crate::migrations::MIGRATIONS;
-use crate::world::{Resolution, WorldState};
+use crate::world;
+use crate::world::item;
 
+/// Numeric identifier for a room or other world entity.
+///
+/// Comparisons like `world.current_room_id() == RoomId::new(2)` and values in
+/// `Action` resolution should be read as opaque ids backed by the database,
+/// not as meaningful numbers on their own. For genuine room identities prefer
+/// the type-safe [`RoomId`](crate::RoomId).
 pub type EntityId = i32;
 
 /// The pure game state + persistence. Holds no rendering or I/O logic.
 ///
+/// Create one with [`GameEngine::open`] (stock rules) or
+/// [`GameEngine::open_with_rules`] (custom [`Rules`]); then feed it raw text
+/// via [`GameEngine::handle_input`] and let a [`View`] render the resulting
+/// [`Event`]s.
+///
 /// Customization is done by injecting a [`Rules`] object at construction time
 /// (via [`GameEngine::open_with_rules`]); there is no need to wrap the engine
 /// in a newtype or re-delegate methods.
+///
+/// [`View`]: crate::view::View
 pub struct GameEngine {
-    pub world: WorldState,
+    pub world: world::WorldState,
     rules: Box<dyn Rules>,
     conn: SqliteConnection,
 }
 
 impl GameEngine {
+    /// Open the engine at `db_path`, seeding and using the world defined by `data`.
+    ///
+    /// Uses the stock [`BasicRules`]; see [`GameEngine::open_with_rules`] to
+    /// supply a custom [`Rules`] implementation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database cannot be opened or migrated, or if
+    /// the world cannot be loaded/created (e.g. `data` has no rooms).
     pub fn open(db_path: &str, data: &WorldData) -> Result<Self, Box<dyn Error + Send + Sync>> {
         Self::open_with_rules(db_path, data, BasicRules)
     }
 
+    /// Open the engine at `db_path` with a custom [`Rules`] implementation.
+    ///
+    /// This is the entry point for customising behaviour: any rules that
+    /// inherit from the defaults only need to override the hooks they care
+    /// about (e.g. a `TakeRules` that moves items into the player's inventory).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database cannot be opened or migrated, or if
+    /// the world cannot be loaded/created (e.g. `data` has no rooms).
     pub fn open_with_rules(
         db_path: &str,
         data: &WorldData,
@@ -37,7 +70,7 @@ impl GameEngine {
         let mut conn = SqliteConnection::establish(db_path)?;
         conn.run_pending_migrations(MIGRATIONS)?;
 
-        let world = WorldState::load_or_seed(&mut conn, data)?;
+        let world = world::WorldState::load_or_seed(&mut conn, data)?;
 
         Ok(GameEngine {
             world,
@@ -55,7 +88,7 @@ impl GameEngine {
         data: &WorldData,
         rules: impl Rules + 'static,
     ) -> Result<Self, DieselError> {
-        let world = WorldState::load_or_seed(&mut conn, data)?;
+        let world = world::WorldState::load_or_seed(&mut conn, data)?;
 
         Ok(GameEngine {
             world,
@@ -65,11 +98,19 @@ impl GameEngine {
     }
 
     /// Execute a raw textual command. Parses it, then runs `execute_action`.
+    ///
+    /// This is the typical per-turn entry point for a front-end: input arrives
+    /// as a string, the engine parses it into an [`Action`] and applies it, and
+    /// the returned [`Event`]s describe what happened so the UI can render them.
     pub fn handle_input(&mut self, input: &str) -> Vec<Event> {
         self.execute_action(parse_input(input))
     }
 
     /// Execute one parsed `Action` against the world, returning events.
+    ///
+    /// Parsing (e.g. with [`crate::parse_input`]) is separate from execution,
+    /// so a front-end can reuse the same [`Action`] value multiple times or
+    /// build one programmatically without going through text.
     pub fn execute_action(&mut self, action: Action) -> Vec<Event> {
         match action {
             Action::Look => self.rules.on_look(&self.world),
@@ -88,10 +129,10 @@ impl GameEngine {
             }
             Action::Use { item, target } => {
                 let item_res = self.world.resolve_player_item(&item);
-                let target_res = target
-                    .as_deref()
-                    .map(|t| self.world.resolve_any_item(t))
-                    .unwrap_or(Resolution::NotFound);
+                let target_res = match target {
+                    Some(ref r) => self.world.resolve_any_item(r),
+                    None => item::ItemResolution::NotFound,
+                };
                 self.rules
                     .on_use(&item, target.as_deref(), item_res, target_res)
             }
@@ -115,7 +156,7 @@ impl GameEngine {
 /// id, name and aliases) rather than a raw name string.
 pub trait Rules {
     /// Decide what happens when the player looks around the room.
-    fn on_look(&mut self, _world: &WorldState) -> Vec<Event> {
+    fn on_look(&mut self, _world: &world::WorldState) -> Vec<Event> {
         vec![Event::Looked]
     }
 
@@ -127,51 +168,41 @@ pub trait Rules {
     /// not move, to block an otherwise valid exit (e.g. a locked door).
     ///
     /// The default follows the exit, emitting nothing if there is none.
-    fn on_go(&mut self, world: &mut WorldState, direction: Direction) -> Vec<Event> {
+    fn on_go(&mut self, world: &mut world::WorldState, direction: Direction) -> Vec<Event> {
         match world.get_room_id_by_exit_direction(direction) {
             Some(room_id) => {
                 world.move_to_room(room_id);
                 vec![Event::Went(direction)]
             }
-            None => vec![Event::Message(format!("To the {} is no exit", direction))],
+            None => vec![Event::WentInvalidDirection(direction)],
         }
     }
 
     /// Decide what happens when the player tries to take an item.
     ///
     /// `resolution` is the outcome of matching `name` against the rooms items.
-    fn on_take(&mut self, world: &mut WorldState, name: &str, resolution: Resolution)
-    -> Vec<Event> {
-        let response_events: &mut Vec<Event> = &mut vec![];
+    fn on_take(
+        &mut self,
+        world: &mut world::WorldState,
+        name: &str,
+        resolution: item::ItemResolution,
+    ) -> Vec<Event> {
         match resolution {
-            Resolution::Found(id) => {
-                if world.player_has_item(id) {
-                    response_events.push(Event::AlreadyHolding {
+            item::ItemResolution::Found(id) => match world.player_take_item(id) {
+                action::TakeResult::Success => vec![Event::Took {
+                    item: name.to_string(),
+                }],
+                action::TakeResult::Fail => {
+                    vec![Event::TookItemNotFound {
                         item: name.to_string(),
-                    });
-                    todo!("Implement behavior when player already has item -> item count +1");
+                    }]
                 }
-
-                if world.move_item_to_inventory(id) {
-                    let item = world
-                        .item_info(id)
-                        .map(|info| info.name)
-                        .unwrap_or_else(|| name.to_string());
-                    vec![Event::Took { item }]
-                } else {
-                    response_events.push(Event::NotFound {
-                        phrase: name.to_string(),
-                    });
-                    unreachable!(
-                        "on_take must only be called if the item is known to be in the room!"
-                    );
-                }
-            }
-            Resolution::Ambiguous(_) => vec![Event::Ambiguous {
-                phrase: name.to_string(),
+            },
+            item::ItemResolution::Ambiguous(_) => vec![Event::TookItemAmbiguous {
+                item: name.to_string(),
             }],
-            Resolution::NotFound => vec![Event::NotFound {
-                phrase: name.to_string(),
+            item::ItemResolution::NotFound => vec![Event::TookItemNotFound {
+                item: name.to_string(),
             }],
         }
     }
@@ -179,53 +210,55 @@ pub trait Rules {
     /// Decide what happens when the player tries to drop an item.
     ///
     /// `resolution` is the outcome of matching `name` against the players items.
-    fn on_drop(&mut self, world: &mut WorldState, name: &str, resolution: Resolution)
-    -> Vec<Event> {
-        let response_events: &mut Vec<Event> = &mut vec![];
+    fn on_drop(
+        &mut self,
+        world: &mut world::WorldState,
+        name: &str,
+        resolution: item::ItemResolution,
+    ) -> Vec<Event> {
         match resolution {
-            Resolution::Found(id) => {
-                if world.room_has_item(id) {
-                    response_events.push(Event::AlreadyHolding {
+            item::ItemResolution::Found(id) => match world.player_drop_item(id) {
+                action::DropResult::Success => vec![Event::Dropped {
+                    item: name.to_string(),
+                }],
+                action::DropResult::Fail => {
+                    vec![Event::DroppedItemNotFound {
                         item: name.to_string(),
-                    });
-                    todo!("Implement behavior when player already has item -> item count +1");
+                    }]
                 }
-
-                if world.move_item_from_inventory(id) {
-                    let item = world
-                        .item_info(id)
-                        .map(|info| info.name)
-                        .unwrap_or_else(|| name.to_string());
-                    vec![Event::Dropped { item }]
-                } else {
-                    response_events.push(Event::NotFound {
-                        phrase: name.to_string(),
-                    });
-                    unreachable!(
-                        "on_drop must only be called if the item is known to be in the room!"
-                    );
-                }
-            }
-            Resolution::Ambiguous(_) => vec![Event::Ambiguous {
-                phrase: name.to_string(),
+            },
+            item::ItemResolution::Ambiguous(_) => vec![Event::DroppedItemAmbiguous {
+                item: name.to_string(),
             }],
-            Resolution::NotFound => vec![Event::NotFound {
-                phrase: name.to_string(),
+            item::ItemResolution::NotFound => vec![Event::DroppedItemNotFound {
+                item: name.to_string(),
             }],
         }
     }
 
     /// Decide what happens when the player examines a thing.
-    fn on_examine(&mut self, _world: &WorldState, name: &str, resolution: Resolution) -> Vec<Event> {
+    fn on_examine(
+        &mut self,
+        _world: &world::WorldState,
+        name: &str,
+        resolution: item::ItemResolution,
+    ) -> Vec<Event> {
         match resolution {
-            Resolution::Found(_) => vec![Event::Message(format!("You examine the {name}."))],
-            Resolution::Ambiguous(_) => {
-                vec![Event::Message(format!(
-                    "Be more specific, there are multiple {}",
-                    name
-                ))]
+            item::ItemResolution::Found(_) => {
+                vec![Event::Examined {
+                    item: name.to_string(),
+                }]
             }
-            Resolution::NotFound => vec![Event::Message(format!("There is no {name}."))],
+            item::ItemResolution::Ambiguous(_) => {
+                vec![Event::ExaminedItemAmbiguous {
+                    item: name.to_string(),
+                }]
+            }
+            item::ItemResolution::NotFound => {
+                vec![Event::ExaminedItemNotFound {
+                    item: name.to_string(),
+                }]
+            }
         }
     }
 
@@ -234,36 +267,44 @@ pub trait Rules {
         &mut self,
         item: &str,
         target: Option<&str>,
-        item_resolution: Resolution,
-        target_resolution: Resolution,
+        item_resolution: item::ItemResolution,
+        target_resolution: item::ItemResolution,
     ) -> Vec<Event> {
         match item_resolution {
-            Resolution::Found(_) => {
-                if let Some(t) = target
-                    && target_resolution == Resolution::NotFound
-                {
-                    return vec![Event::Message(format!("You can't use that on {t}."))];
+            item::ItemResolution::Found(_) => match target_resolution {
+                item::ItemResolution::Found(_) => {
+                    vec![Event::Used {
+                        item: item.to_string(),
+                        target: target.map(String::from),
+                    }]
                 }
-
-                vec![Event::Used {
+                item::ItemResolution::Ambiguous(_) => {
+                    vec![Event::UsedItemAmbiguous {
+                        item: item.to_string(),
+                    }]
+                }
+                item::ItemResolution::NotFound => {
+                    vec![Event::UsedTargetNeeded {
+                        item: item.to_string(),
+                    }]
+                }
+            },
+            item::ItemResolution::Ambiguous(_) => {
+                vec![Event::UsedItemAmbiguous {
                     item: item.to_string(),
-                    target: target.map(str::to_string),
                 }]
             }
-            Resolution::Ambiguous(_) => {
-                vec![Event::Message(format!(
-                    "Be more specific, there are multiple {item}."
-                ))]
+            item::ItemResolution::NotFound => {
+                vec![Event::UsedItemNotFound {
+                    item: item.to_string(),
+                }]
             }
-            Resolution::NotFound => vec![Event::Message(format!("You don't have a {item}."))],
         }
     }
 
     /// Decide what happens for an unrecognised command.
     fn on_unknown(&mut self, phrase: String) -> Vec<Event> {
-        vec![Event::Message(format!(
-            "I don't understand how to \"{phrase}\"."
-        ))]
+        vec![Event::UnknownEvent { name: phrase }]
     }
 }
 

@@ -7,18 +7,8 @@
 
 mod common;
 
-use core::{Direction, Event};
 use common::setup_engine;
-
-fn messages(events: &[Event]) -> Vec<String> {
-    events
-        .iter()
-        .filter_map(|e| match e {
-            Event::Message(text) => Some(text.clone()),
-            _ => None,
-        })
-        .collect()
-}
+use core::{Direction, Event, RoomId};
 
 // --- on_look ---
 
@@ -46,32 +36,44 @@ mod on_go {
     #[test]
     fn valid_exit_moves_rooms() {
         let mut engine = setup_engine();
-        assert_eq!(engine.handle_input("go north"), vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world.current_room_id(), 2);
+        assert_eq!(
+            engine.handle_input("go north"),
+            vec![Event::Went(Direction::North)]
+        );
+        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
     }
 
     #[test]
     fn single_direction_word_moves() {
         let mut engine = setup_engine();
         // Room 1 only has a north exit; a bare direction word is accepted.
-        assert_eq!(engine.handle_input("north"), vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world.current_room_id(), 2);
+        assert_eq!(
+            engine.handle_input("north"),
+            vec![Event::Went(Direction::North)]
+        );
+        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
     }
 
     #[test]
-    fn invalid_exit_reports_no_exit() {
+    fn invalid_exit_reports_invalid_direction() {
         let mut engine = setup_engine();
         // Room 1 only has a north exit.
-        assert_eq!(engine.handle_input("go east"), vec![Event::Message("To the east is no exit".to_string())]);
-        assert_eq!(engine.world.current_room_id(), 1);
+        assert_eq!(
+            engine.handle_input("go east"),
+            vec![Event::WentInvalidDirection(Direction::East)]
+        );
+        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
     }
 
     #[test]
-    fn same_direction_message_from_other_room() {
+    fn same_direction_event_from_other_room() {
         let mut engine = setup_engine();
         engine.handle_input("go north"); // now in room 2
         // Room 2 has south and east exits, not west.
-        assert_eq!(engine.handle_input("go west"), vec![Event::Message("To the west is no exit".to_string())]);
+        assert_eq!(
+            engine.handle_input("go west"),
+            vec![Event::WentInvalidDirection(Direction::West)]
+        );
     }
 }
 
@@ -85,10 +87,17 @@ mod on_take {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("take iron key"),
-            vec![Event::Took { item: "iron key".to_string() }]
+            vec![Event::Took {
+                item: "iron key".to_string()
+            }]
         );
-        assert!(engine.world.player_has_item(2));
-        assert!(!engine.world.room_has_item(2));
+        assert!(
+            engine.world.get_item_from_room(core::ItemId::new(2)) == core::ItemResolution::NotFound
+        );
+        assert!(
+            engine.world.get_item_from_player(core::ItemId::new(2))
+                != core::ItemResolution::NotFound
+        );
     }
 
     #[test]
@@ -96,7 +105,9 @@ mod on_take {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("take bogus"),
-            vec![Event::NotFound { phrase: "bogus".to_string() }]
+            vec![Event::TookItemNotFound {
+                item: "bogus".to_string()
+            }]
         );
     }
 
@@ -106,7 +117,22 @@ mod on_take {
         // "key" matches both item 2 (iron key) and item 4 (brass key) in room 1.
         assert_eq!(
             engine.handle_input("take key"),
-            vec![Event::Ambiguous { phrase: "key".to_string() }]
+            vec![Event::TookItemAmbiguous {
+                item: "key".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn take_already_holding_item_reports_not_found() {
+        let mut engine = setup_engine();
+        engine.handle_input("take iron key");
+        // The item is no longer in the room, so a second take matches nothing.
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::TookItemNotFound {
+                item: "iron key".to_string()
+            }]
         );
     }
 }
@@ -122,10 +148,17 @@ mod on_drop {
         engine.handle_input("take iron key");
         assert_eq!(
             engine.handle_input("drop iron key"),
-            vec![Event::Dropped { item: "iron key".to_string() }]
+            vec![Event::Dropped {
+                item: "iron key".to_string()
+            }]
         );
-        assert!(!engine.world.player_has_item(2));
-        assert!(engine.world.room_has_item(2));
+        assert!(
+            engine.world.get_item_from_player(core::ItemId::new(2))
+                == core::ItemResolution::NotFound
+        );
+        assert!(
+            engine.world.get_item_from_room(core::ItemId::new(2)) != core::ItemResolution::NotFound
+        );
     }
 
     #[test]
@@ -133,7 +166,22 @@ mod on_drop {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("drop iron key"),
-            vec![Event::NotFound { phrase: "iron key".to_string() }]
+            vec![Event::DroppedItemNotFound {
+                item: "iron key".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn drop_ambiguous_item_reports_ambiguous() {
+        let mut engine = setup_engine();
+        engine.handle_input("take iron key");
+        engine.handle_input("take brass key");
+        assert_eq!(
+            engine.handle_input("drop key"),
+            vec![Event::DroppedItemAmbiguous {
+                item: "key".to_string()
+            }]
         );
     }
 }
@@ -144,20 +192,35 @@ mod on_examine {
     use super::*;
 
     #[test]
-    fn examine_found_item_messages() {
+    fn examine_found_item_emits_examined() {
         let mut engine = setup_engine();
         assert_eq!(
-            messages(&engine.handle_input("examine iron key")),
-            vec!["You examine the iron key.".to_string()]
+            engine.handle_input("examine iron key"),
+            vec![Event::Examined {
+                item: "iron key".to_string()
+            }]
         );
     }
 
     #[test]
-    fn examine_unknown_item_messages() {
+    fn examine_unknown_item_reports_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            messages(&engine.handle_input("examine bogus")),
-            vec!["There is no bogus.".to_string()]
+            engine.handle_input("examine bogus"),
+            vec![Event::ExaminedItemNotFound {
+                item: "bogus".to_string()
+            }]
+        );
+    }
+
+    #[test]
+    fn examine_ambiguous_item_reports_ambiguous() {
+        let mut engine = setup_engine();
+        assert_eq!(
+            engine.handle_input("examine key"),
+            vec![Event::ExaminedItemAmbiguous {
+                item: "key".to_string()
+            }]
         );
     }
 }
@@ -168,11 +231,13 @@ mod on_use {
     use super::*;
 
     #[test]
-    fn use_unheld_item_reports_missing() {
+    fn use_unheld_item_reports_item_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            messages(&engine.handle_input("use sword")),
-            vec!["You don't have a sword.".to_string()]
+            engine.handle_input("use sword"),
+            vec![Event::UsedItemNotFound {
+                item: "sword".to_string()
+            }]
         );
     }
 
@@ -182,7 +247,9 @@ mod on_use {
         engine.handle_input("take iron key");
         assert_eq!(
             engine.handle_input("use iron key"),
-            vec![Event::Used { item: "iron key".to_string(), target: None }]
+            vec![Event::UsedTargetNeeded {
+                item: "iron key".to_string()
+            }]
         );
     }
 
@@ -200,12 +267,16 @@ mod on_use {
     }
 
     #[test]
-    fn use_held_item_on_unknown_target_reports() {
+    fn use_ambiguous_item_reports_ambiguous() {
         let mut engine = setup_engine();
         engine.handle_input("take iron key");
+        engine.handle_input("take brass key");
+        // The player holds both keys, so "key" is ambiguous.
         assert_eq!(
-            messages(&engine.handle_input("use iron key on bogus")),
-            vec!["You can't use that on bogus.".to_string()]
+            engine.handle_input("use key on chest"),
+            vec![Event::UsedItemAmbiguous {
+                item: "key".to_string()
+            }]
         );
     }
 }
@@ -216,20 +287,24 @@ mod on_unknown {
     use super::*;
 
     #[test]
-    fn unknown_command_messages() {
+    fn unknown_command_reports_unknown_event() {
         let mut engine = setup_engine();
         assert_eq!(
-            messages(&engine.handle_input("dance wildly")),
-            vec!["I don't understand how to \"dance wildly\".".to_string()]
+            engine.handle_input("dance wildly"),
+            vec![Event::UnknownEvent {
+                name: "dance wildly".to_string()
+            }]
         );
     }
 
     #[test]
-    fn unknown_direction_messages() {
+    fn unknown_direction_reports_unknown_event() {
         let mut engine = setup_engine();
         assert_eq!(
-            messages(&engine.handle_input("go sideways")),
-            vec!["I don't understand how to \"go sideways\".".to_string()]
+            engine.handle_input("go sideways"),
+            vec![Event::UnknownEvent {
+                name: "go sideways".to_string()
+            }]
         );
     }
 }

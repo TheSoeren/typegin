@@ -11,62 +11,77 @@
 
 mod common;
 
-use core::{Direction, Event, GameEngine, Resolution, Rules, WorldState};
 use common::{setup_engine, setup_engine_with_rules};
+use core::{
+    Direction, Event, Rules,
+    world::{WorldState, item},
+};
 
-/// Overrides every hook to return a distinctive message so a test can tell at
-/// a glance whether the override (and not the default) ran.
+/// Overrides every hook to return a distinctive marker event so a test can
+/// tell at a glance whether the override (and not the default) ran.
 struct TestRules;
+
+impl TestRules {
+    fn override_event(label: &str) -> Vec<Event> {
+        vec![Event::UnknownEvent {
+            name: format!("override: {label}"),
+        }]
+    }
+}
 
 impl Rules for TestRules {
     fn on_look(&mut self, _world: &WorldState) -> Vec<Event> {
-        vec![Event::Message("override: look".to_string())]
+        Self::override_event("look")
     }
 
     fn on_go(&mut self, _world: &mut WorldState, _direction: Direction) -> Vec<Event> {
-        vec![Event::Message("override: go".to_string())]
+        Self::override_event("go")
     }
 
     fn on_take(
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: Resolution,
+        _resolution: item::ItemResolution,
     ) -> Vec<Event> {
-        vec![Event::Message("override: take".to_string())]
+        Self::override_event("take")
     }
 
     fn on_drop(
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: Resolution,
+        _resolution: item::ItemResolution,
     ) -> Vec<Event> {
-        vec![Event::Message("override: drop".to_string())]
+        Self::override_event("drop")
     }
 
     fn on_examine(
         &mut self,
         _world: &WorldState,
         _name: &str,
-        _resolution: Resolution,
+        _resolution: item::ItemResolution,
     ) -> Vec<Event> {
-        vec![Event::Message("override: examine".to_string())]
+        Self::override_event("examine")
     }
 
     fn on_use(
         &mut self,
         _item: &str,
         _target: Option<&str>,
-        _item_resolution: Resolution,
-        _target_resolution: Resolution,
+        _item_resolution: item::ItemResolution,
+        _target_resolution: item::ItemResolution,
     ) -> Vec<Event> {
-        vec![Event::Message("override: use".to_string())]
+        Self::override_event("use")
     }
 
     fn on_unknown(&mut self, _phrase: String) -> Vec<Event> {
-        vec![Event::Message("override: unknown".to_string())]
+        Self::override_event("unknown")
     }
+}
+
+fn marker(label: &str) -> Vec<Event> {
+    TestRules::override_event(label)
 }
 
 mod everything_overridden {
@@ -76,10 +91,7 @@ mod everything_overridden {
     fn on_look_override_wins_over_looked() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
-        assert_eq!(
-            vec![Event::Message("override: look".to_string())],
-            custom.handle_input("look")
-        );
+        assert_eq!(marker("look"), custom.handle_input("look"));
         assert_eq!(vec![Event::Looked], default.handle_input("look"));
     }
 
@@ -87,10 +99,7 @@ mod everything_overridden {
     fn on_go_override_wins_over_went() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
-        assert_eq!(
-            vec![Event::Message("override: go".to_string())],
-            custom.handle_input("go north")
-        );
+        assert_eq!(marker("go"), custom.handle_input("go north"));
         assert_eq!(
             vec![Event::Went(Direction::North)],
             default.handle_input("go north")
@@ -101,12 +110,11 @@ mod everything_overridden {
     fn on_take_override_wins_over_took() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
+        assert_eq!(marker("take"), custom.handle_input("take iron key"));
         assert_eq!(
-            vec![Event::Message("override: take".to_string())],
-            custom.handle_input("take iron key")
-        );
-        assert_eq!(
-            vec![Event::Took { item: "iron key".to_string() }],
+            vec![Event::Took {
+                item: "iron key".to_string()
+            }],
             default.handle_input("take iron key")
         );
     }
@@ -114,22 +122,18 @@ mod everything_overridden {
     #[test]
     fn on_drop_override_wins_over_dropped() {
         let mut custom = setup_engine_with_rules(TestRules);
-        assert_eq!(
-            vec![Event::Message("override: drop".to_string())],
-            custom.handle_input("drop iron key")
-        );
+        assert_eq!(marker("drop"), custom.handle_input("drop iron key"));
     }
 
     #[test]
-    fn on_examine_override_wins_over_default_message() {
+    fn on_examine_override_wins_over_examined() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
+        assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
-            vec![Event::Message("override: examine".to_string())],
-            custom.handle_input("examine iron key")
-        );
-        assert_eq!(
-            vec![Event::Message("You examine the iron key.".to_string())],
+            vec![Event::Examined {
+                item: "iron key".to_string()
+            }],
             default.handle_input("examine iron key")
         );
     }
@@ -138,27 +142,25 @@ mod everything_overridden {
     fn on_use_override_wins_over_used() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
-        assert_eq!(
-            vec![Event::Message("override: use".to_string())],
-            custom.handle_input("use iron key")
-        );
+        assert_eq!(marker("use"), custom.handle_input("use iron key"));
         default.handle_input("take iron key");
         assert_eq!(
-            vec![Event::Used { item: "iron key".to_string(), target: None }],
+            vec![Event::UsedTargetNeeded {
+                item: "iron key".to_string()
+            }],
             default.handle_input("use iron key")
         );
     }
 
     #[test]
-    fn on_unknown_override_wins_over_default_message() {
+    fn on_unknown_override_wins_over_unknown_event() {
         let mut custom = setup_engine_with_rules(TestRules);
         let mut default = setup_engine();
+        assert_eq!(marker("unknown"), custom.handle_input("dance wildly"));
         assert_eq!(
-            vec![Event::Message("override: unknown".to_string())],
-            custom.handle_input("dance wildly")
-        );
-        assert_eq!(
-            vec![Event::Message("I don't understand how to \"dance wildly\".".to_string())],
+            vec![Event::UnknownEvent {
+                name: "dance wildly".to_string()
+            }],
             default.handle_input("dance wildly")
         );
     }

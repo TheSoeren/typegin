@@ -4,7 +4,9 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::view::TextView;
-use typegin_core::{Event, GameEngine, Resolution, Rules, View, WorldData, WorldState};
+use typegin_core::{
+    Event, GameEngine, Rules, TakeResult, View, WorldData, WorldState, world::item,
+};
 
 mod view;
 
@@ -75,36 +77,22 @@ impl Rules for TakeRules {
         &mut self,
         world: &mut WorldState,
         name: &str,
-        resolution: Resolution,
+        resolution: item::ItemResolution,
     ) -> Vec<Event> {
         match resolution {
-            Resolution::Found(id) => {
-                if world.player_has_item(id) {
-                    match world.item_info(id) {
-                        Some(info) => return vec![Event::AlreadyHolding { item: info.name }],
-                        None => {
-                            return vec![Event::Message(
-                                "You are already holding that.".to_string(),
-                            )];
-                        }
-                    }
-                }
-
-                if world.move_item_to_inventory(id) {
-                    let item = world
-                        .item_info(id)
-                        .map(|info| info.name)
-                        .unwrap_or_else(|| name.to_string());
-                    vec![Event::Took { item }]
-                } else {
-                    vec![Event::Message("Not in room.".to_string())]
-                }
-            }
-            Resolution::Ambiguous(_) => vec![Event::Ambiguous {
-                phrase: name.to_string(),
+            item::ItemResolution::Found(id) => match world.player_take_item(id) {
+                TakeResult::Success => vec![Event::Took {
+                    item: name.to_string(),
+                }],
+                TakeResult::Fail => vec![Event::TookItemNotFound {
+                    item: name.to_string(),
+                }],
+            },
+            item::ItemResolution::Ambiguous(_) => vec![Event::TookItemAmbiguous {
+                item: name.to_string(),
             }],
-            Resolution::NotFound => vec![Event::NotFound {
-                phrase: name.to_string(),
+            item::ItemResolution::NotFound => vec![Event::TookItemNotFound {
+                item: name.to_string(),
             }],
         }
     }

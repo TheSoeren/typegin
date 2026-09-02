@@ -49,7 +49,10 @@ mod parse {
 
     #[test]
     fn examine() {
-        assert_eq!(Action::Examine("glowing sword".to_string()), parses("examine the glowing sword"));
+        assert_eq!(
+            Action::Examine("glowing sword".to_string()),
+            parses("examine the glowing sword")
+        );
     }
 
     #[test]
@@ -59,7 +62,10 @@ mod parse {
 
     #[test]
     fn take() {
-        assert_eq!(Action::Take("heavy iron key".to_string()), parses("take the heavy iron key"));
+        assert_eq!(
+            Action::Take("heavy iron key".to_string()),
+            parses("take the heavy iron key")
+        );
     }
 
     #[test]
@@ -69,7 +75,10 @@ mod parse {
 
     #[test]
     fn drop() {
-        assert_eq!(Action::Drop("iron key".to_string()), parses("drop the iron key"));
+        assert_eq!(
+            Action::Drop("iron key".to_string()),
+            parses("drop the iron key")
+        );
     }
 
     #[test]
@@ -122,12 +131,18 @@ mod parse {
 
     #[test]
     fn unknown_verb() {
-        assert_eq!(Action::Unknown("dance wildly".to_string()), parses("dance wildly"));
+        assert_eq!(
+            Action::Unknown("dance wildly".to_string()),
+            parses("dance wildly")
+        );
     }
 
     #[test]
     fn unknown_direction() {
-        assert_eq!(Action::Unknown("go sideways".to_string()), parses("go sideways"));
+        assert_eq!(
+            Action::Unknown("go sideways".to_string()),
+            parses("go sideways")
+        );
     }
 
     #[test]
@@ -145,11 +160,17 @@ mod parse {
 
     #[test]
     fn hyphenated_terms_are_split() {
-        assert_eq!(Action::Unknown("open brass key door".to_string()), parses("open the brass-key door"));
+        assert_eq!(
+            Action::Unknown("open brass key door".to_string()),
+            parses("open the brass-key door")
+        );
     }
 
     #[test]
     fn whitespace_is_collapsed() {
-        assert_eq!(Action::Examine("chest".to_string()), parses("examine   the   chest"));
+        assert_eq!(
+            Action::Examine("chest".to_string()),
+            parses("examine   the   chest")
+        );
     }
 }

@@ -8,33 +8,70 @@ use crate::input::Direction;
 /// the same game logic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
+    /// The player typed an unknown command
+    UnknownEvent {
+        name: String,
+    },
+
     /// The player looked around the current room; the world can be re-rendered.
     Looked,
 
     /// The player moved in a direction.
     Went(Direction),
+    WentInvalidDirection(Direction),
 
     /// The player took an item into inventory.
-    Took { item: String },
+    Took {
+        item: String,
+    },
+    TookItemNotFound {
+        item: String,
+    },
+    TookItemAmbiguous {
+        item: String,
+    },
 
     /// The player dropped an item from inventory.
-    Dropped { item: String },
+    Dropped {
+        item: String,
+    },
+    DroppedItemNotFound {
+        item: String,
+    },
+    DroppedItemAmbiguous {
+        item: String,
+    },
 
     /// The player used one item, optionally on a target.
     Used {
         item: String,
         target: Option<String>,
     },
+    UsedItemNotFound {
+        item: String,
+    },
+    UsedItemAmbiguous {
+        item: String,
+    },
+    UsedTargetNeeded {
+        item: String,
+    },
+    UsedTargetNotFound {
+        item: String,
+        target: String,
+    },
+    UsedTargetAmbiguous {
+        item: String,
+    },
 
-    /// The player is already holding the item.
-    AlreadyHolding { item: String },
-
-    /// A named entity could not be matched to anything in the world.
-    NotFound { phrase: String },
-
-    /// The named entity matched more than one thing in the world.
-    Ambiguous { phrase: String },
-
-    /// A generic prose message, useful for custom behaviour and scripts.
-    Message(String),
+    /// The player examined an item
+    Examined {
+        item: String,
+    },
+    ExaminedItemNotFound {
+        item: String,
+    },
+    ExaminedItemAmbiguous {
+        item: String,
+    },
 }

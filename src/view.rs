@@ -21,18 +21,44 @@ impl TextView {
         let line = match event {
             Event::Looked => return render_look(world),
             Event::Went(direction) => format!("You go {:?}.", direction),
+            Event::WentInvalidDirection(direction) => {
+                format!("You can't go that way ({:?}).", direction)
+            }
             Event::Took { item } => format!("You take the {item}."),
+            Event::TookItemNotFound { item } => format!("I don't see any {item} here."),
+            Event::TookItemAmbiguous { item } => {
+                format!("Which {item} do you mean? Be more specific.")
+            }
             Event::Dropped { item } => format!("You dropped the {item}."),
+            Event::DroppedItemNotFound { item } => {
+                format!("You aren't carrying any {item}.")
+            }
+            Event::DroppedItemAmbiguous { item } => {
+                format!("Which {item} do you mean? Be more specific.")
+            }
             Event::Used { item, target } => match target {
                 Some(target) => format!("You use the {item} on the {target}."),
                 None => format!("You use the {item}."),
             },
-            Event::AlreadyHolding { item } => format!("You are already holding the {item}."),
-            Event::NotFound { phrase } => format!("I don't see any {phrase} here."),
-            Event::Ambiguous { phrase } => {
-                format!("Which {phrase} do you mean? Be more specific.")
+            Event::UsedItemNotFound { item } => format!("You don't have a {item}."),
+            Event::UsedItemAmbiguous { item } => {
+                format!("Which {item} do you mean? Be more specific.")
             }
-            Event::Message(text) => text.clone(),
+            Event::UsedTargetNeeded { item } => {
+                format!("You need to use the {item} on something.")
+            }
+            Event::UsedTargetNotFound { item, target } => {
+                format!("You can't use the {item} on {target}.")
+            }
+            Event::UsedTargetAmbiguous { item } => {
+                format!("Which target do you want to use the {item} on?")
+            }
+            Event::Examined { item } => format!("You examine the {item}."),
+            Event::ExaminedItemNotFound { item } => format!("There is no {item}."),
+            Event::ExaminedItemAmbiguous { item } => {
+                format!("Which {item} do you mean? Be more specific.")
+            }
+            Event::UnknownEvent { name } => format!("I don't understand \"{name}\"."),
         };
         vec![line]
     }
@@ -40,7 +66,7 @@ impl TextView {
 
 fn render_look(world: &WorldState) -> Vec<String> {
     let room_items = world.room_item_names();
-    let inventory = world.inventory_item_names();
+    let inventory = world.player_item_names();
 
     let mut parts = vec!["You are in a room.".to_string()];
 
