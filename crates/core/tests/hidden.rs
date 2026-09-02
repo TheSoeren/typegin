@@ -32,8 +32,8 @@ mod hidden_items {
     #[test]
     fn hidden_item_is_not_listed_among_room_items() {
         let engine = setup_engine();
-        assert!(!room_shows(&engine.world, "stale bread"));
-        assert!(room_hides(&engine.world, 5));
+        assert!(!room_shows(engine.world(), "stale bread"));
+        assert!(room_hides(engine.world(), 5));
     }
 
     #[test]
@@ -51,18 +51,18 @@ mod hidden_items {
     fn reveal_item_moves_it_to_visible_items() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.reveal_item(ItemId::new(5)),
+            engine.world_mut().reveal_item(ItemId::new(5)),
             ItemResolution::Found(ItemId::new(5))
         );
-        assert!(room_shows(&engine.world, "stale bread"));
-        assert!(!room_hides(&engine.world, 5));
+        assert!(room_shows(engine.world(), "stale bread"));
+        assert!(!room_hides(engine.world(), 5));
     }
 
     #[test]
     fn reveal_unknown_item_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.reveal_item(ItemId::new(99)),
+            engine.world_mut().reveal_item(ItemId::new(99)),
             ItemResolution::NotFound
         );
     }
@@ -70,7 +70,7 @@ mod hidden_items {
     #[test]
     fn revealed_item_can_be_taken() {
         let mut engine = setup_engine();
-        engine.world.reveal_item(ItemId::new(5));
+        engine.world_mut().reveal_item(ItemId::new(5));
         assert_eq!(
             engine.handle_input("take stale bread"),
             vec![Event::Took {
@@ -83,17 +83,17 @@ mod hidden_items {
     fn hide_visible_item_moves_it_to_hidden() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.hide_item(ItemId::new(1)),
+            engine.world_mut().hide_item(ItemId::new(1)),
             ItemResolution::Found(ItemId::new(1))
         );
-        assert!(!room_shows(&engine.world, "glowing mysterious sword"));
-        assert!(room_hides(&engine.world, 1));
+        assert!(!room_shows(engine.world(), "glowing mysterious sword"));
+        assert!(room_hides(engine.world(), 1));
     }
 
     #[test]
     fn hidden_item_cannot_be_taken_after_hide() {
         let mut engine = setup_engine();
-        engine.world.hide_item(ItemId::new(2));
+        engine.world_mut().hide_item(ItemId::new(2));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::TookItemNotFound {
@@ -106,7 +106,7 @@ mod hidden_items {
     fn hiding_unknown_item_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.hide_item(ItemId::new(99)),
+            engine.world_mut().hide_item(ItemId::new(99)),
             ItemResolution::NotFound
         );
     }
@@ -114,25 +114,25 @@ mod hidden_items {
     #[test]
     fn hide_reveal_round_trip_restores_item() {
         let mut engine = setup_engine();
-        engine.world.hide_item(ItemId::new(1));
+        engine.world_mut().hide_item(ItemId::new(1));
         assert_eq!(
-            engine.world.reveal_item(ItemId::new(1)),
+            engine.world_mut().reveal_item(ItemId::new(1)),
             ItemResolution::Found(ItemId::new(1))
         );
-        assert!(room_shows(&engine.world, "glowing mysterious sword"));
-        assert!(!room_hides(&engine.world, 1));
+        assert!(room_shows(engine.world(), "glowing mysterious sword"));
+        assert!(!room_hides(engine.world(), 1));
     }
 
     #[test]
     fn reveal_then_hide_round_trip_restores_hidden() {
         let mut engine = setup_engine();
-        engine.world.reveal_item(ItemId::new(5));
+        engine.world_mut().reveal_item(ItemId::new(5));
         assert_eq!(
-            engine.world.hide_item(ItemId::new(5)),
+            engine.world_mut().hide_item(ItemId::new(5)),
             ItemResolution::Found(ItemId::new(5))
         );
-        assert!(!room_shows(&engine.world, "stale bread"));
-        assert!(room_hides(&engine.world, 5));
+        assert!(!room_shows(engine.world(), "stale bread"));
+        assert!(room_hides(engine.world(), 5));
     }
 }
 
@@ -150,7 +150,7 @@ mod hidden_exits {
             engine.handle_input("go east"),
             vec![Event::Went(Direction::East)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
         (engine,)
     }
 
@@ -161,7 +161,7 @@ mod hidden_exits {
             engine.handle_input("go north"),
             vec![Event::WentInvalidDirection(Direction::North)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
     }
 
     #[test]
@@ -169,12 +169,14 @@ mod hidden_exits {
         let (engine,) = engine_at_room_3();
         assert!(
             engine
-                .world
+                .world()
                 .hidden_exit_directions()
                 .contains(&Direction::North)
         );
         assert_eq!(
-            engine.world.get_room_id_by_exit_direction(Direction::North),
+            engine
+                .world()
+                .get_room_id_by_exit_direction(Direction::North),
             None
         );
     }
@@ -183,28 +185,30 @@ mod hidden_exits {
     fn reveal_exit_makes_it_traversable() {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
-            engine.world.reveal_exit(Direction::North),
+            engine.world_mut().reveal_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
         assert_eq!(
             engine.handle_input("go north"),
             vec![Event::Went(Direction::North)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
     fn reveal_exit_moves_it_out_of_hidden() {
         let (mut engine,) = engine_at_room_3();
-        engine.world.reveal_exit(Direction::North);
+        engine.world_mut().reveal_exit(Direction::North);
         assert!(
             !engine
-                .world
+                .world()
                 .hidden_exit_directions()
                 .contains(&Direction::North)
         );
         assert_eq!(
-            engine.world.get_room_id_by_exit_direction(Direction::North),
+            engine
+                .world()
+                .get_room_id_by_exit_direction(Direction::North),
             Some(RoomId::new(1))
         );
     }
@@ -213,12 +217,12 @@ mod hidden_exits {
     fn reveal_missing_direction_returns_not_found() {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
-            engine.world.reveal_exit(Direction::North),
+            engine.world_mut().reveal_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
         // A second reveal of the same direction fails: it is no longer hidden.
         assert_eq!(
-            engine.world.reveal_exit(Direction::North),
+            engine.world_mut().reveal_exit(Direction::North),
             DirectionResolution::NotFound
         );
     }
@@ -227,17 +231,19 @@ mod hidden_exits {
     fn hide_visible_exit_moves_it_to_hidden() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.hide_exit(Direction::North),
+            engine.world_mut().hide_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
         assert!(
             engine
-                .world
+                .world()
                 .hidden_exit_directions()
                 .contains(&Direction::North)
         );
         assert_eq!(
-            engine.world.get_room_id_by_exit_direction(Direction::North),
+            engine
+                .world()
+                .get_room_id_by_exit_direction(Direction::North),
             None
         );
     }
@@ -245,19 +251,19 @@ mod hidden_exits {
     #[test]
     fn hidden_exit_is_not_traversable_after_hide() {
         let mut engine = setup_engine();
-        engine.world.hide_exit(Direction::North);
+        engine.world_mut().hide_exit(Direction::North);
         assert_eq!(
             engine.handle_input("go north"),
             vec![Event::WentInvalidDirection(Direction::North)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
     fn hiding_unknown_direction_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world.hide_exit(Direction::East),
+            engine.world_mut().hide_exit(Direction::East),
             DirectionResolution::NotFound
         );
     }
@@ -265,18 +271,20 @@ mod hidden_exits {
     #[test]
     fn hide_reveal_round_trip_restores_exit() {
         let mut engine = setup_engine();
-        engine.world.hide_exit(Direction::North);
+        engine.world_mut().hide_exit(Direction::North);
         assert_eq!(
-            engine.world.reveal_exit(Direction::North),
+            engine.world_mut().reveal_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
         assert_eq!(
-            engine.world.get_room_id_by_exit_direction(Direction::North),
+            engine
+                .world()
+                .get_room_id_by_exit_direction(Direction::North),
             Some(RoomId::new(2))
         );
         assert!(
             !engine
-                .world
+                .world()
                 .hidden_exit_directions()
                 .contains(&Direction::North)
         );
@@ -285,20 +293,20 @@ mod hidden_exits {
     #[test]
     fn reveal_then_hide_round_trip_restores_hidden() {
         let (mut engine,) = engine_at_room_3();
-        engine.world.reveal_exit(Direction::North);
+        engine.world_mut().reveal_exit(Direction::North);
         assert_eq!(
-            engine.world.hide_exit(Direction::North),
+            engine.world_mut().hide_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
         assert!(
             engine
-                .world
+                .world()
                 .hidden_exit_directions()
                 .contains(&Direction::North)
         );
         assert!(
             !engine
-                .world
+                .world()
                 .get_room_id_by_exit_direction(Direction::North)
                 .is_some()
         );

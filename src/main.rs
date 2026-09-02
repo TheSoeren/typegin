@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::view::TextView;
+use typegin_core::{Direction, RoomId};
 use typegin_core::{
     Event, GameEngine, Rules, TakeResult, View, WorldData, WorldState, world::item,
 };
@@ -58,7 +59,7 @@ fn main() -> ExitCode {
         }
 
         let events = engine.handle_input(&input);
-        for line in view.render(&events, &engine.world) {
+        for line in view.render(&events, engine.world()) {
             println!("{line}");
         }
     }
@@ -95,5 +96,13 @@ impl Rules for TakeRules {
                 item: name.to_string(),
             }],
         }
+    }
+
+    fn on_look(&mut self, world: &mut typegin_core::world::WorldState) -> Vec<Event> {
+        if world.current_room_id() == RoomId::new(3) {
+            world.reveal_exit(Direction::North);
+        }
+
+        vec![Event::Looked]
     }
 }

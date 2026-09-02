@@ -30,7 +30,7 @@ impl TestRules {
 }
 
 impl Rules for TestRules {
-    fn on_look(&mut self, _world: &WorldState) -> Vec<Event> {
+    fn on_look(&mut self, _world: &mut WorldState) -> Vec<Event> {
         Self::override_event("look")
     }
 
@@ -58,7 +58,7 @@ impl Rules for TestRules {
 
     fn on_examine(
         &mut self,
-        _world: &WorldState,
+        _world: &mut WorldState,
         _name: &str,
         _resolution: item::ItemResolution,
     ) -> Vec<Event> {
@@ -67,6 +67,7 @@ impl Rules for TestRules {
 
     fn on_use(
         &mut self,
+        _world: &mut WorldState,
         _item: &str,
         _target: Option<&str>,
         _item_resolution: item::ItemResolution,
@@ -75,7 +76,7 @@ impl Rules for TestRules {
         Self::override_event("use")
     }
 
-    fn on_unknown(&mut self, _phrase: String) -> Vec<Event> {
+    fn on_unknown(&mut self, _world: &mut WorldState, _phrase: String) -> Vec<Event> {
         Self::override_event("unknown")
     }
 }

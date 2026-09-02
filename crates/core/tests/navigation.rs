@@ -39,14 +39,14 @@ mod world_state_navigation {
     #[test]
     fn world_tracks_current_room_id() {
         let engine = setup_engine();
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
     fn world_can_change_room() {
         let mut engine = setup_engine();
-        engine.world.move_to_room(RoomId::new(2));
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        engine.world_mut().move_to_room(RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -54,21 +54,21 @@ mod world_state_navigation {
         let mut engine = setup_engine();
         assert!(
             engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"glowing mysterious sword".to_string())
         );
 
-        engine.world.move_to_room(RoomId::new(2));
+        engine.world_mut().move_to_room(RoomId::new(2));
         assert!(
             engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"rusty lamp".to_string())
         );
         assert!(
             !engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"glowing mysterious sword".to_string())
         );
@@ -77,25 +77,31 @@ mod world_state_navigation {
     #[test]
     fn invalid_move_does_not_change_room() {
         let engine = setup_engine();
-        let target = engine.world.get_room_id_by_exit_direction(Direction::West);
+        let target = engine
+            .world()
+            .get_room_id_by_exit_direction(Direction::West);
         assert_eq!(target, None);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
     fn valid_move_returns_target_room_id() {
         let engine = setup_engine();
-        let target = engine.world.get_room_id_by_exit_direction(Direction::North);
+        let target = engine
+            .world()
+            .get_room_id_by_exit_direction(Direction::North);
         assert_eq!(target, Some(RoomId::new(2)));
     }
 
     #[test]
     fn move_from_dead_end_fails() {
         let mut engine = setup_engine();
-        engine.world.move_to_room(RoomId::new(3)); // dead end
-        let target = engine.world.get_room_id_by_exit_direction(Direction::North);
+        engine.world_mut().move_to_room(RoomId::new(3)); // dead end
+        let target = engine
+            .world()
+            .get_room_id_by_exit_direction(Direction::North);
         assert_eq!(target, None);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
     }
 }
 
@@ -107,7 +113,7 @@ mod engine_navigation {
         let mut engine = setup_engine();
         let events = engine.handle_input("go north");
         assert_eq!(events, vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -116,7 +122,7 @@ mod engine_navigation {
         engine.handle_input("go north");
         let events = engine.handle_input("go south");
         assert_eq!(events, vec![Event::Went(Direction::South)]);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
@@ -124,11 +130,11 @@ mod engine_navigation {
         let mut engine = setup_engine();
         engine.handle_input("go north");
         engine.handle_input("go east");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
 
         let events = engine.handle_input("go west");
         assert_eq!(events, vec![Event::Went(Direction::West)]);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -136,7 +142,7 @@ mod engine_navigation {
         let mut engine = setup_engine();
         let events = engine.handle_input("go west");
         assert_eq!(events, vec![Event::WentInvalidDirection(Direction::West)]);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
@@ -144,7 +150,7 @@ mod engine_navigation {
         let mut engine = setup_engine();
         let events = engine.handle_input("n");
         assert_eq!(events, vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -155,7 +161,7 @@ mod engine_navigation {
         assert_eq!(events, vec![Event::Looked]);
         assert!(
             engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"rusty lamp".to_string())
         );

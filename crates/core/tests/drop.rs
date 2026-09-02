@@ -69,28 +69,28 @@ mod world_state_drop {
     #[test]
     fn move_item_from_inventory_to_room() {
         let mut engine = setup_engine();
-        engine.world.player_take_item(ItemId::new(2)); // take iron key
-        assert!(player_has_item(&engine.world, 2));
+        engine.world_mut().player_take_item(ItemId::new(2)); // take iron key
+        assert!(player_has_item(engine.world(), 2));
 
-        let moved = engine.world.player_drop_item(ItemId::new(2));
+        let moved = engine.world_mut().player_drop_item(ItemId::new(2));
         assert_eq!(moved, DropResult::Success);
-        assert!(!player_has_item(&engine.world, 2));
-        assert!(room_has_item(&engine.world, 2));
+        assert!(!player_has_item(engine.world(), 2));
+        assert!(room_has_item(engine.world(), 2));
     }
 
     #[test]
     fn drop_item_not_in_inventory_fails() {
         let mut engine = setup_engine();
-        let moved = engine.world.player_drop_item(ItemId::new(99));
+        let moved = engine.world_mut().player_drop_item(ItemId::new(99));
         assert_eq!(moved, DropResult::Fail);
     }
 
     #[test]
     fn drop_item_not_held_fails() {
         let mut engine = setup_engine();
-        let moved = engine.world.player_drop_item(ItemId::new(2)); // not holding it
+        let moved = engine.world_mut().player_drop_item(ItemId::new(2)); // not holding it
         assert_eq!(moved, DropResult::Fail);
-        assert!(room_has_item(&engine.world, 2));
+        assert!(room_has_item(engine.world(), 2));
     }
 }
 
@@ -101,7 +101,7 @@ mod engine_drop {
     fn drop_item_moves_it_to_room() {
         let mut engine = setup_engine();
         engine.handle_input("take iron key");
-        assert!(player_has_item(&engine.world, 2));
+        assert!(player_has_item(engine.world(), 2));
 
         let events = engine.handle_input("drop iron key");
         assert_eq!(
@@ -110,8 +110,8 @@ mod engine_drop {
                 item: "iron key".to_string()
             }]
         );
-        assert!(!player_has_item(&engine.world, 2));
-        assert!(room_has_item(&engine.world, 2));
+        assert!(!player_has_item(engine.world(), 2));
+        assert!(room_has_item(engine.world(), 2));
     }
 
     #[test]
@@ -156,15 +156,15 @@ mod engine_drop {
     fn drop_item_then_take_again() {
         let mut engine = setup_engine();
         engine.handle_input("take iron key");
-        assert!(player_has_item(&engine.world, 2));
+        assert!(player_has_item(engine.world(), 2));
 
         engine.handle_input("drop iron key");
-        assert!(!player_has_item(&engine.world, 2));
-        assert!(room_has_item(&engine.world, 2));
+        assert!(!player_has_item(engine.world(), 2));
+        assert!(room_has_item(engine.world(), 2));
 
         engine.handle_input("take iron key");
-        assert!(player_has_item(&engine.world, 2));
-        assert!(!room_has_item(&engine.world, 2));
+        assert!(player_has_item(engine.world(), 2));
+        assert!(!room_has_item(engine.world(), 2));
     }
 }
 
@@ -176,18 +176,18 @@ mod integration {
         let mut engine = setup_engine();
 
         engine.handle_input("take sword");
-        assert!(player_has_item(&engine.world, 1));
+        assert!(player_has_item(engine.world(), 1));
 
         engine.handle_input("n");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
 
         engine.handle_input("drop sword");
-        assert!(!player_has_item(&engine.world, 1));
-        assert!(room_has_item(&engine.world, 1));
+        assert!(!player_has_item(engine.world(), 1));
+        assert!(room_has_item(engine.world(), 1));
 
         engine.handle_input("s");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
-        assert!(!room_has_item(&engine.world, 1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert!(!room_has_item(engine.world(), 1));
     }
 
     #[test]
@@ -198,47 +198,47 @@ mod integration {
         assert_eq!(events, vec![Event::Looked]);
         assert!(
             engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"glowing mysterious sword".to_string())
         );
 
         engine.handle_input("take iron key");
         engine.handle_input("take brass key");
-        assert_eq!(engine.world.player_item_names().len(), 2);
+        assert_eq!(engine.world().player_item_names().len(), 2);
 
         engine.handle_input("go north");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
 
         let events = engine.handle_input("look");
         assert_eq!(events, vec![Event::Looked]);
         assert!(
             engine
-                .world
+                .world()
                 .room_item_names()
                 .contains(&"rusty lamp".to_string())
         );
 
         engine.handle_input("take lamp");
-        assert!(player_has_item(&engine.world, 6));
+        assert!(player_has_item(engine.world(), 6));
 
         engine.handle_input("go east");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
 
         let events = engine.handle_input("go north");
         assert_eq!(events, vec![Event::WentInvalidDirection(Direction::North)]);
 
         engine.handle_input("go west");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
 
         engine.handle_input("drop lamp");
-        assert!(!player_has_item(&engine.world, 6));
-        assert!(room_has_item(&engine.world, 6));
+        assert!(!player_has_item(engine.world(), 6));
+        assert!(room_has_item(engine.world(), 6));
 
         engine.handle_input("go south");
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
 
-        assert!(player_has_item(&engine.world, 2));
-        assert!(player_has_item(&engine.world, 4));
+        assert!(player_has_item(engine.world(), 2));
+        assert!(player_has_item(engine.world(), 4));
     }
 }

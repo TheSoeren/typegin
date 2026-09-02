@@ -2,4 +2,17 @@
 id = 1
 visible_items = [1, 2, 3, 4]
 hidden_items = [5]
+exits = { north = 2 }
 
+[[rooms]]
+id = 2
+visible_items = [6, 7]
+hidden_items = []
+exits = { south = 1, east = 3 }
+
+[[rooms]]
+id = 3
+visible_items = []
+hidden_items = []
+exits = { west = 2 }
+hidden_exits = { north = 1 }

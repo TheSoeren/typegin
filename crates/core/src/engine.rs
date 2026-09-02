@@ -4,6 +4,7 @@ use diesel::Connection;
 use diesel::result::Error as DieselError;
 use diesel::sqlite::SqliteConnection;
 use diesel_migrations::MigrationHarness;
+use getset::{Getters, MutGetters};
 
 use crate::data::WorldData;
 use crate::event::Event;
@@ -32,8 +33,10 @@ pub type EntityId = i32;
 /// in a newtype or re-delegate methods.
 ///
 /// [`View`]: crate::view::View
+#[derive(Getters, MutGetters)]
 pub struct GameEngine {
-    pub world: world::WorldState,
+    #[getset(get = "pub", get_mut = "pub")]
+    world: world::WorldState,
     rules: Box<dyn Rules>,
     conn: SqliteConnection,
 }
@@ -113,11 +116,11 @@ impl GameEngine {
     /// build one programmatically without going through text.
     pub fn execute_action(&mut self, action: Action) -> Vec<Event> {
         match action {
-            Action::Look => self.rules.on_look(&self.world),
+            Action::Look => self.rules.on_look(&mut self.world),
             Action::Go(direction) => self.rules.on_go(&mut self.world, direction),
             Action::Examine(name) => {
                 let resolution = self.world.resolve_any_item(&name);
-                self.rules.on_examine(&self.world, &name, resolution)
+                self.rules.on_examine(&mut self.world, &name, resolution)
             }
             Action::Take(name) => {
                 let resolution = self.world.resolve_room_item(&name);
@@ -133,10 +136,15 @@ impl GameEngine {
                     Some(ref r) => self.world.resolve_any_item(r),
                     None => item::ItemResolution::NotFound,
                 };
-                self.rules
-                    .on_use(&item, target.as_deref(), item_res, target_res)
+                self.rules.on_use(
+                    &mut self.world,
+                    &item,
+                    target.as_deref(),
+                    item_res,
+                    target_res,
+                )
             }
-            Action::Unknown(phrase) => self.rules.on_unknown(phrase),
+            Action::Unknown(phrase) => self.rules.on_unknown(&mut self.world, phrase),
         }
     }
 }
@@ -156,7 +164,7 @@ impl GameEngine {
 /// id, name and aliases) rather than a raw name string.
 pub trait Rules {
     /// Decide what happens when the player looks around the room.
-    fn on_look(&mut self, _world: &world::WorldState) -> Vec<Event> {
+    fn on_look(&mut self, _world: &mut world::WorldState) -> Vec<Event> {
         vec![Event::Looked]
     }
 
@@ -239,7 +247,7 @@ pub trait Rules {
     /// Decide what happens when the player examines a thing.
     fn on_examine(
         &mut self,
-        _world: &world::WorldState,
+        _world: &mut world::WorldState,
         name: &str,
         resolution: item::ItemResolution,
     ) -> Vec<Event> {
@@ -265,6 +273,7 @@ pub trait Rules {
     /// Decide what happens when the player uses an item on a target.
     fn on_use(
         &mut self,
+        _world: &mut world::WorldState,
         item: &str,
         target: Option<&str>,
         item_resolution: item::ItemResolution,
@@ -303,7 +312,7 @@ pub trait Rules {
     }
 
     /// Decide what happens for an unrecognised command.
-    fn on_unknown(&mut self, phrase: String) -> Vec<Event> {
+    fn on_unknown(&mut self, _world: &mut world::WorldState, phrase: String) -> Vec<Event> {
         vec![Event::UnknownEvent { name: phrase }]
     }
 }

@@ -40,7 +40,7 @@ mod on_go {
             engine.handle_input("go north"),
             vec![Event::Went(Direction::North)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -51,7 +51,7 @@ mod on_go {
             engine.handle_input("north"),
             vec![Event::Went(Direction::North)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
     }
 
     #[test]
@@ -62,7 +62,7 @@ mod on_go {
             engine.handle_input("go east"),
             vec![Event::WentInvalidDirection(Direction::East)]
         );
-        assert_eq!(engine.world.current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
 
     #[test]
@@ -92,10 +92,11 @@ mod on_take {
             }]
         );
         assert!(
-            engine.world.get_item_from_room(core::ItemId::new(2)) == core::ItemResolution::NotFound
+            engine.world().get_item_from_room(core::ItemId::new(2))
+                == core::ItemResolution::NotFound
         );
         assert!(
-            engine.world.get_item_from_player(core::ItemId::new(2))
+            engine.world().get_item_from_player(core::ItemId::new(2))
                 != core::ItemResolution::NotFound
         );
     }
@@ -153,11 +154,12 @@ mod on_drop {
             }]
         );
         assert!(
-            engine.world.get_item_from_player(core::ItemId::new(2))
+            engine.world().get_item_from_player(core::ItemId::new(2))
                 == core::ItemResolution::NotFound
         );
         assert!(
-            engine.world.get_item_from_room(core::ItemId::new(2)) != core::ItemResolution::NotFound
+            engine.world().get_item_from_room(core::ItemId::new(2))
+                != core::ItemResolution::NotFound
         );
     }
 
