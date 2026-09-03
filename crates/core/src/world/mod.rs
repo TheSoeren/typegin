@@ -4,34 +4,26 @@ pub mod room;
 
 use std::collections::HashMap;
 
-use diesel::prelude::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use diesel::result::Error as DieselError;
-use diesel::sqlite::SqliteConnection;
 use getset::{CopyGetters, Getters};
 use log::warn;
 
 use crate::data;
 use crate::input::action;
-use crate::input::direction::DirectionResolution;
-use crate::schema;
-use crate::{Direction, EntityId, RoomId};
+use crate::input::direction;
 
 #[derive(Debug, Getters, CopyGetters)]
 pub struct WorldState {
     #[getset(get = "pub")]
     player: player::Player,
     #[getset(get = "pub")]
-    rooms: HashMap<RoomId, room::Room>,
+    rooms: HashMap<room::RoomId, room::Room>,
     #[getset(get_copy = "pub")]
-    current_room_id: RoomId,
+    current_room_id: room::RoomId,
 }
 
 /// Navigation: location and movement within the world.
 impl WorldState {
     /// The room the player is currently in.
-    ///
-    /// The current room is always present in the world cache, so this never
-    /// fails in practice.
     fn current_room(&self) -> &room::Room {
         self.rooms
             .get(&self.current_room_id)
@@ -39,9 +31,6 @@ impl WorldState {
     }
 
     /// The mutable room the player is currently in.
-    ///
-    /// The current room is always present in the world cache, so this never
-    /// fails in practice.
     fn current_room_mut(&mut self) -> &mut room::Room {
         self.rooms
             .get_mut(&self.current_room_id)
@@ -49,18 +38,15 @@ impl WorldState {
     }
 
     /// Resolve which room an exit direction leads to from the current room.
-    ///
-    /// Read-only query: returns the target room id, or `None` if there is no
-    /// exit in that direction. The actual room change is done by [`Self::move_to_room`].
-    pub fn get_room_id_by_exit_direction(&self, direction: Direction) -> Option<RoomId> {
+    pub fn get_room_id_by_exit_direction(
+        &self,
+        direction: direction::Direction,
+    ) -> Option<room::RoomId> {
         self.current_room().exits().get(&direction).copied()
     }
 
     /// Change the current room to `room_id`, if it is known to the world.
-    ///
-    /// No-ops (and returns [`MoveResult::Fail`]) when `room_id` is unknown, so
-    /// a malformed exit never crashes the game.
-    pub fn move_to_room(&mut self, room_id: RoomId) -> action::MoveResult {
+    pub fn move_to_room(&mut self, room_id: room::RoomId) -> action::MoveResult {
         if self.rooms.contains_key(&room_id) {
             self.current_room_id = room_id;
             action::MoveResult::Success
@@ -70,15 +56,18 @@ impl WorldState {
         }
     }
 
-    pub fn hidden_exit_directions(&self) -> Vec<Direction> {
+    pub fn hidden_exit_directions(&self) -> Vec<direction::Direction> {
         self.current_room().hidden_exits().keys().copied().collect()
     }
 
-    pub fn reveal_exit(&mut self, direction: Direction) -> DirectionResolution {
+    pub fn reveal_exit(
+        &mut self,
+        direction: direction::Direction,
+    ) -> direction::DirectionResolution {
         self.current_room_mut().reveal_exit(direction)
     }
 
-    pub fn hide_exit(&mut self, direction: Direction) -> DirectionResolution {
+    pub fn hide_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
         self.current_room_mut().hide_exit(direction)
     }
 }
@@ -189,149 +178,74 @@ impl WorldState {
 }
 
 impl WorldState {
-    pub(crate) fn load_or_seed(
-        conn: &mut SqliteConnection,
-        data: &data::WorldData,
-    ) -> Result<Self, DieselError> {
-        let count: i64 = schema::world_states::table.count().get_result(conn)?;
-        let world_id = if count == 0 {
-            Self::seed(conn, data)?
-        } else {
-            schema::world_states::table
-                .select(schema::world_states::id)
-                .first(conn)?
-        };
-
-        Self::load(conn, world_id, data)
-    }
-
-    pub(crate) fn seed(
-        conn: &mut SqliteConnection,
-        data: &data::WorldData,
-    ) -> Result<EntityId, DieselError> {
-        let first_room_id: RoomId = data
+    /// Build a `WorldState` directly from world data (TOML), with no database.
+    pub(crate) fn from_data(data: &data::WorldData) -> Self {
+        let first_room_id: room::RoomId = data
             .rooms
             .first()
             .expect("world data must contain at least one room")
             .id
             .into();
 
-        for room in &data.rooms {
-            let inventory_id: EntityId = diesel::insert_into(schema::inventories::table)
-                .default_values()
-                .returning(schema::inventories::id)
-                .get_result(conn)?;
-
-            diesel::insert_into(schema::rooms::table)
-                .values((
-                    schema::rooms::id.eq(room.id),
-                    schema::rooms::inventory_id.eq(inventory_id),
-                ))
-                .execute(conn)?;
-
-            for item_id in &room.visible_items {
-                diesel::insert_into(schema::inventory_items::table)
-                    .values((
-                        schema::inventory_items::inventory_id.eq(inventory_id),
-                        schema::inventory_items::item_id.eq(item_id),
-                        schema::inventory_items::hidden.eq(false),
-                    ))
-                    .execute(conn)?;
-            }
-
-            for item_id in &room.hidden_items {
-                diesel::insert_into(schema::inventory_items::table)
-                    .values((
-                        schema::inventory_items::inventory_id.eq(inventory_id),
-                        schema::inventory_items::item_id.eq(item_id),
-                        schema::inventory_items::hidden.eq(true),
-                    ))
-                    .execute(conn)?;
-            }
-        }
-
-        for item in &data.items {
-            diesel::insert_into(schema::items::table)
-                .values((
-                    schema::items::id.eq(item.id),
-                    schema::items::primary_name.eq(&item.primary_name),
-                    schema::items::aliases.eq(item.aliases.join(";")),
-                ))
-                .execute(conn)?;
-        }
-
-        let player_inventory_id: EntityId = diesel::insert_into(schema::inventories::table)
-            .default_values()
-            .returning(schema::inventories::id)
-            .get_result(conn)?;
-
-        let player_id: EntityId = diesel::insert_into(schema::players::table)
-            .values(schema::players::inventory_id.eq(player_inventory_id))
-            .returning(schema::players::id)
-            .get_result(conn)?;
-
-        diesel::insert_into(schema::world_states::table)
-            .values((
-                schema::world_states::player_id.eq(player_id),
-                schema::world_states::current_room_id.eq(first_room_id),
-            ))
-            .returning(schema::world_states::id)
-            .get_result(conn)
-    }
-
-    pub(crate) fn load(
-        conn: &mut SqliteConnection,
-        id: EntityId,
-        data: &data::WorldData,
-    ) -> Result<Self, DieselError> {
-        let (player_id, current_room_id): (EntityId, RoomId) = schema::world_states::table
-            .find(id)
-            .select((
-                schema::world_states::player_id,
-                schema::world_states::current_room_id,
-            ))
-            .first(conn)?;
-
-        let player = player::Player::load(conn, player_id)?;
-
         let mut rooms = HashMap::new();
         for room_data in &data.rooms {
-            let mut room = room::Room::load(conn, room_data.id.into())?;
-            room.set_exits(exits_from_data(room_data));
-            room.set_hidden_exits(hidden_exits_from_data(room_data));
-            rooms.insert(room_data.id.into(), room);
+            let items: Vec<item::Item> = room_data
+                .visible_items
+                .iter()
+                .filter_map(|id| data.find_item(*id))
+                .map(item::Item::from_data)
+                .collect();
+
+            let hidden_items: Vec<item::Item> = room_data
+                .hidden_items
+                .iter()
+                .filter_map(|id| data.find_item(*id))
+                .map(item::Item::from_data)
+                .collect();
+
+            let exits = exits_from_data(room_data);
+            let hidden_exits = hidden_exits_from_data(room_data);
+
+            rooms.insert(
+                room_data.id.into(),
+                room::Room::new(items, hidden_items, exits, hidden_exits),
+            );
         }
 
-        if !rooms.contains_key(&current_room_id) {
-            return Err(DieselError::NotFound);
+        if !rooms.contains_key(&first_room_id) {
+            panic!("first room id {first_room_id} not found in rooms");
         }
 
-        Ok(WorldState {
-            player,
+        WorldState {
+            player: player::Player::new(),
             rooms,
-            current_room_id,
-        })
+            current_room_id: first_room_id,
+        }
     }
 }
 
 /// Converts a `RoomData.exits` string map into a `Direction`-keyed map.
-fn exits_from_data(room_data: &crate::data::RoomData) -> HashMap<Direction, RoomId> {
+fn exits_from_data(
+    room_data: &crate::data::RoomData,
+) -> HashMap<direction::Direction, room::RoomId> {
     room_data
         .exits
         .iter()
         .filter_map(|(raw, target)| {
-            Direction::parse(raw).map(|direction| (direction, (*target).into()))
+            direction::Direction::parse(raw).map(|direction| (direction, (*target).into()))
         })
         .collect()
 }
 
 /// Converts a `RoomData.hidden_exits` string map into a `Direction`-keyed map.
-fn hidden_exits_from_data(room_data: &crate::data::RoomData) -> HashMap<Direction, RoomId> {
+fn hidden_exits_from_data(
+    room_data: &crate::data::RoomData,
+) -> HashMap<direction::Direction, room::RoomId> {
     room_data
         .hidden_exits
         .iter()
         .filter_map(|(raw, target)| {
-            Direction::parse(raw).map(|direction| (direction, (*target).into()))
+            direction::Direction::parse(raw).map(|direction| (direction, (*target).into()))
         })
         .collect()
 }

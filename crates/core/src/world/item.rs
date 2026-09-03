@@ -1,24 +1,11 @@
-use diesel::AsExpression;
-use diesel::backend::Backend;
-use diesel::deserialize;
-use diesel::prelude::{Queryable, Selectable};
-use diesel::serialize;
-use diesel::sql_types::Integer;
-use diesel::sqlite::Sqlite;
-
-use crate::schema::items;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, AsExpression, deserialize::FromSqlRow)]
-#[diesel(sql_type = Integer)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct ItemId(i32);
 
 impl ItemId {
-    /// Build an `ItemId` from its raw database value.
     pub fn new(value: i32) -> Self {
         ItemId(value)
     }
 
-    /// The raw database value backing this id.
     pub fn get(self) -> i32 {
         self.0
     }
@@ -36,20 +23,6 @@ impl From<ItemId> for i32 {
     }
 }
 
-impl deserialize::FromSql<Integer, Sqlite> for ItemId {
-    fn from_sql(bytes: <Sqlite as Backend>::RawValue<'_>) -> deserialize::Result<Self> {
-        let val = i32::from_sql(bytes)?;
-        Ok(ItemId(val))
-    }
-}
-
-// 2. Convert from ItemId -> DB (Sqlite)
-impl serialize::ToSql<Integer, Sqlite> for ItemId {
-    fn to_sql<'b>(&'b self, out: &mut serialize::Output<'b, '_, Sqlite>) -> serialize::Result {
-        serialize::ToSql::<Integer, Sqlite>::to_sql(&self.0, out)
-    }
-}
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum ItemResolution {
     Found(ItemId),
@@ -57,9 +30,7 @@ pub enum ItemResolution {
     NotFound,
 }
 
-#[derive(Debug, Clone, Queryable, Selectable, PartialEq, Eq)]
-#[diesel(table_name = items)]
-#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
     pub(crate) id: ItemId,
     pub(crate) primary_name: String,
@@ -82,6 +53,14 @@ impl Item {
             0 => ItemResolution::NotFound,
             1 => ItemResolution::Found(matching_ids[0]),
             _ => ItemResolution::Ambiguous(matching_ids),
+        }
+    }
+
+    pub(crate) fn from_data(item: &crate::data::ItemData) -> Self {
+        Item {
+            id: item.id.into(),
+            primary_name: item.primary_name.clone(),
+            aliases: item.aliases.join(";"),
         }
     }
 }

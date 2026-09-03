@@ -3,12 +3,6 @@ use std::io::{self, BufRead};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::view::TextView;
-use typegin_core::{Direction, RoomId};
-use typegin_core::{
-    Event, GameEngine, Rules, TakeResult, View, WorldData, WorldState, world::item,
-};
-
 mod view;
 
 fn main() -> ExitCode {
@@ -21,7 +15,7 @@ fn main() -> ExitCode {
     let items_path = data_dir.join("items.toml");
     let rooms_path = data_dir.join("rooms.toml");
 
-    let world_data = match WorldData::load(&items_path, &rooms_path) {
+    let world_data = match typegin_core::WorldData::load(&items_path, &rooms_path) {
         Ok(data) => data,
         Err(err) => {
             eprintln!("Failed to load world data: {err}");
@@ -29,17 +23,9 @@ fn main() -> ExitCode {
         }
     };
 
-    let db_path = env::var("TYPEGIN_DB").unwrap_or_else(|_| "typegin.db".to_string());
+    let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, TakeRules);
 
-    let mut engine = match GameEngine::open_with_rules(&db_path, &world_data, TakeRules) {
-        Ok(engine) => engine,
-        Err(err) => {
-            eprintln!("Failed to open game database: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
-
-    let view = TextView;
+    let view = view::TextView;
 
     println!("You find yourself in a mysterious place.");
     println!("Type 'look' to see where you are. 'quit' to leave.\n");
@@ -59,7 +45,7 @@ fn main() -> ExitCode {
         }
 
         let events = engine.handle_input(&input);
-        for line in view.render(&events, engine.world()) {
+        for line in typegin_core::View::render(&view, &events, engine.world()) {
             println!("{line}");
         }
     }
@@ -73,36 +59,44 @@ fn main() -> ExitCode {
 /// between the room and the inventory is behaviour supplied by the game.
 struct TakeRules;
 
-impl Rules for TakeRules {
+impl typegin_core::Rules for TakeRules {
     fn on_take(
         &mut self,
-        world: &mut WorldState,
+        world: &mut typegin_core::WorldState,
         name: &str,
-        resolution: item::ItemResolution,
-    ) -> Vec<Event> {
+        resolution: typegin_core::ItemResolution,
+    ) -> Vec<typegin_core::Event> {
         match resolution {
-            item::ItemResolution::Found(id) => match world.player_take_item(id) {
-                TakeResult::Success => vec![Event::Took {
-                    item: name.to_string(),
-                }],
-                TakeResult::Fail => vec![Event::TookItemNotFound {
-                    item: name.to_string(),
-                }],
+            typegin_core::ItemResolution::Found(id) => match world.player_take_item(id) {
+                typegin_core::TakeResult::Success => {
+                    vec![typegin_core::Event::Took {
+                        item: name.to_string(),
+                    }]
+                }
+                typegin_core::TakeResult::Fail => {
+                    vec![typegin_core::Event::TookItemNotFound {
+                        item: name.to_string(),
+                    }]
+                }
             },
-            item::ItemResolution::Ambiguous(_) => vec![Event::TookItemAmbiguous {
-                item: name.to_string(),
-            }],
-            item::ItemResolution::NotFound => vec![Event::TookItemNotFound {
-                item: name.to_string(),
-            }],
+            typegin_core::ItemResolution::Ambiguous(_) => {
+                vec![typegin_core::Event::TookItemAmbiguous {
+                    item: name.to_string(),
+                }]
+            }
+            typegin_core::ItemResolution::NotFound => {
+                vec![typegin_core::Event::TookItemNotFound {
+                    item: name.to_string(),
+                }]
+            }
         }
     }
 
-    fn on_look(&mut self, world: &mut typegin_core::world::WorldState) -> Vec<Event> {
-        if world.current_room_id() == RoomId::new(3) {
-            world.reveal_exit(Direction::North);
+    fn on_look(&mut self, world: &mut typegin_core::WorldState) -> Vec<typegin_core::Event> {
+        if world.current_room_id() == typegin_core::RoomId::new(3) {
+            world.reveal_exit(typegin_core::Direction::North);
         }
 
-        vec![Event::Looked]
+        vec![typegin_core::Event::Looked]
     }
 }

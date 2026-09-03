@@ -2,6 +2,8 @@
 //!
 //! Individual test files include this via `mod common;`.
 
+#![allow(dead_code)]
+
 use core::{GameEngine, Rules, WorldData};
 
 /// Loads the test-only multi-room world from `crates/core/data/`.
@@ -24,17 +26,15 @@ pub(crate) fn test_world_data() -> WorldData {
 
 /// Opens a multi-room engine with the given custom rules.
 pub(crate) fn setup_engine_with_rules(rules: impl Rules + 'static) -> GameEngine {
-    GameEngine::open_with_rules(":memory:", &multi_room_world_data(), rules)
-        .expect("create engine with rules")
+    GameEngine::get_with_rules(&multi_room_world_data(), rules)
 }
 
 /// Opens a multi-room engine using the default `BasicRules`.
 pub(crate) fn setup_engine() -> GameEngine {
-    GameEngine::open(":memory:", &multi_room_world_data()).expect("create engine with BasicRules")
+    GameEngine::get(&multi_room_world_data())
 }
 
 /// Opens a single-room engine using the default `BasicRules`.
 pub(crate) fn single_room_engine() -> GameEngine {
-    GameEngine::open(":memory:", &test_world_data())
-        .expect("create single-room engine with BasicRules")
+    GameEngine::get(&test_world_data())
 }

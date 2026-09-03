@@ -1,8 +1,8 @@
 # typegin
 
-A small text-adventure engine in Rust. The core is a pure game state +
-persistence layer that turns typed commands into structured `Event`s; any
-front-end (terminal, GUI, web, ...) can render those events however it likes.
+A small text-adventure engine in Rust. The core is a pure game state that
+turns typed commands into structured `Event`s; any front-end (terminal, GUI,
+web, ...) can render those events however it likes.
 
 ## Concepts
 
@@ -16,7 +16,7 @@ The engine is **MVC with a passive view**, wired up with two extension seams:
 | View       | [`View`](crates/core/src/view.rs)            | Trait that renders events + world to text   |
 
 - **`Rules`** (`engine.rs`) is the _inbound_ hook. Inject it via
-  `GameEngine::open_with_rules` to override behaviour - examine an item
+  `GameEngine::get_with_rules` to override behaviour - examine an item
   differently, veto a `take`, run custom logic. It is a Strategy plugged into
   the controller. Every hook has a sensible default (the same behaviour
   `BasicRules` exposes), so a custom type only implements the hooks it wants to
@@ -33,8 +33,7 @@ The engine is **MVC with a passive view**, wired up with two extension seams:
 cargo run
 ```
 
-Type `look` to see the room, `quit` to leave. The database is created at
-`typegin.db` (override with the `TYPEGIN_DB` env var).
+Type `look` to see the room, `quit` to leave.
 
 ### Commands
 
@@ -52,7 +51,7 @@ Type `look` to see the room, `quit` to leave. The database is created at
 ## Layout
 
 ```
-crates/core/        # engine library: state, input parsing, persistence, rules, view
+crates/core/        # engine library: state, input parsing, rules, view
   src/
     engine.rs       # GameEngine + Rules trait (defaults) + BasicRules
     world/          # WorldState, items, rooms, player
@@ -60,8 +59,6 @@ crates/core/        # engine library: state, input parsing, persistence, rules, 
     input/          # tokenizer + lexer: text -> Action
     data.rs         # world data (TOML) types + loading
     view.rs         # View trait
-    migrations.rs   # diesel SQLite schema
-    schema.rs       # generated table schema
   data/             # world fixtures + test worlds (TOML)
   tests/            # integration tests (see Tests below)
 data/               # default runtime world definition (TOML)
@@ -95,9 +92,9 @@ impl Rules for MyRules {
     }
 }
 
-let engine = GameEngine::open_with_rules("typegin.db", &data, MyRules)?;
+let engine = GameEngine::get_with_rules(&data, MyRules);
 // or use the defaults directly:
-let engine = GameEngine::open("typegin.db", &data)?;
+let engine = GameEngine::get(&data);
 ```
 
 ```rust
@@ -118,13 +115,13 @@ cargo test
 All tests are integration tests under `crates/core/tests/`, sharing helpers in
 `tests/common/`:
 
-| File                 | Covers                                              |
-| -------------------- | --------------------------------------------------- |
-| `input.rs`           | Tokenizing + lexing + parsing text into `Action`s   |
-| `world.rs`           | World data, entity resolution, item movement        |
-| `navigation.rs`      | Room exits, movement, engine `on_go`                |
-| `drop.rs`            | `drop` lexing, world drop, engine `on_drop`, flows  |
-| `default_rules.rs`   | The stock behaviour of every `Rules` default        |
-| `rules_override.rs`  | Custom `Rules` overrides actually win over defaults |
+| File                | Covers                                              |
+| ------------------- | --------------------------------------------------- |
+| `input.rs`          | Tokenizing + lexing + parsing text into `Action`s   |
+| `world.rs`          | World data, entity resolution, item movement        |
+| `navigation.rs`     | Room exits, movement, engine `on_go`                |
+| `drop.rs`           | `drop` lexing, world drop, engine `on_drop`, flows  |
+| `default_rules.rs`  | The stock behaviour of every `Rules` default        |
+| `rules_override.rs` | Custom `Rules` overrides actually win over defaults |
 
 Run a single suite with, e.g. `cargo test --test navigation`.

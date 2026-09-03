@@ -1,35 +1,22 @@
-use std::error::Error;
-
-use diesel::Connection;
-use diesel::result::Error as DieselError;
-use diesel::sqlite::SqliteConnection;
-use diesel_migrations::MigrationHarness;
 use getset::{Getters, MutGetters};
 
 use crate::data::WorldData;
 use crate::event::Event;
-use crate::input::{Action, Direction, action, parse_input};
-use crate::migrations::MIGRATIONS;
+use crate::input::{Action, parse_input};
+use crate::rules::BasicRules;
+use crate::rules::Rules;
 use crate::world;
 use crate::world::item;
 
-/// Numeric identifier for a room or other world entity.
-///
-/// Comparisons like `world.current_room_id() == RoomId::new(2)` and values in
-/// `Action` resolution should be read as opaque ids backed by the database,
-/// not as meaningful numbers on their own. For genuine room identities prefer
-/// the type-safe [`RoomId`](crate::RoomId).
-pub type EntityId = i32;
-
-/// The pure game state + persistence. Holds no rendering or I/O logic.
+/// The pure game state. Holds no rendering, I/O, or persistence logic.
 ///
 /// Create one with [`GameEngine::open`] (stock rules) or
-/// [`GameEngine::open_with_rules`] (custom [`Rules`]); then feed it raw text
+/// [`GameEngine::get_with_rules`] (custom [`Rules`]); then feed it raw text
 /// via [`GameEngine::handle_input`] and let a [`View`] render the resulting
 /// [`Event`]s.
 ///
 /// Customization is done by injecting a [`Rules`] object at construction time
-/// (via [`GameEngine::open_with_rules`]); there is no need to wrap the engine
+/// (via [`GameEngine::get_with_rules`]); there is no need to wrap the engine
 /// in a newtype or re-delegate methods.
 ///
 /// [`View`]: crate::view::View
@@ -38,66 +25,24 @@ pub struct GameEngine {
     #[getset(get = "pub", get_mut = "pub")]
     world: world::WorldState,
     rules: Box<dyn Rules>,
-    conn: SqliteConnection,
 }
 
 impl GameEngine {
-    /// Open the engine at `db_path`, seeding and using the world defined by `data`.
-    ///
-    /// Uses the stock [`BasicRules`]; see [`GameEngine::open_with_rules`] to
-    /// supply a custom [`Rules`] implementation.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the database cannot be opened or migrated, or if
-    /// the world cannot be loaded/created (e.g. `data` has no rooms).
-    pub fn open(db_path: &str, data: &WorldData) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        Self::open_with_rules(db_path, data, BasicRules)
+    /// Open the engine with the world defined by `data`.
+    /// Uses the stock [`BasicRules`]
+    pub fn get(data: &WorldData) -> Self {
+        Self::get_with_rules(data, BasicRules)
     }
 
-    /// Open the engine at `db_path` with a custom [`Rules`] implementation.
-    ///
-    /// This is the entry point for customising behaviour: any rules that
-    /// inherit from the defaults only need to override the hooks they care
-    /// about (e.g. a `TakeRules` that moves items into the player's inventory).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the database cannot be opened or migrated, or if
-    /// the world cannot be loaded/created (e.g. `data` has no rooms).
-    pub fn open_with_rules(
-        db_path: &str,
-        data: &WorldData,
-        rules: impl Rules + 'static,
-    ) -> Result<Self, Box<dyn Error + Send + Sync>> {
-        let mut conn = SqliteConnection::establish(db_path)?;
-        conn.run_pending_migrations(MIGRATIONS)?;
+    /// Open the engine with the world defined by `data` and
+    /// a custom [`Rules`] implementation.
+    pub fn get_with_rules(data: &WorldData, rules: impl Rules + 'static) -> Self {
+        let world = world::WorldState::from_data(data);
 
-        let world = world::WorldState::load_or_seed(&mut conn, data)?;
-
-        Ok(GameEngine {
+        GameEngine {
             world,
             rules: Box::new(rules),
-            conn,
-        })
-    }
-
-    pub(crate) fn new(conn: SqliteConnection, data: &WorldData) -> Result<Self, DieselError> {
-        Self::new_with_rules(conn, data, BasicRules)
-    }
-
-    pub(crate) fn new_with_rules(
-        mut conn: SqliteConnection,
-        data: &WorldData,
-        rules: impl Rules + 'static,
-    ) -> Result<Self, DieselError> {
-        let world = world::WorldState::load_or_seed(&mut conn, data)?;
-
-        Ok(GameEngine {
-            world,
-            rules: Box::new(rules),
-            conn,
-        })
+        }
     }
 
     /// Execute a raw textual command. Parses it, then runs `execute_action`.
@@ -148,178 +93,3 @@ impl GameEngine {
         }
     }
 }
-
-/// Hooks the game logic uses to decide behaviour.
-///
-/// This is how a game customizes rules: implement `Rules` and pass it to
-/// [`GameEngine::open_with_rules`]. The world is passed in, so there is no
-/// wrapper boilerplate and no delegation. Every method has a default
-/// implementation, so a custom type only implements the hooks it wants to
-/// change.
-///
-/// For actions that reference world entities (`take`, `examine`, `use`), the
-/// engine resolves the name before calling the hook and passes both the
-/// resulting [`Resolution`] and the ability to look up the matched
-/// [`ItemInfo`] from the world — so a rule can act on the real entity (its
-/// id, name and aliases) rather than a raw name string.
-pub trait Rules {
-    /// Decide what happens when the player looks around the room.
-    fn on_look(&mut self, _world: &mut world::WorldState) -> Vec<Event> {
-        vec![Event::Looked]
-    }
-
-    /// Decide what happens when the player moves in a direction.
-    ///
-    /// The world is mutable so a rule has full control: it may call
-    /// [`WorldState::get_room_id_by_exit_direction`] to resolve the target room and
-    /// [`WorldState::move_to_room`] to actually change rooms — or deliberately
-    /// not move, to block an otherwise valid exit (e.g. a locked door).
-    ///
-    /// The default follows the exit, emitting nothing if there is none.
-    fn on_go(&mut self, world: &mut world::WorldState, direction: Direction) -> Vec<Event> {
-        match world.get_room_id_by_exit_direction(direction) {
-            Some(room_id) => {
-                world.move_to_room(room_id);
-                vec![Event::Went(direction)]
-            }
-            None => vec![Event::WentInvalidDirection(direction)],
-        }
-    }
-
-    /// Decide what happens when the player tries to take an item.
-    ///
-    /// `resolution` is the outcome of matching `name` against the rooms items.
-    fn on_take(
-        &mut self,
-        world: &mut world::WorldState,
-        name: &str,
-        resolution: item::ItemResolution,
-    ) -> Vec<Event> {
-        match resolution {
-            item::ItemResolution::Found(id) => match world.player_take_item(id) {
-                action::TakeResult::Success => vec![Event::Took {
-                    item: name.to_string(),
-                }],
-                action::TakeResult::Fail => {
-                    vec![Event::TookItemNotFound {
-                        item: name.to_string(),
-                    }]
-                }
-            },
-            item::ItemResolution::Ambiguous(_) => vec![Event::TookItemAmbiguous {
-                item: name.to_string(),
-            }],
-            item::ItemResolution::NotFound => vec![Event::TookItemNotFound {
-                item: name.to_string(),
-            }],
-        }
-    }
-
-    /// Decide what happens when the player tries to drop an item.
-    ///
-    /// `resolution` is the outcome of matching `name` against the players items.
-    fn on_drop(
-        &mut self,
-        world: &mut world::WorldState,
-        name: &str,
-        resolution: item::ItemResolution,
-    ) -> Vec<Event> {
-        match resolution {
-            item::ItemResolution::Found(id) => match world.player_drop_item(id) {
-                action::DropResult::Success => vec![Event::Dropped {
-                    item: name.to_string(),
-                }],
-                action::DropResult::Fail => {
-                    vec![Event::DroppedItemNotFound {
-                        item: name.to_string(),
-                    }]
-                }
-            },
-            item::ItemResolution::Ambiguous(_) => vec![Event::DroppedItemAmbiguous {
-                item: name.to_string(),
-            }],
-            item::ItemResolution::NotFound => vec![Event::DroppedItemNotFound {
-                item: name.to_string(),
-            }],
-        }
-    }
-
-    /// Decide what happens when the player examines a thing.
-    fn on_examine(
-        &mut self,
-        _world: &mut world::WorldState,
-        name: &str,
-        resolution: item::ItemResolution,
-    ) -> Vec<Event> {
-        match resolution {
-            item::ItemResolution::Found(_) => {
-                vec![Event::Examined {
-                    item: name.to_string(),
-                }]
-            }
-            item::ItemResolution::Ambiguous(_) => {
-                vec![Event::ExaminedItemAmbiguous {
-                    item: name.to_string(),
-                }]
-            }
-            item::ItemResolution::NotFound => {
-                vec![Event::ExaminedItemNotFound {
-                    item: name.to_string(),
-                }]
-            }
-        }
-    }
-
-    /// Decide what happens when the player uses an item on a target.
-    fn on_use(
-        &mut self,
-        _world: &mut world::WorldState,
-        item: &str,
-        target: Option<&str>,
-        item_resolution: item::ItemResolution,
-        target_resolution: item::ItemResolution,
-    ) -> Vec<Event> {
-        match item_resolution {
-            item::ItemResolution::Found(_) => match target_resolution {
-                item::ItemResolution::Found(_) => {
-                    vec![Event::Used {
-                        item: item.to_string(),
-                        target: target.map(String::from),
-                    }]
-                }
-                item::ItemResolution::Ambiguous(_) => {
-                    vec![Event::UsedItemAmbiguous {
-                        item: item.to_string(),
-                    }]
-                }
-                item::ItemResolution::NotFound => {
-                    vec![Event::UsedTargetNeeded {
-                        item: item.to_string(),
-                    }]
-                }
-            },
-            item::ItemResolution::Ambiguous(_) => {
-                vec![Event::UsedItemAmbiguous {
-                    item: item.to_string(),
-                }]
-            }
-            item::ItemResolution::NotFound => {
-                vec![Event::UsedItemNotFound {
-                    item: item.to_string(),
-                }]
-            }
-        }
-    }
-
-    /// Decide what happens for an unrecognised command.
-    fn on_unknown(&mut self, _world: &mut world::WorldState, phrase: String) -> Vec<Event> {
-        vec![Event::UnknownEvent { name: phrase }]
-    }
-}
-
-/// Minimal rules that reuse every default hook.
-///
-/// Used when no custom rules are supplied to [`GameEngine::open`].
-pub struct BasicRules;
-
-impl Rules for BasicRules {}

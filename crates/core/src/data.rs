@@ -32,6 +32,18 @@ pub struct WorldData {
     pub rooms: Vec<RoomData>,
 }
 
+impl WorldData {
+    /// Look up an item definition by id, if present.
+    pub fn find_item(&self, id: i32) -> Option<&ItemData> {
+        self.items.iter().find(|item| item.id == id)
+    }
+
+    /// Look up a room definition by id, if present.
+    pub fn find_room(&self, id: i32) -> Option<&RoomData> {
+        self.rooms.iter().find(|room| room.id == id)
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct ItemsFile {
     items: Vec<ItemData>,
