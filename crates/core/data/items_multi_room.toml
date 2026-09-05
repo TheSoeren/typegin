@@ -8,6 +8,15 @@ id = 2
 primary_name = "iron key"
 aliases = ["key", "rusty key"]
 
+[items.extra]
+weight = 3
+opens = "chest"
+materials = ["metal", "iron"]
+tags = { kind = "key" }
+
+[items.extra.gui]
+icon = "sprites/key.png"
+
 [[items]]
 id = 3
 primary_name = "locked chest"

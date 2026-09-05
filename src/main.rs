@@ -67,9 +67,10 @@ impl typegin_core::Rules for TakeRules {
         resolution: typegin_core::ItemResolution,
     ) -> Vec<typegin_core::Event> {
         match resolution {
-            typegin_core::ItemResolution::Found(id) => match world.player_take_item(id) {
+            typegin_core::ItemResolution::Found(item_id) => match world.player_take_item(item_id) {
                 typegin_core::TakeResult::Success => {
                     vec![typegin_core::Event::Took {
+                        item_id,
                         item: name.to_string(),
                     }]
                 }
@@ -79,8 +80,9 @@ impl typegin_core::Rules for TakeRules {
                     }]
                 }
             },
-            typegin_core::ItemResolution::Ambiguous(_) => {
+            typegin_core::ItemResolution::Ambiguous(item_ids) => {
                 vec![typegin_core::Event::TookItemAmbiguous {
+                    item_ids,
                     item: name.to_string(),
                 }]
             }

@@ -32,50 +32,64 @@ impl TextView {
             typegin_core::Event::WentInvalidDirection(direction) => {
                 format!("You can't go that way ({:?}).", direction)
             }
-            typegin_core::Event::Took { item } => {
+            typegin_core::Event::Took { item_id: _, item } => {
                 format!("You take the {item}.")
             }
             typegin_core::Event::TookItemNotFound { item } => {
                 format!("I don't see any {item} here.")
             }
-            typegin_core::Event::TookItemAmbiguous { item } => {
+            typegin_core::Event::TookItemAmbiguous { item_ids: _, item } => {
                 format!("Which {item} do you mean? Be more specific.")
             }
-            typegin_core::Event::Dropped { item } => {
+            typegin_core::Event::Dropped { item_id: _, item } => {
                 format!("You dropped the {item}.")
             }
             typegin_core::Event::DroppedItemNotFound { item } => {
                 format!("You aren't carrying any {item}.")
             }
-            typegin_core::Event::DroppedItemAmbiguous { item } => {
+            typegin_core::Event::DroppedItemAmbiguous { item_ids: _, item } => {
                 format!("Which {item} do you mean? Be more specific.")
             }
-            typegin_core::Event::Used { item, target } => match target {
+            typegin_core::Event::Used {
+                item_id: _,
+                item,
+                target_id: _,
+                target,
+            } => match target {
                 Some(target) => format!("You use the {item} on the {target}."),
                 None => format!("You use the {item}."),
             },
             typegin_core::Event::UsedItemNotFound { item } => {
                 format!("You don't have a {item}.")
             }
-            typegin_core::Event::UsedItemAmbiguous { item } => {
+            typegin_core::Event::UsedItemAmbiguous { item_ids: _, item } => {
                 format!("Which {item} do you mean? Be more specific.")
             }
-            typegin_core::Event::UsedTargetNeeded { item } => {
+            typegin_core::Event::UsedTargetNeeded { item_id: _, item } => {
                 format!("You need to use the {item} on something.")
             }
-            typegin_core::Event::UsedTargetNotFound { item, target } => {
+            typegin_core::Event::UsedTargetNotFound {
+                item_id: _,
+                item,
+                target,
+            } => {
                 format!("You can't use the {item} on {target}.")
             }
-            typegin_core::Event::UsedTargetAmbiguous { item } => {
+            typegin_core::Event::UsedTargetAmbiguous {
+                item_id: _,
+                item,
+                target_ids: _,
+                target: _,
+            } => {
                 format!("Which target do you want to use the {item} on?")
             }
-            typegin_core::Event::Examined { item } => {
+            typegin_core::Event::Examined { item_id: _, item } => {
                 format!("You examine the {item}.")
             }
             typegin_core::Event::ExaminedItemNotFound { item } => {
                 format!("There is no {item}.")
             }
-            typegin_core::Event::ExaminedItemAmbiguous { item } => {
+            typegin_core::Event::ExaminedItemAmbiguous { item_ids: _, item } => {
                 format!("Which {item} do you mean? Be more specific.")
             }
             typegin_core::Event::UnknownEvent { name } => {

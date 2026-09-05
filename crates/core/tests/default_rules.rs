@@ -8,7 +8,7 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, Event, RoomId};
+use core::{Direction, Event, ItemId, RoomId};
 
 // --- on_look ---
 
@@ -88,6 +88,7 @@ mod on_take {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }]
         );
@@ -119,6 +120,7 @@ mod on_take {
         assert_eq!(
             engine.handle_input("take key"),
             vec![Event::TookItemAmbiguous {
+                item_ids: vec![ItemId::new(2), ItemId::new(4)],
                 item: "key".to_string()
             }]
         );
@@ -150,6 +152,7 @@ mod on_drop {
         assert_eq!(
             engine.handle_input("drop iron key"),
             vec![Event::Dropped {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }]
         );
@@ -182,6 +185,7 @@ mod on_drop {
         assert_eq!(
             engine.handle_input("drop key"),
             vec![Event::DroppedItemAmbiguous {
+                item_ids: vec![ItemId::new(2), ItemId::new(4)],
                 item: "key".to_string()
             }]
         );
@@ -199,7 +203,8 @@ mod on_examine {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                item: "iron key".to_string()
+                item_id: ItemId::new(2),
+                item: "iron key".to_string(),
             }]
         );
     }
@@ -221,6 +226,7 @@ mod on_examine {
         assert_eq!(
             engine.handle_input("examine key"),
             vec![Event::ExaminedItemAmbiguous {
+                item_ids: vec![ItemId::new(2), ItemId::new(4)],
                 item: "key".to_string()
             }]
         );
@@ -250,6 +256,7 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key"),
             vec![Event::UsedTargetNeeded {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }]
         );
@@ -262,7 +269,9 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key on chest"),
             vec![Event::Used {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string(),
+                target_id: Some(ItemId::new(3)),
                 target: Some("chest".to_string()),
             }]
         );
@@ -277,6 +286,7 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use key on chest"),
             vec![Event::UsedItemAmbiguous {
+                item_ids: vec![ItemId::new(2), ItemId::new(4)],
                 item: "key".to_string()
             }]
         );

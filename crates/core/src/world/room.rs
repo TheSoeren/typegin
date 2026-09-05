@@ -1,8 +1,8 @@
 use getset::{Getters, MutGetters, Setters};
 use std::collections::HashMap;
 
-use crate::input;
 use crate::world::item;
+use crate::{data, input};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct RoomId(i32);
@@ -46,6 +46,7 @@ pub struct Room {
     exits: HashMap<input::Direction, RoomId>,
     #[getset(set = "pub(crate)", get_mut)]
     hidden_exits: HashMap<input::Direction, RoomId>,
+    extra: HashMap<String, data::ExtraValue>,
 }
 
 impl Room {
@@ -54,12 +55,14 @@ impl Room {
         hidden_items: Vec<item::Item>,
         exits: HashMap<input::Direction, RoomId>,
         hidden_exits: HashMap<input::Direction, RoomId>,
+        extra: HashMap<String, data::ExtraValue>,
     ) -> Self {
         Room {
             items,
             hidden_items,
             exits,
             hidden_exits,
+            extra,
         }
     }
 }

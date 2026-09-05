@@ -54,8 +54,9 @@ pub trait Rules {
         resolution: item::ItemResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(id) => match world.player_take_item(id) {
+            item::ItemResolution::Found(item_id) => match world.player_take_item(item_id) {
                 action::TakeResult::Success => vec![event::Event::Took {
+                    item_id,
                     item: name.to_string(),
                 }],
                 action::TakeResult::Fail => {
@@ -64,7 +65,8 @@ pub trait Rules {
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(_) => vec![event::Event::TookItemAmbiguous {
+            item::ItemResolution::Ambiguous(item_ids) => vec![event::Event::TookItemAmbiguous {
+                item_ids,
                 item: name.to_string(),
             }],
             item::ItemResolution::NotFound => vec![event::Event::TookItemNotFound {
@@ -81,8 +83,9 @@ pub trait Rules {
         resolution: item::ItemResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(id) => match world.player_drop_item(id) {
+            item::ItemResolution::Found(item_id) => match world.player_drop_item(item_id) {
                 action::DropResult::Success => vec![event::Event::Dropped {
+                    item_id,
                     item: name.to_string(),
                 }],
                 action::DropResult::Fail => {
@@ -91,7 +94,8 @@ pub trait Rules {
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(_) => vec![event::Event::DroppedItemAmbiguous {
+            item::ItemResolution::Ambiguous(item_ids) => vec![event::Event::DroppedItemAmbiguous {
+                item_ids,
                 item: name.to_string(),
             }],
             item::ItemResolution::NotFound => vec![event::Event::DroppedItemNotFound {
@@ -108,13 +112,15 @@ pub trait Rules {
         resolution: item::ItemResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(_) => {
+            item::ItemResolution::Found(item_id) => {
                 vec![event::Event::Examined {
+                    item_id,
                     item: name.to_string(),
                 }]
             }
-            item::ItemResolution::Ambiguous(_) => {
+            item::ItemResolution::Ambiguous(item_ids) => {
                 vec![event::Event::ExaminedItemAmbiguous {
+                    item_ids,
                     item: name.to_string(),
                 }]
             }
@@ -136,26 +142,33 @@ pub trait Rules {
         target_resolution: item::ItemResolution,
     ) -> Vec<event::Event> {
         match item_resolution {
-            item::ItemResolution::Found(_) => match target_resolution {
-                item::ItemResolution::Found(_) => {
+            item::ItemResolution::Found(item_id) => match target_resolution {
+                item::ItemResolution::Found(target_id) => {
                     vec![event::Event::Used {
+                        item_id,
                         item: item.to_string(),
+                        target_id: Some(target_id),
                         target: target.map(String::from),
                     }]
                 }
-                item::ItemResolution::Ambiguous(_) => {
-                    vec![event::Event::UsedItemAmbiguous {
+                item::ItemResolution::Ambiguous(target_ids) => {
+                    vec![event::Event::UsedTargetAmbiguous {
+                        item_id,
                         item: item.to_string(),
+                        target_ids,
+                        target: "".to_string(), // TODO:
                     }]
                 }
                 item::ItemResolution::NotFound => {
                     vec![event::Event::UsedTargetNeeded {
+                        item_id,
                         item: item.to_string(),
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(_) => {
+            item::ItemResolution::Ambiguous(item_ids) => {
                 vec![event::Event::UsedItemAmbiguous {
+                    item_ids,
                     item: item.to_string(),
                 }]
             }

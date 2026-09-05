@@ -5,12 +5,25 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+#[derive(Debug, Clone, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum ExtraValue {
+    Str(String),
+    Int(i64),
+    Float(f64),
+    Bool(bool),
+    Array(Vec<ExtraValue>),
+    Table(HashMap<String, ExtraValue>),
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct ItemData {
     pub id: i32,
     pub primary_name: String,
     #[serde(default)]
     pub aliases: Vec<String>,
+    #[serde(default)]
+    pub extra: HashMap<String, ExtraValue>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -24,6 +37,8 @@ pub struct RoomData {
     pub exits: HashMap<String, i32>,
     #[serde(default)]
     pub hidden_exits: HashMap<String, i32>,
+    #[serde(default)]
+    pub extra: HashMap<String, ExtraValue>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

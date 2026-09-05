@@ -72,7 +72,7 @@ impl WorldState {
     }
 }
 
-/// Room item state
+/// Room helpers
 impl WorldState {
     pub fn get_item_from_room(&self, id: item::ItemId) -> item::ItemResolution {
         self.current_room().get_item(id)
@@ -98,9 +98,13 @@ impl WorldState {
     pub fn hide_item(&mut self, id: item::ItemId) -> item::ItemResolution {
         self.current_room_mut().hide_item(id)
     }
+
+    pub fn current_room_extra(&self) -> HashMap<String, data::ExtraValue> {
+        self.current_room().extra().clone()
+    }
 }
 
-/// player item state
+/// Player helpers
 impl WorldState {
     pub fn get_item_from_player(&self, id: item::ItemId) -> item::ItemResolution {
         self.player.get_item(id)
@@ -208,7 +212,13 @@ impl WorldState {
 
             rooms.insert(
                 room_data.id.into(),
-                room::Room::new(items, hidden_items, exits, hidden_exits),
+                room::Room::new(
+                    items,
+                    hidden_items,
+                    exits,
+                    hidden_exits,
+                    room_data.extra.clone(),
+                ),
             );
         }
 

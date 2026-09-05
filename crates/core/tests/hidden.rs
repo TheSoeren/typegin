@@ -74,6 +74,7 @@ mod hidden_items {
         assert_eq!(
             engine.handle_input("take stale bread"),
             vec![Event::Took {
+                item_id: ItemId::new(5),
                 item: "stale bread".to_string()
             }]
         );

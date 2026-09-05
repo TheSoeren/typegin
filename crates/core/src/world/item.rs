@@ -30,11 +30,15 @@ pub enum ItemResolution {
     NotFound,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+use crate::data;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Item {
     pub(crate) id: ItemId,
     pub(crate) primary_name: String,
     pub(crate) aliases: String,
+    pub(crate) extra: HashMap<String, data::ExtraValue>,
 }
 
 impl Item {
@@ -56,22 +60,24 @@ impl Item {
         }
     }
 
-    pub(crate) fn from_data(item: &crate::data::ItemData) -> Self {
+    pub(crate) fn from_data(item: &data::ItemData) -> Self {
         Item {
             id: item.id.into(),
             primary_name: item.primary_name.clone(),
             aliases: item.aliases.join(";"),
+            extra: item.extra.clone(),
         }
     }
 }
 
 /// Public, plain-data view of an item in the world, handed to game rules so
 /// they can decide behaviour without reaching into the engine's internals.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ItemInfo {
     pub id: ItemId,
     pub name: String,
     pub aliases: Vec<String>,
+    pub extra: HashMap<String, data::ExtraValue>,
 }
 
 impl ItemInfo {
@@ -85,6 +91,7 @@ impl ItemInfo {
                 .filter(|a| !a.is_empty())
                 .map(str::to_string)
                 .collect(),
+            extra: item.extra.clone(),
         }
     }
 }

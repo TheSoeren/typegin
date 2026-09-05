@@ -57,6 +57,7 @@ mod rules_drop_trait {
         assert_eq!(
             events,
             vec![Event::Dropped {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }]
         );
@@ -107,6 +108,7 @@ mod engine_drop {
         assert_eq!(
             events,
             vec![Event::Dropped {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }]
         );
@@ -135,6 +137,7 @@ mod engine_drop {
         assert_eq!(
             events,
             vec![Event::DroppedItemAmbiguous {
+                item_ids: vec![ItemId::new(2), ItemId::new(4)],
                 item: "key".to_string()
             }]
         );

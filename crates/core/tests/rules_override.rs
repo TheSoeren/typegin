@@ -13,7 +13,7 @@ mod common;
 
 use common::{setup_engine, setup_engine_with_rules};
 use core::{
-    Direction, Event, Rules,
+    Direction, Event, ItemId, Rules,
     world::{WorldState, item},
 };
 
@@ -114,6 +114,7 @@ mod everything_overridden {
         assert_eq!(marker("take"), custom.handle_input("take iron key"));
         assert_eq!(
             vec![Event::Took {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }],
             default.handle_input("take iron key")
@@ -133,7 +134,8 @@ mod everything_overridden {
         assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
             vec![Event::Examined {
-                item: "iron key".to_string()
+                item_id: ItemId::new(2),
+                item: "iron key".to_string(),
             }],
             default.handle_input("examine iron key")
         );
@@ -147,6 +149,7 @@ mod everything_overridden {
         default.handle_input("take iron key");
         assert_eq!(
             vec![Event::UsedTargetNeeded {
+                item_id: ItemId::new(2),
                 item: "iron key".to_string()
             }],
             default.handle_input("use iron key")
