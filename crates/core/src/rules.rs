@@ -44,10 +44,10 @@ pub trait Rules {
             vec![event::Event::WentExitLocked(direction)]
         } else {
             match world.get_room_id_by_exit_direction(direction) {
-                Some(room_id) => {
-                    world.move_to_room(room_id);
-                    vec![event::Event::Went(direction)]
-                }
+                Some(room_id) => match world.move_to_room(room_id) {
+                    action::MoveResult::Success => vec![event::Event::Went(direction)],
+                    action::MoveResult::Fail => vec![event::Event::WentInvalidDirection(direction)],
+                },
                 None => vec![event::Event::WentInvalidDirection(direction)],
             }
         }

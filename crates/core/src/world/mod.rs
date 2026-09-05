@@ -69,6 +69,14 @@ impl WorldState {
         self.current_room().is_exit_hidden(direction)
     }
 
+    /// The opaque `extra` data attached to the exit in `direction`, if any.
+    pub fn exit_extra(
+        &self,
+        direction: direction::Direction,
+    ) -> Option<HashMap<String, data::ExtraValue>> {
+        self.current_room().exit_extra(direction)
+    }
+
     pub fn unlock_exit(
         &mut self,
         direction: direction::Direction,
@@ -261,6 +269,7 @@ fn exits_from_data(room_data: &crate::data::RoomData) -> HashMap<direction::Dire
                         to: exit_data.to.into(),
                         locked: exit_data.locked,
                         hidden: exit_data.hidden,
+                        extra: exit_data.extra.clone(),
                     },
                 )
             })

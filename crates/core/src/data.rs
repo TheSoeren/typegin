@@ -34,6 +34,8 @@ pub struct ExitData {
     pub locked: bool,
     #[serde(default)]
     pub hidden: bool,
+    #[serde(default)]
+    pub extra: HashMap<String, ExtraValue>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

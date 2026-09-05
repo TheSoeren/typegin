@@ -29,9 +29,19 @@ name = "The Dusty Study"
 visible_items = []
 hidden_items = []
 
-[rooms.exits]
-west = { to = 2 }
-north = { to = 1, hidden = true, locked = false }
-east = { to = 2, hidden = false, locked = true }
-south = { to = 1, hidden = true, locked = true }
+[rooms.exits.north]
+to = 1
+hidden = true
 
+[rooms.exits.west]
+to = 2
+
+[rooms.exits.south]
+to = 1
+hidden = true
+locked = true
+
+[rooms.exits.east]
+to = 2
+locked = true
+extra = { material = "oak", name = "oak door" }

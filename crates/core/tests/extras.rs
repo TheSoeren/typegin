@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use core::data::ExtraValue;
 use core::event::Event;
-use core::{GameEngine, ItemId, Rules, WorldState};
+use core::{Direction, GameEngine, ItemId, Rules, WorldState};
 
 fn item_2_extra() -> HashMap<String, ExtraValue> {
     let mut extra = HashMap::new();
@@ -49,6 +49,13 @@ fn room_1_extra() -> HashMap<String, ExtraValue> {
     extra
 }
 
+fn exit_east_extra() -> HashMap<String, ExtraValue> {
+    let mut extra = HashMap::new();
+    extra.insert("material".to_string(), ExtraValue::Str("oak".to_string()));
+    extra.insert("name".to_string(), ExtraValue::Str("oak door".to_string()));
+    extra
+}
+
 // --- TOML data parsing ---
 
 mod data_parsing {
@@ -66,6 +73,25 @@ mod data_parsing {
         let data = common::multi_room_world_data();
         let room = data.find_room(1).expect("room 1 exists");
         assert_eq!(room.extra, room_1_extra());
+    }
+
+    #[test]
+    fn exit_extra_parses() {
+        let data = common::multi_room_world_data();
+        let room = data.find_room(3).expect("room 3 exists");
+        let east = room.exits.get("east").expect("east exit");
+        assert_eq!(east.extra, exit_east_extra());
+    }
+
+    #[test]
+    fn exit_without_extra_parses_as_empty() {
+        let data = common::multi_room_world_data();
+        let room1 = data.find_room(1).expect("room 1 exists");
+        let north = room1.exits.get("north").expect("north exit");
+        assert!(north.extra.is_empty());
+        let room2 = data.find_room(2).expect("room 2 exists");
+        let south = room2.exits.get("south").expect("south exit");
+        assert!(south.extra.is_empty());
     }
 
     #[test]
@@ -119,6 +145,32 @@ mod world_exposure {
         let mut engine = common::setup_engine();
         engine.handle_input("go north");
         assert!(engine.world().current_room_extra().is_empty());
+    }
+
+    #[test]
+    fn exit_extra_matches_exit_data() {
+        let mut engine = common::setup_engine();
+        engine.handle_input("go north");
+        engine.handle_input("go east");
+        assert_eq!(
+            engine.world().exit_extra(Direction::East),
+            Some(exit_east_extra())
+        );
+    }
+
+    #[test]
+    fn exit_without_extra_exposes_empty_map() {
+        let engine = common::setup_engine();
+        assert_eq!(
+            engine.world().exit_extra(Direction::North),
+            Some(HashMap::new())
+        );
+    }
+
+    #[test]
+    fn absent_exit_has_no_extra() {
+        let engine = common::setup_engine();
+        assert_eq!(engine.world().exit_extra(Direction::East), None);
     }
 }
 

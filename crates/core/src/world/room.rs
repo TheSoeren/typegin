@@ -42,11 +42,12 @@ impl From<RoomId> for i32 {
 /// that also needs a key). Hiddenness takes precedence over lock status when
 /// reporting movement: a player unaware of an exit hears "invalid direction",
 /// once revealed they hear "the door is locked".
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Exit {
     pub(crate) to: RoomId,
     pub(crate) locked: bool,
     pub(crate) hidden: bool,
+    pub(crate) extra: HashMap<String, data::ExtraValue>,
 }
 
 #[derive(Debug, Getters, MutGetters, Default, Clone)]
@@ -155,6 +156,13 @@ impl Room {
 
     pub(crate) fn is_exit_hidden(&self, direction: input::Direction) -> bool {
         self.exits.get(&direction).is_some_and(|exit| exit.hidden)
+    }
+
+    pub(crate) fn exit_extra(
+        &self,
+        direction: input::Direction,
+    ) -> Option<HashMap<String, data::ExtraValue>> {
+        self.exits.get(&direction).map(|exit| exit.extra.clone())
     }
 
     pub(crate) fn lock_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
