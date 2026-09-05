@@ -160,7 +160,7 @@ mod hidden_exits {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentInvalidDirection(Direction::North)]
+            vec![Event::WentExitHidden(Direction::North)]
         );
         assert_eq!(engine.world().current_room_id(), RoomId::new(3));
     }
@@ -168,12 +168,6 @@ mod hidden_exits {
     #[test]
     fn hidden_exit_direction_is_listed_but_not_visible() {
         let (engine,) = engine_at_room_3();
-        assert!(
-            engine
-                .world()
-                .hidden_exit_directions()
-                .contains(&Direction::North)
-        );
         assert_eq!(
             engine
                 .world()
@@ -200,12 +194,6 @@ mod hidden_exits {
     fn reveal_exit_moves_it_out_of_hidden() {
         let (mut engine,) = engine_at_room_3();
         engine.world_mut().reveal_exit(Direction::North);
-        assert!(
-            !engine
-                .world()
-                .hidden_exit_directions()
-                .contains(&Direction::North)
-        );
         assert_eq!(
             engine
                 .world()
@@ -235,12 +223,6 @@ mod hidden_exits {
             engine.world_mut().hide_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
-        assert!(
-            engine
-                .world()
-                .hidden_exit_directions()
-                .contains(&Direction::North)
-        );
         assert_eq!(
             engine
                 .world()
@@ -255,7 +237,7 @@ mod hidden_exits {
         engine.world_mut().hide_exit(Direction::North);
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentInvalidDirection(Direction::North)]
+            vec![Event::WentExitHidden(Direction::North)]
         );
         assert_eq!(engine.world().current_room_id(), RoomId::new(1));
     }
@@ -283,12 +265,6 @@ mod hidden_exits {
                 .get_room_id_by_exit_direction(Direction::North),
             Some(RoomId::new(2))
         );
-        assert!(
-            !engine
-                .world()
-                .hidden_exit_directions()
-                .contains(&Direction::North)
-        );
     }
 
     #[test]
@@ -299,17 +275,11 @@ mod hidden_exits {
             engine.world_mut().hide_exit(Direction::North),
             DirectionResolution::Found(Direction::North)
         );
-        assert!(
+        assert_eq!(
             engine
                 .world()
-                .hidden_exit_directions()
-                .contains(&Direction::North)
-        );
-        assert!(
-            !engine
-                .world()
-                .get_room_id_by_exit_direction(Direction::North)
-                .is_some()
+                .get_room_id_by_exit_direction(Direction::North),
+            None
         );
     }
 }

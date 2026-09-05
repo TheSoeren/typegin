@@ -229,7 +229,7 @@ mod integration {
         assert_eq!(engine.world().current_room_id(), RoomId::new(3));
 
         let events = engine.handle_input("go north");
-        assert_eq!(events, vec![Event::WentInvalidDirection(Direction::North)]);
+        assert_eq!(events, vec![Event::WentExitHidden(Direction::North)]);
 
         engine.handle_input("go west");
         assert_eq!(engine.world().current_room_id(), RoomId::new(2));

@@ -37,12 +37,15 @@ impl WorldState {
             .expect("current room must be present in the world")
     }
 
-    /// Resolve which room an exit direction leads to from the current room.
+    /// Resolve which room an open exit direction leads to from the current room.
+    ///
+    /// Hidden and locked exits are not traversable, so they resolve to `None`
+    /// just like a direction with no exit at all.
     pub fn get_room_id_by_exit_direction(
         &self,
         direction: direction::Direction,
     ) -> Option<room::RoomId> {
-        self.current_room().exits().get(&direction).copied()
+        self.current_room().get_room_id_by_exit_direction(direction)
     }
 
     /// Change the current room to `room_id`, if it is known to the world.
@@ -56,8 +59,25 @@ impl WorldState {
         }
     }
 
-    pub fn hidden_exit_directions(&self) -> Vec<direction::Direction> {
-        self.current_room().hidden_exits().keys().copied().collect()
+    /// Whether the exit in `direction` is locked (blocks traversal).
+    pub fn is_exit_locked(&self, direction: direction::Direction) -> bool {
+        self.current_room().is_exit_locked(direction)
+    }
+
+    /// Whether the exit in `direction` is hidden (the player is unaware of it).
+    pub fn is_exit_hidden(&self, direction: direction::Direction) -> bool {
+        self.current_room().is_exit_hidden(direction)
+    }
+
+    pub fn unlock_exit(
+        &mut self,
+        direction: direction::Direction,
+    ) -> direction::DirectionResolution {
+        self.current_room_mut().unlock_exit(direction)
+    }
+
+    pub fn lock_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
+        self.current_room_mut().lock_exit(direction)
     }
 
     pub fn reveal_exit(
@@ -208,17 +228,10 @@ impl WorldState {
                 .collect();
 
             let exits = exits_from_data(room_data);
-            let hidden_exits = hidden_exits_from_data(room_data);
 
             rooms.insert(
                 room_data.id.into(),
-                room::Room::new(
-                    items,
-                    hidden_items,
-                    exits,
-                    hidden_exits,
-                    room_data.extra.clone(),
-                ),
+                room::Room::new(items, hidden_items, exits, room_data.extra.clone()),
             );
         }
 
@@ -234,28 +247,23 @@ impl WorldState {
     }
 }
 
-/// Converts a `RoomData.exits` string map into a `Direction`-keyed map.
-fn exits_from_data(
-    room_data: &crate::data::RoomData,
-) -> HashMap<direction::Direction, room::RoomId> {
+/// Converts a `RoomData.exits` string map into a `Direction`-keyed map of
+/// `Exit` values, carrying each exit's destination and state flags.
+fn exits_from_data(room_data: &crate::data::RoomData) -> HashMap<direction::Direction, room::Exit> {
     room_data
         .exits
         .iter()
-        .filter_map(|(raw, target)| {
-            direction::Direction::parse(raw).map(|direction| (direction, (*target).into()))
-        })
-        .collect()
-}
-
-/// Converts a `RoomData.hidden_exits` string map into a `Direction`-keyed map.
-fn hidden_exits_from_data(
-    room_data: &crate::data::RoomData,
-) -> HashMap<direction::Direction, room::RoomId> {
-    room_data
-        .hidden_exits
-        .iter()
-        .filter_map(|(raw, target)| {
-            direction::Direction::parse(raw).map(|direction| (direction, (*target).into()))
+        .filter_map(|(raw, exit_data)| {
+            direction::Direction::parse(raw).map(|direction| {
+                (
+                    direction,
+                    room::Exit {
+                        to: exit_data.to.into(),
+                        locked: exit_data.locked,
+                        hidden: exit_data.hidden,
+                    },
+                )
+            })
         })
         .collect()
 }

@@ -6,7 +6,7 @@ pub mod rules;
 pub mod view;
 pub mod world;
 
-pub use data::{ItemData, RoomData, WorldData, WorldDataError};
+pub use data::{ExitData, ItemData, RoomData, WorldData, WorldDataError};
 pub use engine::GameEngine;
 pub use event::Event;
 pub use input::parse_input;

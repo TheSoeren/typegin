@@ -32,6 +32,12 @@ impl TextView {
             typegin_core::Event::WentInvalidDirection(direction) => {
                 format!("You can't go that way ({:?}).", direction)
             }
+            typegin_core::Event::WentExitHidden(direction) => {
+                format!("The {direction:?} door is hidden.")
+            }
+            typegin_core::Event::WentExitLocked(direction) => {
+                format!("The {direction:?} door is locked.")
+            }
             typegin_core::Event::Took { item_id: _, item } => {
                 format!("You take the {item}.")
             }

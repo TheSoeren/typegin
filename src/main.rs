@@ -80,10 +80,13 @@ impl typegin_core::Rules for TakeRules {
                     }]
                 }
             },
-            typegin_core::ItemResolution::Ambiguous(item_ids) => {
+            typegin_core::ItemResolution::Ambiguous {
+                ids,
+                alias: item_name,
+            } => {
                 vec![typegin_core::Event::TookItemAmbiguous {
-                    item_ids,
-                    item: name.to_string(),
+                    item_ids: ids,
+                    item: item_name,
                 }]
             }
             typegin_core::ItemResolution::NotFound => {

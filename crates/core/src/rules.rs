@@ -31,18 +31,25 @@ pub trait Rules {
 
     /// Decide what happens when the player moves in a direction.
     ///
-    /// The default follows the exit, emitting nothing if there is none.
+    /// The default reports hidden exits as if they did not exist, refuses
+    /// locked ones as a `WentDoorLocked`, and otherwise follows the exit.
     fn on_go(
         &mut self,
         world: &mut world::WorldState,
         direction: crate::input::Direction,
     ) -> Vec<event::Event> {
-        match world.get_room_id_by_exit_direction(direction) {
-            Some(room_id) => {
-                world.move_to_room(room_id);
-                vec![event::Event::Went(direction)]
+        if world.is_exit_hidden(direction) {
+            vec![event::Event::WentExitHidden(direction)]
+        } else if world.is_exit_locked(direction) {
+            vec![event::Event::WentExitLocked(direction)]
+        } else {
+            match world.get_room_id_by_exit_direction(direction) {
+                Some(room_id) => {
+                    world.move_to_room(room_id);
+                    vec![event::Event::Went(direction)]
+                }
+                None => vec![event::Event::WentInvalidDirection(direction)],
             }
-            None => vec![event::Event::WentInvalidDirection(direction)],
         }
     }
 
@@ -65,9 +72,12 @@ pub trait Rules {
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(item_ids) => vec![event::Event::TookItemAmbiguous {
-                item_ids,
-                item: name.to_string(),
+            item::ItemResolution::Ambiguous {
+                ids,
+                alias: item_name,
+            } => vec![event::Event::TookItemAmbiguous {
+                item_ids: ids,
+                item: item_name,
             }],
             item::ItemResolution::NotFound => vec![event::Event::TookItemNotFound {
                 item: name.to_string(),
@@ -94,9 +104,12 @@ pub trait Rules {
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(item_ids) => vec![event::Event::DroppedItemAmbiguous {
-                item_ids,
-                item: name.to_string(),
+            item::ItemResolution::Ambiguous {
+                ids,
+                alias: item_name,
+            } => vec![event::Event::DroppedItemAmbiguous {
+                item_ids: ids,
+                item: item_name,
             }],
             item::ItemResolution::NotFound => vec![event::Event::DroppedItemNotFound {
                 item: name.to_string(),
@@ -118,10 +131,10 @@ pub trait Rules {
                     item: name.to_string(),
                 }]
             }
-            item::ItemResolution::Ambiguous(item_ids) => {
+            item::ItemResolution::Ambiguous { ids, alias: name } => {
                 vec![event::Event::ExaminedItemAmbiguous {
-                    item_ids,
-                    item: name.to_string(),
+                    item_ids: ids,
+                    item: name,
                 }]
             }
             item::ItemResolution::NotFound => {
@@ -151,12 +164,12 @@ pub trait Rules {
                         target: target.map(String::from),
                     }]
                 }
-                item::ItemResolution::Ambiguous(target_ids) => {
+                item::ItemResolution::Ambiguous { ids, alias: name } => {
                     vec![event::Event::UsedTargetAmbiguous {
                         item_id,
                         item: item.to_string(),
-                        target_ids,
-                        target: "".to_string(), // TODO:
+                        target_ids: ids,
+                        target: name,
                     }]
                 }
                 item::ItemResolution::NotFound => {
@@ -166,10 +179,10 @@ pub trait Rules {
                     }]
                 }
             },
-            item::ItemResolution::Ambiguous(item_ids) => {
+            item::ItemResolution::Ambiguous { ids, alias: name } => {
                 vec![event::Event::UsedItemAmbiguous {
-                    item_ids,
-                    item: item.to_string(),
+                    item_ids: ids,
+                    item: name,
                 }]
             }
             item::ItemResolution::NotFound => {

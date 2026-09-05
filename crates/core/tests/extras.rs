@@ -162,9 +162,9 @@ impl Rules for VetoHeavyRules {
                     }
                 }
             }
-            core::ItemResolution::Ambiguous(item_ids) => vec![Event::TookItemAmbiguous {
-                item_ids,
-                item: name.to_string(),
+            core::ItemResolution::Ambiguous { ids, alias } => vec![Event::TookItemAmbiguous {
+                item_ids: ids,
+                item: alias,
             }],
             core::ItemResolution::NotFound => vec![Event::TookItemNotFound {
                 item: name.to_string(),

@@ -18,6 +18,8 @@ pub enum Event {
 
     /// The player moved in a direction.
     Went(Direction),
+    WentExitHidden(Direction),
+    WentExitLocked(Direction),
     WentInvalidDirection(Direction),
 
     /// The player took an item into inventory.

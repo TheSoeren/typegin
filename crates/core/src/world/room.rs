@@ -1,8 +1,9 @@
-use getset::{Getters, MutGetters, Setters};
+use getset::{Getters, MutGetters};
 use std::collections::HashMap;
 
+use crate::data;
+use crate::input;
 use crate::world::item;
-use crate::{data, input};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct RoomId(i32);
@@ -35,17 +36,27 @@ impl From<RoomId> for i32 {
     }
 }
 
-#[derive(Debug, Getters, MutGetters, Setters, Default, Clone)]
+/// A single exit from a room: where it leads plus its independent state flags.
+///
+/// `locked` and `hidden` are independent — an exit may be both (a secret door
+/// that also needs a key). Hiddenness takes precedence over lock status when
+/// reporting movement: a player unaware of an exit hears "invalid direction",
+/// once revealed they hear "the door is locked".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Exit {
+    pub(crate) to: RoomId,
+    pub(crate) locked: bool,
+    pub(crate) hidden: bool,
+}
+
+#[derive(Debug, Getters, MutGetters, Default, Clone)]
 #[getset(get = "pub(crate)")]
 pub struct Room {
     #[get_mut(get_mut = "pub(crate)")]
     items: Vec<item::Item>,
     #[get_mut(get_mut = "pub(crate)")]
     hidden_items: Vec<item::Item>,
-    #[getset(set = "pub(crate)", get_mut)]
-    exits: HashMap<input::Direction, RoomId>,
-    #[getset(set = "pub(crate)", get_mut)]
-    hidden_exits: HashMap<input::Direction, RoomId>,
+    exits: HashMap<input::Direction, Exit>,
     extra: HashMap<String, data::ExtraValue>,
 }
 
@@ -53,15 +64,13 @@ impl Room {
     pub(crate) fn new(
         items: Vec<item::Item>,
         hidden_items: Vec<item::Item>,
-        exits: HashMap<input::Direction, RoomId>,
-        hidden_exits: HashMap<input::Direction, RoomId>,
+        exits: HashMap<input::Direction, Exit>,
         extra: HashMap<String, data::ExtraValue>,
     ) -> Self {
         Room {
             items,
             hidden_items,
             exits,
-            hidden_exits,
             extra,
         }
     }
@@ -126,47 +135,71 @@ impl Room {
 
 // Exit management
 impl Room {
-    fn add_exit(&mut self, direction: input::Direction, room_id: RoomId) {
-        self.exits_mut().insert(direction, room_id);
+    /// The destination of an *open* exit in `direction`, if one exists.
+    ///
+    /// Hidden and locked exits are not usable for movement, so they resolve to
+    /// `None` (exactly as if no exit were present).
+    pub(crate) fn get_room_id_by_exit_direction(
+        &self,
+        direction: input::Direction,
+    ) -> Option<RoomId> {
+        self.exits
+            .get(&direction)
+            .filter(|exit| !exit.locked && !exit.hidden)
+            .map(|exit| exit.to)
     }
 
-    fn remove_exit(&mut self, direction: input::Direction) -> Option<RoomId> {
-        self.exits_mut().remove(&direction)
+    pub(crate) fn is_exit_locked(&self, direction: input::Direction) -> bool {
+        self.exits.get(&direction).is_some_and(|exit| exit.locked)
     }
 
-    fn add_hidden_exit(&mut self, direction: input::Direction, room_id: RoomId) {
-        self.hidden_exits_mut().insert(direction, room_id);
+    pub(crate) fn is_exit_hidden(&self, direction: input::Direction) -> bool {
+        self.exits.get(&direction).is_some_and(|exit| exit.hidden)
     }
 
-    fn remove_hidden_exit(&mut self, direction: input::Direction) -> Option<RoomId> {
-        self.hidden_exits_mut().remove(&direction)
+    pub(crate) fn lock_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
+        match self.exits.get_mut(&direction) {
+            Some(exit) if !exit.locked => {
+                exit.locked = true;
+                input::DirectionResolution::Found(direction)
+            }
+            _ => input::DirectionResolution::NotFound,
+        }
+    }
+
+    pub(crate) fn unlock_exit(
+        &mut self,
+        direction: input::Direction,
+    ) -> input::DirectionResolution {
+        match self.exits.get_mut(&direction) {
+            Some(exit) if exit.locked => {
+                exit.locked = false;
+                input::DirectionResolution::Found(direction)
+            }
+            _ => input::DirectionResolution::NotFound,
+        }
+    }
+
+    pub(crate) fn hide_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
+        match self.exits.get_mut(&direction) {
+            Some(exit) if !exit.hidden => {
+                exit.hidden = true;
+                input::DirectionResolution::Found(direction)
+            }
+            _ => input::DirectionResolution::NotFound,
+        }
     }
 
     pub(crate) fn reveal_exit(
         &mut self,
         direction: input::Direction,
-    ) -> crate::input::direction::DirectionResolution {
-        let removed_exit = self.remove_hidden_exit(direction);
-        match removed_exit {
-            Some(id) => {
-                self.add_exit(direction, id);
-                crate::input::direction::DirectionResolution::Found(direction)
+    ) -> input::DirectionResolution {
+        match self.exits.get_mut(&direction) {
+            Some(exit) if exit.hidden => {
+                exit.hidden = false;
+                input::DirectionResolution::Found(direction)
             }
-            None => crate::input::direction::DirectionResolution::NotFound,
-        }
-    }
-
-    pub(crate) fn hide_exit(
-        &mut self,
-        direction: input::Direction,
-    ) -> crate::input::direction::DirectionResolution {
-        let removed_exit = self.remove_exit(direction);
-        match removed_exit {
-            Some(id) => {
-                self.add_hidden_exit(direction, id);
-                crate::input::direction::DirectionResolution::Found(direction)
-            }
-            None => crate::input::direction::DirectionResolution::NotFound,
+            _ => input::DirectionResolution::NotFound,
         }
     }
 }

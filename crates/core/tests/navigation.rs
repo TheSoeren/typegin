@@ -14,22 +14,27 @@ mod room_exits {
     fn room_data_has_exits() {
         let data = multi_room_world_data();
         let room1 = data.rooms.iter().find(|r| r.id == 1).unwrap();
-        assert_eq!(room1.exits.get("north"), Some(&2));
+        assert_eq!(room1.exits.get("north").map(|e| e.to), Some(2));
     }
 
     #[test]
     fn room_data_multiple_exits() {
         let data = multi_room_world_data();
         let room2 = data.rooms.iter().find(|r| r.id == 2).unwrap();
-        assert_eq!(room2.exits.get("south"), Some(&1));
-        assert_eq!(room2.exits.get("east"), Some(&3));
+        assert_eq!(room2.exits.get("south").map(|e| e.to), Some(1));
+        assert_eq!(room2.exits.get("east").map(|e| e.to), Some(3));
     }
 
     #[test]
     fn room_data_dead_end() {
         let data = multi_room_world_data();
         let room3 = data.rooms.iter().find(|r| r.id == 3).unwrap();
-        assert_eq!(room3.exits.len(), 1);
+        let open_exits = room3
+            .exits
+            .values()
+            .filter(|e| !e.hidden && !e.locked)
+            .count();
+        assert_eq!(open_exits, 1);
     }
 }
 

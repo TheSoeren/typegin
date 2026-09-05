@@ -26,6 +26,16 @@ pub struct ItemData {
     pub extra: HashMap<String, ExtraValue>,
 }
 
+/// A single exit from a room as declared in world data.
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExitData {
+    pub to: i32,
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub hidden: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct RoomData {
     pub id: i32,
@@ -34,9 +44,7 @@ pub struct RoomData {
     #[serde(default)]
     pub hidden_items: Vec<i32>,
     #[serde(default)]
-    pub exits: HashMap<String, i32>,
-    #[serde(default)]
-    pub hidden_exits: HashMap<String, i32>,
+    pub exits: HashMap<String, ExitData>,
     #[serde(default)]
     pub extra: HashMap<String, ExtraValue>,
 }

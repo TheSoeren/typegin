@@ -63,7 +63,10 @@ mod resolution {
     #[test]
     fn ambiguous_key() {
         assert_eq!(
-            ItemResolution::Ambiguous(vec![ItemId::new(2), ItemId::new(4)]),
+            ItemResolution::Ambiguous {
+                ids: vec![ItemId::new(2), ItemId::new(4)],
+                alias: "key".to_string()
+            },
             resolves("key")
         );
     }

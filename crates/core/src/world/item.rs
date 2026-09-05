@@ -26,7 +26,7 @@ impl From<ItemId> for i32 {
 #[derive(Debug, PartialEq, Eq)]
 pub enum ItemResolution {
     Found(ItemId),
-    Ambiguous(Vec<ItemId>),
+    Ambiguous { ids: Vec<ItemId>, alias: String },
     NotFound,
 }
 
@@ -56,7 +56,10 @@ impl Item {
         match matching_ids.len() {
             0 => ItemResolution::NotFound,
             1 => ItemResolution::Found(matching_ids[0]),
-            _ => ItemResolution::Ambiguous(matching_ids),
+            _ => ItemResolution::Ambiguous {
+                ids: matching_ids,
+                alias: name.to_string(),
+            },
         }
     }
 
