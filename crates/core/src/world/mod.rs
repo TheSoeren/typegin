@@ -64,9 +64,16 @@ impl WorldState {
         self.current_room().is_exit_locked(direction)
     }
 
-    /// Whether the exit in `direction` is hidden (the player is unaware of it).
+    /// Whether the exit in `direction` is hidden (not yet discovered by the player).
     pub fn is_exit_hidden(&self, direction: direction::Direction) -> bool {
         self.current_room().is_exit_hidden(direction)
+    }
+
+    /// Directions with an open (passable) exit from the current room.
+    ///
+    /// Locked and hidden exits are excluded. Note: order is unspecified.
+    pub fn exit_directions(&self) -> Vec<direction::Direction> {
+        self.current_room().exit_directions()
     }
 
     /// The opaque `extra` data attached to the exit in `direction`, if any.

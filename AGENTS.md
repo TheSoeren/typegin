@@ -28,7 +28,7 @@ Text-adventure engine in Rust. Workspace with two crates:
 | Build               | `cargo build`                                                                                                           |
 | Run                 | `cargo run`                                                                                                             |
 | Test (all)          | `cargo test`                                                                                                            |
-| Test (single suite) | `cargo test --test <name>` (names: `input`, `world`, `navigation`, `drop`, `default_rules`, `rules_override`, `hidden`) |
+| Test (single suite) | `cargo test --test <name>` (names: `input`, `world`, `navigation`, `drop`, `default_rules`, `rules_override`, `hidden`, `extras`, `doors`) |
 | Lint                | `cargo clippy --workspace --all-targets`                                                                                |
 | Format              | `cargo fmt`                                                                                                             |
 | Format check        | `cargo fmt --check`                                                                                                     |
@@ -51,3 +51,8 @@ Recommended verification order: `cargo fmt --check && cargo clippy --workspace -
 `text input → tokenizer → lexer → Action → GameEngine.handle_input → Rules hook → Events + mutated WorldState → View.render → text output`
 
 Public API surface is re-exported from `crates/core/src/lib.rs`. The `input` module is private to the crate.
+
+## Backlog
+
+- **Opaque game event passthrough** — add something like `Event::Custom { name: String }` so custom `Rules` can emit game-specific beats and consumer `View`s render them; the last big engine reusability unlock.
+- **Game-side proof of doors** — front-end `Rules` making "use iron key on door" read the exit `extra` (`opens_with`), call `unlock_exit`, and reveal a hidden door, proving the lock/door/extra loop end-to-end from the consumer side.

@@ -31,8 +31,9 @@ pub trait Rules {
 
     /// Decide what happens when the player moves in a direction.
     ///
-    /// The default reports hidden exits as if they did not exist, refuses
-    /// locked ones as a `WentDoorLocked`, and otherwise follows the exit.
+    /// The default refuses a locked exit (`WentExitLocked`), reports a hidden
+    /// one via `WentExitHidden` (how that reads to the player is the
+    /// consumer's call), and otherwise follows the exit.
     fn on_go(
         &mut self,
         world: &mut world::WorldState,

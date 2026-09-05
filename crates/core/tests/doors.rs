@@ -1,12 +1,12 @@
 //! Spec (red phase) for exit state.
 //!
 //! An exit is a value — it has a destination plus two independent flags:
-//! `hidden` (the player is unaware of it) and `locked` (a door blocks it).
-//! An exit can be both (a secret door that also needs a key). Hiddenness
-//! takes precedence over lock status in movement reporting: a player who
-//! doesn't know an exit exists hears "invalid", once revealed they hear
-//! "locked". World data declares one `exits` table per room, so exit state
-//! lives in a single map on the room instead of parallel per-flag maps.
+//! `hidden` and `locked`. An exit can be both (a secret door that also needs
+//! a key). Both refuse movement; the engine reports the reason
+//! (`WentExitHidden` vs `WentExitLocked`) so the consumer decides how a
+//! hidden exit reads (undiscovered passage vs dead end). World data declares
+//! one `exits` table per room, so exit state lives in a single map on the
+//! room instead of parallel per-flag maps.
 
 mod common;
 

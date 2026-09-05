@@ -39,9 +39,10 @@ impl From<RoomId> for i32 {
 /// A single exit from a room: where it leads plus its independent state flags.
 ///
 /// `locked` and `hidden` are independent — an exit may be both (a secret door
-/// that also needs a key). Hiddenness takes precedence over lock status when
-/// reporting movement: a player unaware of an exit hears "invalid direction",
-/// once revealed they hear "the door is locked".
+/// that also needs a key). Both block movement; the engine reports the reason
+/// through distinct events (`WentExitHidden` vs `WentExitLocked`), so the
+/// consumer decides whether a hidden exit is discoverable by trying, or
+/// simply reads as a dead end.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Exit {
     pub(crate) to: RoomId,
@@ -156,6 +157,15 @@ impl Room {
 
     pub(crate) fn is_exit_hidden(&self, direction: input::Direction) -> bool {
         self.exits.get(&direction).is_some_and(|exit| exit.hidden)
+    }
+
+    /// Directions leading to an *open* (passable) exit in this room.
+    pub(crate) fn exit_directions(&self) -> Vec<input::Direction> {
+        self.exits
+            .iter()
+            .filter(|(_, exit)| !exit.locked && !exit.hidden)
+            .map(|(direction, _)| *direction)
+            .collect()
     }
 
     pub(crate) fn exit_extra(

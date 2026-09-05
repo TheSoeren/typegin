@@ -108,6 +108,20 @@ mod world_state_navigation {
         assert_eq!(target, None);
         assert_eq!(engine.world().current_room_id(), RoomId::new(3));
     }
+
+    #[test]
+    fn exit_directions_lists_passable_doors() {
+        let engine = setup_engine();
+        assert_eq!(engine.world().exit_directions(), vec![Direction::North]);
+    }
+
+    #[test]
+    fn locked_and_hidden_exits_are_not_listed_as_open() {
+        let mut engine = setup_engine();
+        engine.handle_input("go north");
+        engine.handle_input("go east"); // now in room 3
+        assert_eq!(engine.world().exit_directions(), vec![Direction::West]);
+    }
 }
 
 mod engine_navigation {
