@@ -1,0 +1,20 @@
+items:
+  - id: 1
+    primary_name: glowing mysterious sword
+    aliases: [glowing sword, sword]
+
+  - id: 2
+    primary_name: iron key
+    aliases: [key, rusty key]
+
+  - id: 3
+    primary_name: locked chest
+    aliases: [chest]
+
+  - id: 4
+    primary_name: brass key
+    aliases: [key]
+
+  - id: 5
+    primary_name: stale bread
+    aliases: [bread]

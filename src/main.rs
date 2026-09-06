@@ -12,8 +12,8 @@ fn main() -> ExitCode {
         .nth(1)
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("data"));
-    let items_path = data_dir.join("items.toml");
-    let rooms_path = data_dir.join("rooms.toml");
+    let items_path = data_dir.join("items.yaml");
+    let rooms_path = data_dir.join("rooms.yaml");
 
     let world_data = match typegin_core::WorldData::load(&items_path, &rooms_path) {
         Ok(data) => data,

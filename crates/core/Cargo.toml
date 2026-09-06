@@ -7,4 +7,4 @@ edition = "2024"
 getset = "0.1.7"
 log = "0.4.34"
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.9.4"
+serde_yaml_ng = "0.10"

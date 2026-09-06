@@ -1,0 +1,36 @@
+items:
+  - id: 1
+    primary_name: glowing mysterious sword
+    aliases: [glowing sword, sword]
+
+  - id: 2
+    primary_name: iron key
+    aliases: [key, rusty key]
+    extra:
+      weight: 3
+      opens: chest
+      materials: [metal, iron]
+      tags:
+        kind: key
+      gui:
+        icon: sprites/key.png
+
+  - id: 3
+    primary_name: locked chest
+    aliases: [chest]
+
+  - id: 4
+    primary_name: brass key
+    aliases: [key]
+
+  - id: 5
+    primary_name: stale bread
+    aliases: [bread]
+
+  - id: 6
+    primary_name: rusty lamp
+    aliases: [lamp]
+
+  - id: 7
+    primary_name: old map
+    aliases: [map]

@@ -38,8 +38,8 @@ Recommended verification order: `cargo fmt --check && cargo clippy --workspace -
 ## Key conventions
 
 - Rust edition 2024. No rustfmt.toml or clippy.toml; defaults apply.
-- World content is TOML: `data/items.toml` and `data/rooms.toml`. Test fixtures live in `crates/core/data/`.
-- `GameEngine` is a pure in-memory `WorldState` built from world data (TOML); there is no database.
+- World content is YAML: `data/items.yaml` and `data/rooms.yaml`. Test fixtures live in `crates/core/data/`.
+- `GameEngine` is a pure in-memory `WorldState` built from world data (YAML); there is no database.
 - All tests are integration tests under `crates/core/tests/` with shared helpers in `tests/common/mod.rs`.
 - `GameEngine::get` uses `BasicRules` (stock defaults). `get_with_rules` injects custom `Rules`. The terminal front-end in `src/main.rs` provides `TakeRules` that overrides `on_take` — the core's `BasicRules` does **not** move items into inventory.
 - `View` is a read-only render trait observing `Event`s + `&WorldState`. It can never mutate the game.

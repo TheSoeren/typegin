@@ -57,16 +57,16 @@ crates/core/        # engine library: state, input parsing, rules, view
     world/          # WorldState, items, rooms, player
     event.rs        # Event enum
     input/          # tokenizer + lexer: text -> Action
-    data.rs         # world data (TOML) types + loading
+    data.rs         # world data (YAML) types + loading
     view.rs         # View trait
-  data/             # world fixtures + test worlds (TOML)
+  data/             # world fixtures + test worlds (YAML)
   tests/            # integration tests (see Tests below)
-data/               # default runtime world definition (TOML)
+data/               # default runtime world definition (YAML)
 src/                # the terminal front-end (TextView + CLI loop)
 ```
 
-The engine world content lives in TOML: `data/items.toml` describes items
-(`id`, `primary_name`, `aliases`), `data/rooms.toml` describes rooms, the items
+The engine world content lives in YAML: `data/items.yaml` describes items
+(`id`, `primary_name`, `aliases`), `data/rooms.yaml` describes rooms, the items
 they contain, and optional exits to other rooms. Point the binary at a different
 data folder via its first argument (defaults to `data/`).
 

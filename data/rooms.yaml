@@ -1,0 +1,29 @@
+rooms:
+  - id: 1
+    name: The Damp Cellar
+    visible_items: [1, 2, 3, 4]
+    hidden_items: [5]
+    exits:
+      north: { to: 2 }
+    extra:
+      description: Stone walls glisten with moisture and the air reeks of rot.
+
+  - id: 2
+    name: The Torchlit Corridor
+    visible_items: [6, 7]
+    hidden_items: []
+    exits:
+      south: { to: 1 }
+      east: { to: 3 }
+    extra:
+      description: Flickering torches line the corridor walls.
+
+  - id: 3
+    name: The Dusty Study
+    visible_items: []
+    hidden_items: []
+    exits:
+      west: { to: 2 }
+      north: { to: 1, hidden: true }
+    extra:
+      description: Bookshelves crowd the room, thick with dust.

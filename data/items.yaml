@@ -1,0 +1,42 @@
+items:
+  - id: 1
+    primary_name: glowing mysterious sword
+    aliases: [glowing sword, sword]
+    extra:
+      description: A sword that hums with a faint blue glow.
+      weight: 30
+      opens: chest
+      materials: [metal, iron]
+
+  - id: 2
+    primary_name: iron key
+    aliases: [key, rusty key]
+    extra:
+      description: A heavy iron key, cool to the touch.
+      weight: 1
+      opens: chest
+      materials: [metal, iron]
+
+  - id: 3
+    primary_name: locked chest
+    aliases: [chest]
+    extra:
+      description: A sturdy chest with a gleaming keyhole.
+      weight: 100
+      materials: [wood, iron]
+
+  - id: 4
+    primary_name: brass key
+    aliases: [key]
+    extra:
+      description: A small brass key on a worn ring.
+      weight: 1
+      materials: [brass]
+
+  - id: 5
+    primary_name: stale bread
+    aliases: [bread]
+    extra:
+      description: A crusty loaf, hard as a brick.
+      weight: 1
+      materials: [wheat]

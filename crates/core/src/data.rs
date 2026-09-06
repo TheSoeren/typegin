@@ -82,14 +82,14 @@ struct RoomsFile {
 #[derive(Debug)]
 pub enum WorldDataError {
     Io(std::io::Error),
-    Toml(toml::de::Error),
+    Yaml(serde_yaml_ng::Error),
 }
 
 impl fmt::Display for WorldDataError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             WorldDataError::Io(err) => write!(f, "failed to read data file: {err}"),
-            WorldDataError::Toml(err) => write!(f, "failed to parse data file: {err}"),
+            WorldDataError::Yaml(err) => write!(f, "failed to parse data file: {err}"),
         }
     }
 }
@@ -98,7 +98,7 @@ impl Error for WorldDataError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             WorldDataError::Io(err) => Some(err),
-            WorldDataError::Toml(err) => Some(err),
+            WorldDataError::Yaml(err) => Some(err),
         }
     }
 }
@@ -109,16 +109,16 @@ impl From<std::io::Error> for WorldDataError {
     }
 }
 
-impl From<toml::de::Error> for WorldDataError {
-    fn from(err: toml::de::Error) -> Self {
-        WorldDataError::Toml(err)
+impl From<serde_yaml_ng::Error> for WorldDataError {
+    fn from(err: serde_yaml_ng::Error) -> Self {
+        WorldDataError::Yaml(err)
     }
 }
 
 impl WorldData {
-    pub fn from_toml(items_toml: &str, rooms_toml: &str) -> Result<Self, toml::de::Error> {
-        let items: ItemsFile = toml::from_str(items_toml)?;
-        let rooms: RoomsFile = toml::from_str(rooms_toml)?;
+    pub fn from_yaml(items_yaml: &str, rooms_yaml: &str) -> Result<Self, serde_yaml_ng::Error> {
+        let items: ItemsFile = serde_yaml_ng::from_str(items_yaml)?;
+        let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
 
         Ok(WorldData {
             items: items.items,
@@ -130,9 +130,9 @@ impl WorldData {
         items_path: impl AsRef<Path>,
         rooms_path: impl AsRef<Path>,
     ) -> Result<Self, WorldDataError> {
-        let items_toml = std::fs::read_to_string(items_path)?;
-        let rooms_toml = std::fs::read_to_string(rooms_path)?;
+        let items_yaml = std::fs::read_to_string(items_path)?;
+        let rooms_yaml = std::fs::read_to_string(rooms_path)?;
 
-        Ok(Self::from_toml(&items_toml, &rooms_toml)?)
+        Ok(Self::from_yaml(&items_yaml, &rooms_yaml)?)
     }
 }
