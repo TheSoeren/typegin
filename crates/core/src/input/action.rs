@@ -9,7 +9,7 @@ use super::direction::Direction;
 ///
 /// The string payloads are the verbatim nouns the player typed (e.g.
 /// `"iron key"`); the engine resolves them against the world at execution time.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Action {
     /// The player looked around the current room.
     Look,

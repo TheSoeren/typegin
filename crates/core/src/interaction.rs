@@ -13,6 +13,7 @@ pub enum Verb {
     Take,
     Drop,
     Use,
+    Any,
 }
 
 impl Verb {
@@ -38,15 +39,16 @@ impl Verb {
 ///
 /// For `use X on Y`: `item` is the carried `X`, `target` is the resolved `Y`.
 /// For a self-use (`use X`), `target` is `None`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct ActionContext {
+    pub verb: Option<Verb>,
     pub item: Option<ObjectId>,
     pub target: Option<ObjectId>,
 }
 
 impl ActionContext {
-    pub fn new(item: Option<ObjectId>, target: Option<ObjectId>) -> Self {
-        ActionContext { item, target }
+    pub fn new(verb: Option<Verb>, item: Option<ObjectId>, target: Option<ObjectId>) -> Self {
+        ActionContext { verb, item, target }
     }
 }
 
@@ -159,6 +161,7 @@ impl Interaction {
             None => true,
         };
         item_ok
+            && context.verb.is_none_or(|v| self.verb() == v)
             && self.target.matches(world, context.target)
             && self.condition_applies(world, context)
     }

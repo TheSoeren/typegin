@@ -149,6 +149,23 @@ verb menu.
   `Event::Custom { name }` — an opaque, game-authored beat (the engine's
   "plugin channel", from the backlog).
 
+### 7. Rendering: one pipeline, many front-ends
+
+Text and GUI front-ends share a single render pipeline:
+`View::render(&mut self, events, world) -> Vec<RenderCommand>`.
+
+- The default `render` dispatches each `Event` to a **typed, per-event hook**
+  (`render_took`, `render_went_exit_locked`, ...) with the payload already
+  destructured (`object: &str`, `direction: &Direction`). A view overrides
+  only the events it phrases; every hook defaults to silence, so a new engine
+  event never breaks existing views (OCP). Unknown events fall back to
+  `render_generic`.
+- Output is a stream of `RenderCommand` (`Line`, `ClearScreen`, ...) — a
+  `#[non_exhaustive]` enum the engine can extend. A terminal front-end prints
+  lines; a GUI interprets commands in its widget tree.
+- `render` takes `&mut self` so stateful views can pace output, accumulate a
+  transcript, or animate — a pure view simply ignores the mutation.
+
 ## The pipeline today
 
 ```
@@ -159,7 +176,8 @@ text input → tokenizer → lexer → Action
           → authored Interaction? (conditions re-checked)
           → else stock fallback (kind check, gated unlock, refusals)
       → Vec<Event> + &mut WorldState
-  → View.render → text output
+  → View.render → Vec<RenderCommand> (Line, ClearScreen, ...)
+      → front-end interpreter (print / widget tree)
 ```
 
 A point-and-click front-end is just a View plus the `interactions_for` query:
@@ -178,7 +196,8 @@ it synthesizes an `Action` from clicks, sends it through the exact same
 | `crates/core/src/engine.rs` | Action → hook dispatch, `interactions_for` query |
 | `crates/core/src/event.rs` | `Event` enum (object payloads, `UnlockedExit`, `CannotUse`, `CantTake`, `Custom`) |
 | `crates/core/src/data.rs` | `WorldData`/`ObjectData`/`RoomData`, `ObjectKind`, `DoorData` (`direction`, `to`, `locked`, `gated_by`) |
-| `src/main.rs`, `src/view.rs` | `GameRules` (only the reveal-on-look beat), `TextView` |
+| `crates/core/src/view.rs` | `View` trait: `render` dispatches to typed `render_*` hooks (defaults silent, `render_generic` fallback), `RenderCommand` (`Line`/`ClearScreen`, `#[non_exhaustive]`) |
+| `src/main.rs`, `src/view.rs` | `GameRules` (only the reveal-on-look beat), `TextView` (phrases via `render_*` hooks), `RenderCommand` interpreter loop |
 
 ## Data mapping
 

@@ -14,7 +14,7 @@ pub use input::parse_input;
 pub use input::{Action, Direction, DirectionResolution, DropResult, MoveResult, TakeResult};
 pub use interaction::{ActionContext, Interaction, TargetFilter, Verb};
 pub use rules::{BasicRules, Rules};
-pub use view::View;
+pub use view::{RenderCommand, View};
 pub use world::WorldState;
 pub use world::object::{ObjectId, ObjectInfo, ObjectResolution};
 pub use world::room::RoomId;

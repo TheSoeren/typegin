@@ -11,7 +11,9 @@
 //!   * hidden doors being invisible to resolution (they are not targets),
 //!   * unified item/object resolution through `WorldState::resolve_target`,
 //!   * the `GameEngine::interactions_for` point-and-click query (with the
-//!     same condition evaluation the dispatcher uses).
+//!     same condition evaluation the dispatcher uses),
+//!   * the same authored-interaction surface extending past `Use` to
+//!     `Examine`, `Take` and `Drop`, and the query reporting all verbs.
 //!
 //! Run with: cd crates/core && cargo test --test interactions
 
@@ -381,5 +383,286 @@ mod interactions_for {
                 .interactions_for(Some(ObjectId::new(4)), Some(ObjectId::new(14)))
                 .is_empty()
         );
+    }
+}
+
+/// The interaction surface extends past `Use`: the same "first matching
+/// interaction for the resolved object wins, else stock" gate applies to
+/// `Examine`, `Take` and `Drop`, and `interactions_for` reports every verb.
+///
+/// Contract (the spec this suite pins down):
+/// 1. The default `on_examine`/`on_take`/`on_drop` run the *first* matching
+///    authored interaction before their stock spine — but only when the
+///    object resolved (`Found`); bad names never reach interactions.
+/// 2. A matching interaction fully replaces stock behaviour: the effect owns
+///    the world mutation (via `&mut WorldState`) and the returned events.
+/// 3. `ActionContext` carries the resolved object as `item` and `None` as
+///    `target` for these verbs, so `TargetFilter` must be `Any` to match.
+/// 4. `GameEngine::interactions_for` reports matching interactions for any
+///    verb (no `Use`-only filter).
+mod non_use_verbs {
+    use super::*;
+
+    struct AuthoredInteractions(Vec<Interaction>);
+    impl Rules for AuthoredInteractions {
+        fn interactions(&self) -> &[Interaction] {
+            &self.0
+        }
+    }
+
+    fn engine_with(interactions: Vec<Interaction>) -> GameEngine {
+        GameEngine::get_with_rules(
+            &common::multi_room_world_data(),
+            AuthoredInteractions(interactions),
+        )
+    }
+
+    #[test]
+    fn examine_interaction_runs_first_and_can_mutate_the_world() {
+        // "Examining the oak door in the study reveals the secret passage."
+        let interactions = vec![Interaction::build(
+            Verb::Examine,
+            Some(ObjectId::new(14)),
+            TargetFilter::Any,
+            None,
+            Box::new(|world: &mut WorldState, _context: &ActionContext| {
+                let _ = world.reveal_object(ObjectId::new(12));
+                vec![Event::Custom {
+                    name: "passage-found".to_string(),
+                }]
+            }),
+        )];
+        let mut engine = engine_with(interactions);
+        engine.handle_input("go north");
+        engine.handle_input("go east");
+
+        // The authored beat replaces the stock `Examined`...
+        assert_eq!(
+            engine.handle_input("examine oak door"),
+            vec![Event::Custom {
+                name: "passage-found".to_string(),
+            }]
+        );
+        // ...and its world mutation took effect: the hidden door is now visible.
+        assert_eq!(
+            engine.world().resolve_target("secret passage"),
+            ObjectResolution::Found(ObjectId::new(12))
+        );
+        assert!(!engine.world().is_exit_hidden(Direction::North));
+    }
+
+    #[test]
+    fn stock_examine_runs_for_objects_with_no_interaction() {
+        let interactions = vec![Interaction::build(
+            Verb::Examine,
+            Some(ObjectId::new(14)),
+            TargetFilter::Any,
+            None,
+            Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+        )];
+        let mut engine = engine_with(interactions);
+        engine.handle_input("go north");
+        engine.handle_input("go east");
+
+        assert_eq!(
+            engine.handle_input("examine wooden door"),
+            vec![Event::Examined {
+                object_id: ObjectId::new(11),
+                object: "wooden door".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn take_interaction_gated_by_condition_overrides_stock_take() {
+        // "The sword can only be lifted while holding the lamp."
+        let interactions = vec![Interaction::build(
+            Verb::Take,
+            Some(ObjectId::new(1)),
+            TargetFilter::Any,
+            Some(Box::new(|world: &WorldState, _context: &ActionContext| {
+                world.player_holds(ObjectId::new(6))
+            })),
+            Box::new(|world: &mut WorldState, _context: &ActionContext| {
+                let _ = world.player_take_object(ObjectId::new(1));
+                vec![Event::Custom {
+                    name: "sword-taken-under-light".to_string(),
+                }]
+            }),
+        )];
+        let mut engine = engine_with(interactions);
+        // The condition gates the query too: before holding the lamp the
+        // interaction is not listed.
+        assert!(
+            engine
+                .interactions_for(Some(ObjectId::new(1)), None)
+                .is_empty()
+        );
+
+        // Condition not met: stock take, no authored beat.
+        assert_eq!(
+            engine.handle_input("take sword"),
+            vec![Event::Took {
+                object_id: ObjectId::new(1),
+                object: "sword".to_string(),
+            }]
+        );
+
+        // Drop the sword, fetch the lamp, take again: now the interaction fires.
+        engine.handle_input("drop sword");
+        engine.handle_input("go north");
+        engine.handle_input("take rusty lamp");
+        engine.handle_input("go south");
+        // Lamp in hand: the condition holds, so the query now lists it.
+        assert_eq!(
+            engine.interactions_for(Some(ObjectId::new(1)), None).len(),
+            1
+        );
+        assert_eq!(
+            engine.handle_input("take sword"),
+            vec![Event::Custom {
+                name: "sword-taken-under-light".to_string(),
+            }]
+        );
+        assert!(engine.world().player_holds(ObjectId::new(1)));
+    }
+
+    #[test]
+    fn drop_interaction_replaces_stock_drop_and_owns_the_mutation() {
+        let interactions = vec![Interaction::build(
+            Verb::Drop,
+            Some(ObjectId::new(7)),
+            TargetFilter::Any,
+            None,
+            Box::new(|_world: &mut WorldState, _context: &ActionContext| {
+                vec![Event::Custom {
+                    name: "map-returned".to_string(),
+                }]
+            }),
+        )];
+        let mut engine = engine_with(interactions);
+
+        // The interaction fires instead of `Dropped`, and the effect did not
+        // drop the map — full replacement, the map stays carried.
+        engine.handle_input("take iron key");
+        engine.handle_input("go north");
+        engine.handle_input("take old map");
+        assert_eq!(
+            engine.handle_input("drop map"),
+            vec![Event::Custom {
+                name: "map-returned".to_string(),
+            }]
+        );
+        assert!(engine.world().player_holds(ObjectId::new(7)));
+        assert!(
+            !engine
+                .world()
+                .room_object_names()
+                .contains(&"old map".to_string())
+        );
+        assert!(
+            engine
+                .world()
+                .player_object_names()
+                .contains(&"old map".to_string())
+        );
+
+        // Objects without an authored beat keep the stock drop.
+        assert_eq!(
+            engine.handle_input("drop iron key"),
+            vec![Event::Dropped {
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn unresolvable_names_never_reach_interactions() {
+        // A matching-item-less Take interaction would intercept *every* take —
+        // but only ones that resolved.
+        let interactions = vec![Interaction::build(
+            Verb::Take,
+            None,
+            TargetFilter::Any,
+            None,
+            Box::new(|_world: &mut WorldState, _context: &ActionContext| {
+                vec![Event::Custom {
+                    name: "intercepted".to_string(),
+                }]
+            }),
+        )];
+        let mut engine = engine_with(interactions);
+
+        assert_eq!(
+            engine.handle_input("take nonexistent"),
+            vec![Event::TookObjectNotFound {
+                object: "nonexistent".to_string(),
+            }]
+        );
+        // A resolved object *is* intercepted, and the stock take does not
+        // happen (the sword stays in the room).
+        assert_eq!(
+            engine.handle_input("take sword"),
+            vec![Event::Custom {
+                name: "intercepted".to_string(),
+            }]
+        );
+        assert!(!engine.world().player_holds(ObjectId::new(1)));
+    }
+
+    #[test]
+    fn interactions_for_reports_every_verb() {
+        let interactions = vec![
+            Interaction::build(
+                Verb::Examine,
+                Some(ObjectId::new(14)),
+                TargetFilter::Any,
+                None,
+                Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+            ),
+            Interaction::build(
+                Verb::Take,
+                Some(ObjectId::new(1)),
+                TargetFilter::Any,
+                None,
+                Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+            ),
+            Interaction::build(
+                Verb::Drop,
+                Some(ObjectId::new(7)),
+                TargetFilter::Any,
+                None,
+                Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+            ),
+            Interaction::build(
+                Verb::Use,
+                Some(ObjectId::new(2)),
+                TargetFilter::Door,
+                None,
+                Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+            ),
+        ];
+        // Navigate to room 3 so the oak door is in scope for TargetFilter::Door.
+        let mut engine = engine_with(interactions);
+        engine.handle_input("go north");
+        engine.handle_input("go east");
+
+        // Each item returns its matching interaction — verb-independent.
+        let examine = engine.interactions_for(Some(ObjectId::new(14)), None);
+        assert_eq!(examine.len(), 1);
+        assert_eq!(examine[0].verb(), Verb::Examine);
+
+        let take = engine.interactions_for(Some(ObjectId::new(1)), None);
+        assert_eq!(take.len(), 1);
+        assert_eq!(take[0].verb(), Verb::Take);
+
+        let drop = engine.interactions_for(Some(ObjectId::new(7)), None);
+        assert_eq!(drop.len(), 1);
+        assert_eq!(drop[0].verb(), Verb::Drop);
+
+        let use_it = engine.interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)));
+        assert_eq!(use_it.len(), 1);
+        assert_eq!(use_it[0].verb(), Verb::Use);
     }
 }

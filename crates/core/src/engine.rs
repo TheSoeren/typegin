@@ -3,7 +3,7 @@ use getset::{Getters, MutGetters};
 use crate::data::WorldData;
 use crate::event::Event;
 use crate::input::{Action, parse_input};
-use crate::interaction::{ActionContext, Interaction, Verb};
+use crate::interaction::{ActionContext, Interaction};
 use crate::rules::BasicRules;
 use crate::rules::Rules;
 use crate::world;
@@ -57,7 +57,8 @@ impl GameEngine {
     /// as a string, the engine parses it into an [`Action`] and applies it, and
     /// the returned [`Event`]s describe what happened so the UI can render them.
     pub fn handle_input(&mut self, input: &str) -> Vec<Event> {
-        self.execute_action(parse_input(input))
+        let action = parse_input(input);
+        self.execute_action(action)
     }
 
     /// Execute one parsed `Action` against the world, returning events.
@@ -116,13 +117,11 @@ impl GameEngine {
         item: Option<ObjectId>,
         target: Option<ObjectId>,
     ) -> Vec<&Interaction> {
-        let context = ActionContext::new(item, target);
+        let context = ActionContext::new(None, item, target);
         self.rules
             .interactions()
             .iter()
-            .filter(|interaction| {
-                interaction.verb() == Verb::Use && interaction.matches(&self.world, &context)
-            })
+            .filter(|interaction| interaction.matches(&self.world, &context))
             .collect()
     }
 }

@@ -79,32 +79,45 @@ pub trait Rules {
         name: &str,
         resolution: ObjectResolution,
     ) -> Vec<event::Event> {
-        match resolution {
-            ObjectResolution::Found(object_id) => match world.object_kind(object_id) {
-                Some(ObjectKind::Scene) => vec![event::Event::CantTake {
+        let ObjectResolution::Found(object_id) = resolution else {
+            return match resolution {
+                ObjectResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::TookObjectAmbiguous {
+                        object_ids: ids,
+                        object: alias,
+                    }]
+                }
+                _ => vec![event::Event::TookObjectNotFound {
                     object: name.to_string(),
                 }],
-                _ => match world.player_take_object(object_id) {
-                    action::TakeResult::Success => vec![event::Event::Took {
-                        object_id,
-                        object: name.to_string(),
-                    }],
-                    action::TakeResult::Fail => {
-                        vec![event::Event::TookObjectNotFound {
-                            object: name.to_string(),
-                        }]
-                    }
-                },
-            },
-            ObjectResolution::Ambiguous { ids, alias } => {
-                vec![event::Event::TookObjectAmbiguous {
-                    object_ids: ids,
-                    object: alias,
-                }]
-            }
-            ObjectResolution::NotFound => vec![event::Event::TookObjectNotFound {
+            };
+        };
+
+        if let Some(ObjectKind::Scene) = world.object_kind(object_id) {
+            return vec![event::Event::CantTake {
+                object: name.to_string(),
+            }];
+        }
+
+        let context = ActionContext::new(Some(Verb::Take), Some(object_id), None);
+        if let Some(interaction) = self
+            .interactions()
+            .iter()
+            .find(|interaction| interaction.matches(world, &context))
+        {
+            return interaction.run(world, &context);
+        }
+
+        match world.player_take_object(object_id) {
+            action::TakeResult::Success => vec![event::Event::Took {
+                object_id,
                 object: name.to_string(),
             }],
+            action::TakeResult::Fail => {
+                vec![event::Event::TookObjectNotFound {
+                    object: name.to_string(),
+                }]
+            }
         }
     }
 
@@ -115,23 +128,35 @@ pub trait Rules {
         name: &str,
         resolution: ObjectResolution,
     ) -> Vec<event::Event> {
-        match resolution {
-            ObjectResolution::Found(object_id) => match world.player_drop_object(object_id) {
-                action::DropResult::Success => vec![event::Event::Dropped {
-                    object_id,
+        let ObjectResolution::Found(object_id) = resolution else {
+            return match resolution {
+                ObjectResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::DroppedObjectAmbiguous {
+                        object_ids: ids,
+                        object: alias,
+                    }]
+                }
+                _ => vec![event::Event::DroppedObjectNotFound {
                     object: name.to_string(),
                 }],
-                action::DropResult::Fail => vec![event::Event::DroppedObjectNotFound {
-                    object: name.to_string(),
-                }],
-            },
-            ObjectResolution::Ambiguous { ids, alias } => {
-                vec![event::Event::DroppedObjectAmbiguous {
-                    object_ids: ids,
-                    object: alias,
-                }]
-            }
-            ObjectResolution::NotFound => vec![event::Event::DroppedObjectNotFound {
+            };
+        };
+
+        let context = ActionContext::new(Some(Verb::Drop), Some(object_id), None);
+        if let Some(interaction) = self
+            .interactions()
+            .iter()
+            .find(|interaction| interaction.matches(world, &context))
+        {
+            return interaction.run(world, &context);
+        }
+
+        match world.player_drop_object(object_id) {
+            action::DropResult::Success => vec![event::Event::Dropped {
+                object_id,
+                object: name.to_string(),
+            }],
+            action::DropResult::Fail => vec![event::Event::DroppedObjectNotFound {
                 object: name.to_string(),
             }],
         }
@@ -142,25 +167,37 @@ pub trait Rules {
     /// Any object in scope — carried, in the room, or a door — can be examined.
     fn on_examine(
         &mut self,
-        _world: &mut world::WorldState,
+        world: &mut world::WorldState,
         name: &str,
         resolution: ObjectResolution,
     ) -> Vec<event::Event> {
-        match resolution {
-            ObjectResolution::Found(object_id) => vec![event::Event::Examined {
-                object_id,
-                object: name.to_string(),
-            }],
-            ObjectResolution::Ambiguous { ids, alias } => {
-                vec![event::Event::ExaminedObjectAmbiguous {
-                    object_ids: ids,
-                    object: alias,
-                }]
-            }
-            ObjectResolution::NotFound => vec![event::Event::ExaminedObjectNotFound {
-                object: name.to_string(),
-            }],
+        let ObjectResolution::Found(object_id) = resolution else {
+            return match resolution {
+                ObjectResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::ExaminedObjectAmbiguous {
+                        object_ids: ids,
+                        object: alias,
+                    }]
+                }
+                _ => vec![event::Event::ExaminedObjectNotFound {
+                    object: name.to_string(),
+                }],
+            };
+        };
+
+        let context = ActionContext::new(Some(Verb::Examine), Some(object_id), None);
+        if let Some(interaction) = self
+            .interactions()
+            .iter()
+            .find(|interaction| interaction.matches(world, &context))
+        {
+            return interaction.run(world, &context);
         }
+
+        vec![event::Event::Examined {
+            object_id,
+            object: name.to_string(),
+        }]
     }
 
     /// Decide what happens when the player uses an object, optionally on a target.
@@ -201,16 +238,15 @@ pub trait Rules {
             ObjectResolution::Found(id) => Some(id),
             _ => None,
         };
-        let context = ActionContext::new(Some(item_id), target_id);
-
-        // 1. Authored interactions win over the stock fallback.
-        if let Some(interaction) = self.interactions().iter().find(|interaction| {
-            interaction.verb() == Verb::Use && interaction.matches(world, &context)
-        }) {
+        let context = ActionContext::new(Some(Verb::Use), Some(item_id), target_id);
+        if let Some(interaction) = self
+            .interactions()
+            .iter()
+            .find(|interaction| interaction.matches(world, &context))
+        {
             return interaction.run(world, &context);
         }
 
-        // 2. + 3. Stock fallback.
         let target_text = target.map(str::to_string);
         match target_resolution {
             ObjectResolution::Found(target_id) => {

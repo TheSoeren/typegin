@@ -1,5 +1,5 @@
 use std::env;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -25,7 +25,7 @@ fn main() -> ExitCode {
 
     let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, GameRules);
 
-    let view = view::TextView;
+    let mut view = view::TextView;
 
     println!("You find yourself in a mysterious place.");
     println!("Type 'look' to see where you are. 'quit' to leave.\n");
@@ -45,8 +45,15 @@ fn main() -> ExitCode {
         }
 
         let events = engine.handle_input(&input);
-        for line in typegin_core::View::render(&view, &events, engine.world()) {
-            println!("{line}");
+        for command in typegin_core::View::render(&mut view, &events, engine.world()) {
+            match command {
+                typegin_core::RenderCommand::Line(text) => println!("{text}"),
+                typegin_core::RenderCommand::ClearScreen => {
+                    print!("\u{1b}[2J\u{1b}[H");
+                    let _ = io::stdout().flush();
+                }
+                _ => {}
+            }
         }
     }
 
