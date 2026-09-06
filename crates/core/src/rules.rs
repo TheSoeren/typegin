@@ -1,11 +1,13 @@
+use crate::data::ObjectKind;
 use crate::event;
 use crate::input::action;
+use crate::interaction::{ActionContext, Interaction, Verb};
 use crate::world;
-use crate::world::item;
+use crate::world::object::ObjectResolution;
 
 /// Minimal rules that reuse every default hook.
 ///
-/// Used when no custom rules are supplied to [`GameEngine::open`].
+/// Used when no custom rules are supplied to [`GameEngine::get`](crate::GameEngine::get).
 pub struct BasicRules;
 
 impl Rules for BasicRules {}
@@ -13,17 +15,28 @@ impl Rules for BasicRules {}
 /// Hooks the game logic uses to decide behaviour.
 ///
 /// This is how a game customizes rules: implement `Rules` and pass it to
-/// [`GameEngine::get_with_rules`]. The world is passed in, so there is no
-/// wrapper boilerplate and no delegation. Every method has a default
-/// implementation, so a custom type only implements the hooks it wants to
-/// change.
+/// [`GameEngine::get_with_rules`](crate::GameEngine::get_with_rules). The world
+/// is passed in, so there is no wrapper boilerplate and no delegation. Every
+/// method has a default implementation, so a custom type only implements the
+/// hooks it wants to change.
 ///
-/// For actions that reference world entities (`take`, `examine`, `use`), the
-/// engine resolves the name before calling the hook and passes both the
-/// resulting [`Resolution`] and the ability to look up the matched
-/// [`ItemInfo`] from the world — so a rule can act on the real entity (its
-/// id, name and aliases) rather than a raw name string.
+/// Two complementary customization surfaces exist:
+///
+/// * **Per-verb defaults** — override one of the `on_*` hooks to change a
+///   whole action category (`on_take`, `on_use`, ...).
+/// * **Per-interaction rules** — provide [`Interaction`]s via [`Rules::interactions`].
+///   These run *before* the default `on_use` fallback, so bespoke puzzle logic
+///   ("cut the rope with the knife") authors as a single interaction instead of
+///   a hook re-implementation. Front-ends can also enumerate them (see
+///   `GameEngine::interactions_for`) to build point-and-click menus.
 pub trait Rules {
+    /// Authored interactions, consulted before the default `on_use` fallback.
+    ///
+    /// The default returns none; provide interactions for custom puzzle logic.
+    fn interactions(&self) -> &[Interaction] {
+        &[]
+    }
+
     /// Decide what happens when the player looks around the room.
     fn on_look(&mut self, _world: &mut world::WorldState) -> Vec<event::Event> {
         vec![event::Event::Looked]
@@ -33,7 +46,7 @@ pub trait Rules {
     ///
     /// The default refuses a locked exit (`WentExitLocked`), reports a hidden
     /// one via `WentExitHidden` (how that reads to the player is the
-    /// consumer's call), and otherwise follows the exit.
+    /// consumer's call), and otherwise follows the door.
     fn on_go(
         &mut self,
         world: &mut world::WorldState,
@@ -54,143 +67,194 @@ pub trait Rules {
         }
     }
 
-    /// Decide what happens when the player tries to take an item.
+    /// Decide what happens when the player tries to take an object.
+    ///
+    /// Only [`Item`](ObjectKind::Item) objects are portable — the default
+    /// takes them into inventory. Scene objects (furniture, doors, ...) are a
+    /// fixed part of the world and are refused with `CantTake`; authored
+    /// interactions never get a say here (use flows through `on_use`).
     fn on_take(
         &mut self,
         world: &mut world::WorldState,
         name: &str,
-        resolution: item::ItemResolution,
+        resolution: ObjectResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(item_id) => match world.player_take_item(item_id) {
-                action::TakeResult::Success => vec![event::Event::Took {
-                    item_id,
-                    item: name.to_string(),
+            ObjectResolution::Found(object_id) => match world.object_kind(object_id) {
+                Some(ObjectKind::Scene) => vec![event::Event::CantTake {
+                    object: name.to_string(),
                 }],
-                action::TakeResult::Fail => {
-                    vec![event::Event::TookItemNotFound {
-                        item: name.to_string(),
-                    }]
-                }
+                _ => match world.player_take_object(object_id) {
+                    action::TakeResult::Success => vec![event::Event::Took {
+                        object_id,
+                        object: name.to_string(),
+                    }],
+                    action::TakeResult::Fail => {
+                        vec![event::Event::TookObjectNotFound {
+                            object: name.to_string(),
+                        }]
+                    }
+                },
             },
-            item::ItemResolution::Ambiguous {
-                ids,
-                alias: item_name,
-            } => vec![event::Event::TookItemAmbiguous {
-                item_ids: ids,
-                item: item_name,
-            }],
-            item::ItemResolution::NotFound => vec![event::Event::TookItemNotFound {
-                item: name.to_string(),
+            ObjectResolution::Ambiguous { ids, alias } => {
+                vec![event::Event::TookObjectAmbiguous {
+                    object_ids: ids,
+                    object: alias,
+                }]
+            }
+            ObjectResolution::NotFound => vec![event::Event::TookObjectNotFound {
+                object: name.to_string(),
             }],
         }
     }
 
-    /// Decide what happens when the player tries to drop an item.
+    /// Decide what happens when the player tries to drop an object.
     fn on_drop(
         &mut self,
         world: &mut world::WorldState,
         name: &str,
-        resolution: item::ItemResolution,
+        resolution: ObjectResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(item_id) => match world.player_drop_item(item_id) {
+            ObjectResolution::Found(object_id) => match world.player_drop_object(object_id) {
                 action::DropResult::Success => vec![event::Event::Dropped {
-                    item_id,
-                    item: name.to_string(),
+                    object_id,
+                    object: name.to_string(),
                 }],
-                action::DropResult::Fail => {
-                    vec![event::Event::DroppedItemNotFound {
-                        item: name.to_string(),
-                    }]
-                }
+                action::DropResult::Fail => vec![event::Event::DroppedObjectNotFound {
+                    object: name.to_string(),
+                }],
             },
-            item::ItemResolution::Ambiguous {
-                ids,
-                alias: item_name,
-            } => vec![event::Event::DroppedItemAmbiguous {
-                item_ids: ids,
-                item: item_name,
-            }],
-            item::ItemResolution::NotFound => vec![event::Event::DroppedItemNotFound {
-                item: name.to_string(),
+            ObjectResolution::Ambiguous { ids, alias } => {
+                vec![event::Event::DroppedObjectAmbiguous {
+                    object_ids: ids,
+                    object: alias,
+                }]
+            }
+            ObjectResolution::NotFound => vec![event::Event::DroppedObjectNotFound {
+                object: name.to_string(),
             }],
         }
     }
 
     /// Decide what happens when the player examines a thing.
+    ///
+    /// Any object in scope — carried, in the room, or a door — can be examined.
     fn on_examine(
         &mut self,
         _world: &mut world::WorldState,
         name: &str,
-        resolution: item::ItemResolution,
+        resolution: ObjectResolution,
     ) -> Vec<event::Event> {
         match resolution {
-            item::ItemResolution::Found(item_id) => {
-                vec![event::Event::Examined {
-                    item_id,
-                    item: name.to_string(),
+            ObjectResolution::Found(object_id) => vec![event::Event::Examined {
+                object_id,
+                object: name.to_string(),
+            }],
+            ObjectResolution::Ambiguous { ids, alias } => {
+                vec![event::Event::ExaminedObjectAmbiguous {
+                    object_ids: ids,
+                    object: alias,
                 }]
             }
-            item::ItemResolution::Ambiguous { ids, alias: name } => {
-                vec![event::Event::ExaminedItemAmbiguous {
-                    item_ids: ids,
-                    item: name,
-                }]
-            }
-            item::ItemResolution::NotFound => {
-                vec![event::Event::ExaminedItemNotFound {
-                    item: name.to_string(),
-                }]
-            }
+            ObjectResolution::NotFound => vec![event::Event::ExaminedObjectNotFound {
+                object: name.to_string(),
+            }],
         }
     }
 
-    /// Decide what happens when the player uses an item on a target.
+    /// Decide what happens when the player uses an object, optionally on a target.
+    ///
+    /// The default runs three stages:
+    ///
+    /// 1. Match an authored [`Interaction`] (see [`Rules::interactions`]) — the
+    ///    custom-puzzle slot.
+    /// 2. Otherwise, fall back to the stock behaviour: a successful use on an
+    ///    object emits `Used`; using an object on a *locked* door whose
+    ///    `gated_by` is the used object unlocks it (`UnlockedExit`).
+    /// 3. Everything else (wrong target, missing target, already open door)
+    ///    gets a generic refusal event (`CannotUse`, etc.) — the fallback
+    ///    spine that makes authored interactions cheap to write.
     fn on_use(
         &mut self,
-        _world: &mut world::WorldState,
+        world: &mut world::WorldState,
         item: &str,
         target: Option<&str>,
-        item_resolution: item::ItemResolution,
-        target_resolution: item::ItemResolution,
+        item_resolution: ObjectResolution,
+        target_resolution: ObjectResolution,
     ) -> Vec<event::Event> {
-        match item_resolution {
-            item::ItemResolution::Found(item_id) => match target_resolution {
-                item::ItemResolution::Found(target_id) => {
+        let ObjectResolution::Found(item_id) = item_resolution else {
+            return match item_resolution {
+                ObjectResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::UsedObjectAmbiguous {
+                        object_ids: ids,
+                        object: alias,
+                    }]
+                }
+                _ => vec![event::Event::UsedObjectNotFound {
+                    object: item.to_string(),
+                }],
+            };
+        };
+
+        let target_id = match target_resolution {
+            ObjectResolution::Found(id) => Some(id),
+            _ => None,
+        };
+        let context = ActionContext::new(Some(item_id), target_id);
+
+        // 1. Authored interactions win over the stock fallback.
+        if let Some(interaction) = self.interactions().iter().find(|interaction| {
+            interaction.verb() == Verb::Use && interaction.matches(world, &context)
+        }) {
+            return interaction.run(world, &context);
+        }
+
+        // 2. + 3. Stock fallback.
+        let target_text = target.map(str::to_string);
+        match target_resolution {
+            ObjectResolution::Found(target_id) => {
+                if let Some(direction) = world.exit_direction_of(target_id) {
+                    // It's a door.
+                    if world.is_exit_locked(direction)
+                        && world.exit_gated_by(direction) == Some(item_id)
+                    {
+                        world.unlock_exit(direction);
+                        vec![event::Event::UnlockedExit { direction }]
+                    } else {
+                        vec![event::Event::CannotUse {
+                            item: item.to_string(),
+                            target: target_text.unwrap_or_default(),
+                        }]
+                    }
+                } else {
                     vec![event::Event::Used {
-                        item_id,
-                        item: item.to_string(),
+                        object_id: item_id,
+                        object: item.to_string(),
                         target_id: Some(target_id),
-                        target: target.map(String::from),
+                        target: target_text.clone(),
                     }]
                 }
-                item::ItemResolution::Ambiguous { ids, alias: name } => {
-                    vec![event::Event::UsedTargetAmbiguous {
-                        item_id,
-                        item: item.to_string(),
-                        target_ids: ids,
-                        target: name,
-                    }]
-                }
-                item::ItemResolution::NotFound => {
-                    vec![event::Event::UsedTargetNeeded {
-                        item_id,
-                        item: item.to_string(),
-                    }]
-                }
+            }
+            ObjectResolution::Ambiguous { ids, alias } => {
+                vec![event::Event::UsedTargetAmbiguous {
+                    object_id: item_id,
+                    object: item.to_string(),
+                    target_ids: ids,
+                    target: alias,
+                }]
+            }
+            ObjectResolution::NotFound => match target_text {
+                None => vec![event::Event::UsedTargetNeeded {
+                    object_id: item_id,
+                    object: item.to_string(),
+                }],
+                Some(target) => vec![event::Event::UsedTargetNotFound {
+                    object_id: item_id,
+                    object: item.to_string(),
+                    target,
+                }],
             },
-            item::ItemResolution::Ambiguous { ids, alias: name } => {
-                vec![event::Event::UsedItemAmbiguous {
-                    item_ids: ids,
-                    item: name,
-                }]
-            }
-            item::ItemResolution::NotFound => {
-                vec![event::Event::UsedItemNotFound {
-                    item: item.to_string(),
-                }]
-            }
         }
     }
 

@@ -2,7 +2,7 @@
 //!
 //! Game- and front-end-specific data (sprites, weights, puzzle hints, ...)
 //! travels through the engine untouched. It is declared as a TOML table on an
-//! item or room, mirrored on the public `ItemInfo`/`WorldState`, and readable
+//! item or room, mirrored on the public `ObjectInfo`/`WorldState`, and readable
 //! by custom `Rules` — without the engine ever interpreting the keys. Key
 //! namespacing (`gui.*`, `mechanics.*`) is a convention, not engine knowledge.
 
@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use core::data::ExtraValue;
 use core::event::Event;
-use core::{Direction, GameEngine, ItemId, Rules, WorldState};
+use core::{Direction, GameEngine, ObjectId, Rules, WorldState};
 
 fn item_2_extra() -> HashMap<String, ExtraValue> {
     let mut extra = HashMap::new();
@@ -52,7 +52,6 @@ fn room_1_extra() -> HashMap<String, ExtraValue> {
 fn exit_east_extra() -> HashMap<String, ExtraValue> {
     let mut extra = HashMap::new();
     extra.insert("material".to_string(), ExtraValue::Str("oak".to_string()));
-    extra.insert("name".to_string(), ExtraValue::Str("oak door".to_string()));
     extra
 }
 
@@ -64,7 +63,7 @@ mod data_parsing {
     #[test]
     fn item_extra_parses_all_types() {
         let data = common::multi_room_world_data();
-        let key = data.find_item(2).expect("item 2 exists");
+        let key = data.find_object(2).expect("item 2 exists");
         assert_eq!(key.extra, item_2_extra());
     }
 
@@ -76,28 +75,25 @@ mod data_parsing {
     }
 
     #[test]
-    fn exit_extra_parses() {
+    fn door_extra_parses() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(3).expect("room 3 exists");
-        let east = room.exits.get("east").expect("east exit");
-        assert_eq!(east.extra, exit_east_extra());
+        let oak = data.find_object(14).expect("oak door exists");
+        assert_eq!(oak.extra, exit_east_extra());
     }
 
     #[test]
-    fn exit_without_extra_parses_as_empty() {
+    fn door_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
-        let room1 = data.find_room(1).expect("room 1 exists");
-        let north = room1.exits.get("north").expect("north exit");
-        assert!(north.extra.is_empty());
-        let room2 = data.find_room(2).expect("room 2 exists");
-        let south = room2.exits.get("south").expect("south exit");
-        assert!(south.extra.is_empty());
+        let north_stairs = data.find_object(8).expect("cellar stairs north exists");
+        assert!(north_stairs.extra.is_empty());
+        let south_stairs = data.find_object(9).expect("cellar stairs south exists");
+        assert!(south_stairs.extra.is_empty());
     }
 
     #[test]
     fn item_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
-        let sword = data.find_item(1).expect("item 1 exists");
+        let sword = data.find_object(1).expect("item 1 exists");
         assert!(sword.extra.is_empty());
     }
 
@@ -115,11 +111,11 @@ mod world_exposure {
     use super::*;
 
     #[test]
-    fn item_info_exposes_extra() {
+    fn object_info_exposes_extra() {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .item_info(ItemId::new(2))
+            .object_info(ObjectId::new(2))
             .expect("item 2 in room");
         assert_eq!(info.extra, item_2_extra());
     }
@@ -129,7 +125,7 @@ mod world_exposure {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .item_info(ItemId::new(3))
+            .object_info(ObjectId::new(3))
             .expect("item 3 in room");
         assert!(info.extra.is_empty());
     }
@@ -180,9 +176,9 @@ mod world_exposure {
 /// the item in the room. Items without a weight are unaffected.
 struct VetoHeavyRules;
 
-fn weight_of(world: &WorldState, id: ItemId) -> Option<i64> {
+fn weight_of(world: &WorldState, id: ObjectId) -> Option<i64> {
     world
-        .item_info(id)
+        .object_info(id)
         .and_then(|info| match info.extra.get("weight") {
             Some(ExtraValue::Int(kg)) => Some(*kg),
             _ => None,
@@ -194,32 +190,34 @@ impl Rules for VetoHeavyRules {
         &mut self,
         world: &mut WorldState,
         name: &str,
-        resolution: core::ItemResolution,
+        resolution: core::ObjectResolution,
     ) -> Vec<Event> {
         match resolution {
-            core::ItemResolution::Found(id) => {
+            core::ObjectResolution::Found(id) => {
                 if weight_of(world, id).is_some_and(|kg| kg > 2) {
                     Vec::new()
                 } else {
-                    match world.player_take_item(id) {
+                    match world.player_take_object(id) {
                         core::TakeResult::Success => vec![Event::Took {
-                            item_id: id,
-                            item: name.to_string(),
+                            object_id: id,
+                            object: name.to_string(),
                         }],
                         core::TakeResult::Fail => {
-                            vec![Event::TookItemNotFound {
-                                item: name.to_string(),
+                            vec![Event::TookObjectNotFound {
+                                object: name.to_string(),
                             }]
                         }
                     }
                 }
             }
-            core::ItemResolution::Ambiguous { ids, alias } => vec![Event::TookItemAmbiguous {
-                item_ids: ids,
-                item: alias,
-            }],
-            core::ItemResolution::NotFound => vec![Event::TookItemNotFound {
-                item: name.to_string(),
+            core::ObjectResolution::Ambiguous { ids, alias } => {
+                vec![Event::TookObjectAmbiguous {
+                    object_ids: ids,
+                    object: alias,
+                }]
+            }
+            core::ObjectResolution::NotFound => vec![Event::TookObjectNotFound {
+                object: name.to_string(),
             }],
         }
     }
@@ -239,13 +237,13 @@ mod rules_read_extra {
         assert!(
             !engine
                 .world()
-                .player_item_names()
+                .player_object_names()
                 .contains(&"iron key".to_string())
         );
         assert!(
             engine
                 .world()
-                .room_item_names()
+                .room_object_names()
                 .contains(&"iron key".to_string())
         );
     }
@@ -256,14 +254,14 @@ mod rules_read_extra {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                item_id: ItemId::new(4),
-                item: "brass key".to_string()
+                object_id: ObjectId::new(4),
+                object: "brass key".to_string()
             }]
         );
         assert!(
             engine
                 .world()
-                .player_item_names()
+                .player_object_names()
                 .contains(&"brass key".to_string())
         );
     }

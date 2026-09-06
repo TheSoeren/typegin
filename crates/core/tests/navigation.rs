@@ -7,34 +7,41 @@ mod common;
 use common::{multi_room_world_data, setup_engine};
 use core::{Direction, Event, RoomId};
 
-mod room_exits {
+mod room_door_data {
     use super::*;
 
     #[test]
-    fn room_data_has_exits() {
+    fn door_object_leads_where_the_exit_used_to() {
         let data = multi_room_world_data();
-        let room1 = data.rooms.iter().find(|r| r.id == 1).unwrap();
-        assert_eq!(room1.exits.get("north").map(|e| e.to), Some(2));
+        let stairs = data.find_object(8).expect("door object 8 exists");
+        assert_eq!(stairs.door.as_ref().expect("door data").to, 2);
+        assert_eq!(
+            stairs.door.as_ref().expect("door data").direction,
+            "north".to_string()
+        );
     }
 
     #[test]
-    fn room_data_multiple_exits() {
+    fn multiple_doors_serve_one_room() {
         let data = multi_room_world_data();
-        let room2 = data.rooms.iter().find(|r| r.id == 2).unwrap();
-        assert_eq!(room2.exits.get("south").map(|e| e.to), Some(1));
-        assert_eq!(room2.exits.get("east").map(|e| e.to), Some(3));
+        let room2 = data.find_room(2).expect("room 2 exists");
+        assert!(room2.visible_objects.contains(&9)); // cellar stairs → room 1
+        assert!(room2.visible_objects.contains(&10)); // study door → room 3
     }
 
     #[test]
-    fn room_data_dead_end() {
+    fn dead_end_room_holds_one_open_door() {
         let data = multi_room_world_data();
-        let room3 = data.rooms.iter().find(|r| r.id == 3).unwrap();
-        let open_exits = room3
-            .exits
-            .values()
-            .filter(|e| !e.hidden && !e.locked)
+        let room3 = data.find_room(3).expect("room 3 exists");
+        let open = room3
+            .visible_objects
+            .iter()
+            .filter(|id| {
+                let object = data.find_object(**id).expect("object in room");
+                object.door.as_ref().is_some_and(|door| !door.locked)
+            })
             .count();
-        assert_eq!(open_exits, 1);
+        assert_eq!(open, 1);
     }
 }
 
@@ -60,7 +67,7 @@ mod world_state_navigation {
         assert!(
             engine
                 .world()
-                .room_item_names()
+                .room_object_names()
                 .contains(&"glowing mysterious sword".to_string())
         );
 
@@ -68,13 +75,13 @@ mod world_state_navigation {
         assert!(
             engine
                 .world()
-                .room_item_names()
+                .room_object_names()
                 .contains(&"rusty lamp".to_string())
         );
         assert!(
             !engine
                 .world()
-                .room_item_names()
+                .room_object_names()
                 .contains(&"glowing mysterious sword".to_string())
         );
     }
@@ -181,7 +188,7 @@ mod engine_navigation {
         assert!(
             engine
                 .world()
-                .room_item_names()
+                .room_object_names()
                 .contains(&"rusty lamp".to_string())
         );
     }

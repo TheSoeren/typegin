@@ -41,7 +41,7 @@ Recommended verification order: `cargo fmt --check && cargo clippy --workspace -
 - World content is YAML: `data/items.yaml` and `data/rooms.yaml`. Test fixtures live in `crates/core/data/`.
 - `GameEngine` is a pure in-memory `WorldState` built from world data (YAML); there is no database.
 - All tests are integration tests under `crates/core/tests/` with shared helpers in `tests/common/mod.rs`.
-- `GameEngine::get` uses `BasicRules` (stock defaults). `get_with_rules` injects custom `Rules`. The terminal front-end in `src/main.rs` provides `TakeRules` that overrides `on_take` — the core's `BasicRules` does **not** move items into inventory.
+- `GameEngine::get` uses `BasicRules` (stock defaults). `get_with_rules` injects custom `Rules`. The stock `BasicRules` already implements take/drop, refuses to take scene objects (`CantTake`) and unlocks doors whose `gated_by` object is used on them; the terminal front-end in `src/main.rs` only adds a `GameRules::on_look` that reveals the hidden passage door.
 - `View` is a read-only render trait observing `Event`s + `&WorldState`. It can never mutate the game.
 - NEVER use `deref`
 - NEVER use `unwrap`

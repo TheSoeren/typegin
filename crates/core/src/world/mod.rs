@@ -1,4 +1,4 @@
-pub mod item;
+pub mod object;
 pub mod player;
 pub mod room;
 
@@ -8,8 +8,10 @@ use getset::{CopyGetters, Getters};
 use log::warn;
 
 use crate::data;
+use crate::data::ObjectKind;
 use crate::input::action;
 use crate::input::direction;
+use crate::world::object::{ObjectId, ObjectInfo, ObjectResolution};
 
 #[derive(Debug, Getters, CopyGetters)]
 pub struct WorldState {
@@ -69,6 +71,17 @@ impl WorldState {
         self.current_room().is_exit_hidden(direction)
     }
 
+    /// The id of the object that unlocks the exit in `direction`, if one is
+    /// declared. The gate link is data; unlocking behaviour is a rule.
+    pub fn exit_gated_by(&self, direction: direction::Direction) -> Option<ObjectId> {
+        self.current_room().exit_gated_by(direction)
+    }
+
+    /// Public details about the exit in `direction`, if there is one.
+    pub fn exit_info(&self, direction: direction::Direction) -> Option<ObjectInfo> {
+        self.current_room().door_in_direction_info(direction)
+    }
+
     /// Directions with an open (passable) exit from the current room.
     ///
     /// Locked and hidden exits are excluded. Note: order is unspecified.
@@ -109,29 +122,29 @@ impl WorldState {
 
 /// Room helpers
 impl WorldState {
-    pub fn get_item_from_room(&self, id: item::ItemId) -> item::ItemResolution {
-        self.current_room().get_item(id)
+    pub fn get_object_from_room(&self, id: ObjectId) -> ObjectResolution {
+        self.current_room().get_object(id)
     }
 
-    pub fn remove_item_from_room(&mut self, id: item::ItemId) -> Option<item::Item> {
-        self.current_room_mut().remove_item(id)
+    pub fn remove_object_from_room(&mut self, id: ObjectId) -> Option<object::Object> {
+        self.current_room_mut().remove_object(id)
     }
 
-    /// Names of the items currently visible in the current room.
-    pub fn room_item_names(&self) -> Vec<String> {
+    /// Names of the objects currently visible in the current room.
+    pub fn room_object_names(&self) -> Vec<String> {
         self.current_room()
-            .items()
+            .objects()
             .iter()
-            .map(|item| item.primary_name.clone())
+            .map(|object| object.primary_name.clone())
             .collect()
     }
 
-    pub fn reveal_item(&mut self, id: item::ItemId) -> item::ItemResolution {
-        self.current_room_mut().reveal_item(id)
+    pub fn reveal_object(&mut self, id: ObjectId) -> ObjectResolution {
+        self.current_room_mut().reveal_object(id)
     }
 
-    pub fn hide_item(&mut self, id: item::ItemId) -> item::ItemResolution {
-        self.current_room_mut().hide_item(id)
+    pub fn hide_object(&mut self, id: ObjectId) -> ObjectResolution {
+        self.current_room_mut().hide_object(id)
     }
 
     pub fn current_room_extra(&self) -> HashMap<String, data::ExtraValue> {
@@ -141,42 +154,47 @@ impl WorldState {
 
 /// Player helpers
 impl WorldState {
-    pub fn get_item_from_player(&self, id: item::ItemId) -> item::ItemResolution {
-        self.player.get_item(id)
+    pub fn get_object_from_player(&self, id: ObjectId) -> ObjectResolution {
+        self.player.get_object(id)
     }
 
-    pub fn remove_item_from_player(&mut self, id: item::ItemId) -> Option<item::Item> {
-        self.player.remove_item(id)
+    pub fn remove_object_from_player(&mut self, id: ObjectId) -> Option<object::Object> {
+        self.player.remove_object(id)
     }
 
-    /// Names of the items currently held by the player.
-    pub fn player_item_names(&self) -> Vec<String> {
+    /// Whether the player currently holds the object with `id`.
+    pub fn player_holds(&self, id: ObjectId) -> bool {
+        self.player.holds(id)
+    }
+
+    /// Names of the objects currently held by the player.
+    pub fn player_object_names(&self) -> Vec<String> {
         self.player
-            .items()
+            .objects()
             .iter()
-            .map(|item| item.primary_name.clone())
+            .map(|object| object.primary_name.clone())
             .collect()
     }
 }
 
-/// Item transfer management
+/// Object transfer management
 impl WorldState {
-    pub fn player_take_item(&mut self, id: item::ItemId) -> action::TakeResult {
-        let removed_item = self.remove_item_from_room(id);
-        match removed_item {
-            Some(item) => {
-                self.player.add_item(item);
+    pub fn player_take_object(&mut self, id: ObjectId) -> action::TakeResult {
+        let removed = self.remove_object_from_room(id);
+        match removed {
+            Some(object) => {
+                self.player.add_object(object);
                 action::TakeResult::Success
             }
             None => action::TakeResult::Fail,
         }
     }
 
-    pub fn player_drop_item(&mut self, id: item::ItemId) -> action::DropResult {
-        let removed_item = self.remove_item_from_player(id);
-        match removed_item {
-            Some(item) => {
-                self.current_room_mut().add_item(item);
+    pub fn player_drop_object(&mut self, id: ObjectId) -> action::DropResult {
+        let removed = self.remove_object_from_player(id);
+        match removed {
+            Some(object) => {
+                self.current_room_mut().add_object(object);
                 action::DropResult::Success
             }
             None => action::DropResult::Fail,
@@ -184,40 +202,80 @@ impl WorldState {
     }
 }
 
-/// All available items' helper methods
+/// Object helpers over everything in the player's scope.
 impl WorldState {
-    /// Details about an item visible to the player (in the room or inventory).
-    pub fn item_info(&self, id: item::ItemId) -> Option<item::ItemInfo> {
-        self.get_available_items()
-            .iter()
-            .find(|item| item.id == id)
-            .map(item::ItemInfo::from_item)
+    /// Details about an object visible to the player (in the room or inventory).
+    pub fn object_info(&self, id: ObjectId) -> Option<ObjectInfo> {
+        self.any_object(id).map(ObjectInfo::from_object)
     }
 
-    pub fn resolve_any_item(&self, name: &str) -> item::ItemResolution {
-        let items = self.get_available_items();
-        item::Item::resolve_item_by_name(&items, name)
+    /// Find an object by id across the current room (visible or hidden) and
+    /// the player's inventory.
+    fn any_object(&self, id: ObjectId) -> Option<&object::Object> {
+        self.current_room()
+            .find_any(id)
+            .or_else(|| self.player.find_by_id(id))
     }
 
-    pub fn resolve_player_item(&self, name: &str) -> item::ItemResolution {
-        self.player.find_item(name)
+    /// The kind of the object with `id`, if it is anywhere in scope.
+    pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
+        self.any_object(id).map(|object| object.kind)
     }
 
-    pub fn resolve_room_item(&self, name: &str) -> item::ItemResolution {
-        self.current_room().find_item(name)
+    /// Whether the object with `id` is a scene object (stays in the world).
+    pub fn object_is_scene(&self, id: ObjectId) -> bool {
+        self.any_object(id)
+            .is_some_and(|object| object.kind == ObjectKind::Scene)
     }
 
-    fn get_available_items(&self) -> Vec<item::Item> {
+    /// Whether the object with `id` is a door (a scene object with door data).
+    pub fn object_is_door(&self, id: ObjectId) -> bool {
+        self.any_object(id)
+            .is_some_and(|object| object.door.is_some())
+    }
+
+    /// The direction the door object with `id` occupies in its room, if it is
+    /// a door. Works while the door is hidden too (the object is still in the
+    /// world); hidden doors still do not resolve as targets.
+    pub fn exit_direction_of(&self, id: ObjectId) -> Option<direction::Direction> {
+        self.any_object(id)
+            .and_then(|object| object.door.as_ref())
+            .map(|door| door.direction)
+    }
+
+    /// Resolve a noun against everything currently in the player's scope:
+    /// visible room objects and carried objects. Doors are ordinary scene
+    /// objects, so they resolve here exactly like any other visible object.
+    pub fn resolve_target(&self, name: &str) -> ObjectResolution {
+        object::Object::resolve_by_name(&self.get_available_objects(), name)
+    }
+
+    /// Resolve a noun against the objects in the current room only.
+    pub fn resolve_room_object(&self, name: &str) -> ObjectResolution {
+        self.current_room().find_object(name)
+    }
+
+    /// Resolve a noun against the objects the player is carrying.
+    pub fn resolve_player_object(&self, name: &str) -> ObjectResolution {
+        self.player.find_object(name)
+    }
+
+    /// Whether a given target is currently in the player's scope.
+    pub fn target_in_scope(&self, target: ObjectId) -> bool {
+        self.current_room().holds(target) || self.player.holds(target)
+    }
+
+    fn get_available_objects(&self) -> Vec<object::Object> {
         [
-            self.current_room().items().as_slice(),
-            self.player().items().as_slice(),
+            self.current_room().objects().as_slice(),
+            self.player().objects().as_slice(),
         ]
         .concat()
     }
 }
 
 impl WorldState {
-    /// Build a `WorldState` directly from world data (TOML), with no database.
+    /// Build a `WorldState` directly from world data (YAML), with no database.
     pub(crate) fn from_data(data: &data::WorldData) -> Self {
         let first_room_id: room::RoomId = data
             .rooms
@@ -228,25 +286,23 @@ impl WorldState {
 
         let mut rooms = HashMap::new();
         for room_data in &data.rooms {
-            let items: Vec<item::Item> = room_data
-                .visible_items
+            let objects: Vec<object::Object> = room_data
+                .visible_objects
                 .iter()
-                .filter_map(|id| data.find_item(*id))
-                .map(item::Item::from_data)
+                .filter_map(|id| data.find_object(*id))
+                .map(object::Object::from_data)
                 .collect();
 
-            let hidden_items: Vec<item::Item> = room_data
-                .hidden_items
+            let hidden_objects: Vec<object::Object> = room_data
+                .hidden_objects
                 .iter()
-                .filter_map(|id| data.find_item(*id))
-                .map(item::Item::from_data)
+                .filter_map(|id| data.find_object(*id))
+                .map(object::Object::from_data)
                 .collect();
-
-            let exits = exits_from_data(room_data);
 
             rooms.insert(
                 room_data.id.into(),
-                room::Room::new(items, hidden_items, exits, room_data.extra.clone()),
+                room::Room::new(objects, hidden_objects, room_data.extra.clone()),
             );
         }
 
@@ -260,26 +316,4 @@ impl WorldState {
             current_room_id: first_room_id,
         }
     }
-}
-
-/// Converts a `RoomData.exits` string map into a `Direction`-keyed map of
-/// `Exit` values, carrying each exit's destination and state flags.
-fn exits_from_data(room_data: &crate::data::RoomData) -> HashMap<direction::Direction, room::Exit> {
-    room_data
-        .exits
-        .iter()
-        .filter_map(|(raw, exit_data)| {
-            direction::Direction::parse(raw).map(|direction| {
-                (
-                    direction,
-                    room::Exit {
-                        to: exit_data.to.into(),
-                        locked: exit_data.locked,
-                        hidden: exit_data.hidden,
-                        extra: exit_data.extra.clone(),
-                    },
-                )
-            })
-        })
-        .collect()
 }

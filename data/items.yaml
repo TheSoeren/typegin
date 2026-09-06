@@ -1,4 +1,4 @@
-items:
+objects:
   - id: 1
     primary_name: glowing mysterious sword
     aliases: [glowing sword, sword]
@@ -40,3 +40,93 @@ items:
       description: A crusty loaf, hard as a brick.
       weight: 1
       materials: [wheat]
+
+  - id: 6
+    primary_name: rusty lamp
+    aliases: [lamp]
+    extra:
+      description: A lamp crusted with rust, its glass black with soot.
+      weight: 2
+      materials: [metal, glass]
+
+  - id: 7
+    primary_name: old map
+    aliases: [map]
+    extra:
+      description: A faded map of the dungeon.
+      weight: 1
+      materials: [paper]
+
+  - id: 8
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: north
+      to: 2
+    extra:
+      description: A narrow stone stairway climbs north.
+
+  - id: 9
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: south
+      to: 1
+    extra:
+      description: The stairway descends south.
+
+  - id: 10
+    primary_name: study door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 3
+    extra:
+      description: A heavy oak-framed door leading east.
+
+  - id: 11
+    primary_name: wooden door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: west
+      to: 2
+    extra:
+      description: A plain wooden door leading west.
+
+  - id: 12
+    primary_name: secret passage
+    aliases: [passage]
+    kind: Scene
+    door:
+      direction: north
+      to: 1
+    extra:
+      description: A concealed passage hidden behind the shelves.
+
+  - id: 13
+    primary_name: hidden vault
+    aliases: [vault]
+    kind: Scene
+    door:
+      direction: south
+      to: 1
+      locked: true
+    extra:
+      description: A steel vault door sealed tight.
+
+  - id: 14
+    primary_name: oak door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 2
+      locked: true
+      gated_by: 2
+    extra:
+      description: A sturdy oak door with an iron lock.
+      material: oak

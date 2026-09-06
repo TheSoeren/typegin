@@ -16,24 +16,50 @@ pub enum ExtraValue {
     Table(HashMap<String, ExtraValue>),
 }
 
+/// The two object kinds of the Visionaire model:
+///
+/// * [`Item`](Self::Item) — an inventory object: portable, carried in
+///   inventory, taken from a room (a key, a sword).
+/// * [`Scene`](Self::Scene) — a scene object: stays in the world, is
+///   clickable/examinable but not portable (furniture, fixtures — and every
+///   door). A door is just a Scene object with optional `door` data.
+///
+/// The kind defaults to `Item` when omitted from world data.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, Default)]
+pub enum ObjectKind {
+    #[default]
+    Item,
+    Scene,
+}
+
+/// Optional door data on a [`Scene`](ObjectKind::Scene) object.
+///
+/// A door is an ordinary object (id, names, `extra`) that additionally leads
+/// somewhere: `direction` is the compass direction the door occupies in its
+/// room, `to` the room it leads into. `locked` blocks traversal, `hidden` is
+/// *not* stored here — hidden-ness is list membership (the door object lives in
+/// the room's `hidden_objects` until revealed). `gated_by` optionally links the
+/// door to the object that unlocks it; the unlock behaviour itself is a rule.
 #[derive(Debug, Clone, Deserialize)]
-pub struct ItemData {
+pub struct DoorData {
+    pub direction: String,
+    pub to: i32,
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub gated_by: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ObjectData {
     pub id: i32,
     pub primary_name: String,
     #[serde(default)]
     pub aliases: Vec<String>,
     #[serde(default)]
-    pub extra: HashMap<String, ExtraValue>,
-}
-
-/// A single exit from a room as declared in world data.
-#[derive(Debug, Clone, Deserialize)]
-pub struct ExitData {
-    pub to: i32,
+    pub kind: ObjectKind,
     #[serde(default)]
-    pub locked: bool,
-    #[serde(default)]
-    pub hidden: bool,
+    pub door: Option<DoorData>,
     #[serde(default)]
     pub extra: HashMap<String, ExtraValue>,
 }
@@ -42,25 +68,23 @@ pub struct ExitData {
 pub struct RoomData {
     pub id: i32,
     #[serde(default)]
-    pub visible_items: Vec<i32>,
+    pub visible_objects: Vec<i32>,
     #[serde(default)]
-    pub hidden_items: Vec<i32>,
-    #[serde(default)]
-    pub exits: HashMap<String, ExitData>,
+    pub hidden_objects: Vec<i32>,
     #[serde(default)]
     pub extra: HashMap<String, ExtraValue>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorldData {
-    pub items: Vec<ItemData>,
+    pub objects: Vec<ObjectData>,
     pub rooms: Vec<RoomData>,
 }
 
 impl WorldData {
-    /// Look up an item definition by id, if present.
-    pub fn find_item(&self, id: i32) -> Option<&ItemData> {
-        self.items.iter().find(|item| item.id == id)
+    /// Look up an object definition by id, if present.
+    pub fn find_object(&self, id: i32) -> Option<&ObjectData> {
+        self.objects.iter().find(|object| object.id == id)
     }
 
     /// Look up a room definition by id, if present.
@@ -71,7 +95,7 @@ impl WorldData {
 
 #[derive(Debug, Deserialize)]
 struct ItemsFile {
-    items: Vec<ItemData>,
+    objects: Vec<ObjectData>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,7 +145,7 @@ impl WorldData {
         let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
 
         Ok(WorldData {
-            items: items.items,
+            objects: items.objects,
             rooms: rooms.rooms,
         })
     }

@@ -13,17 +13,17 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, DirectionResolution, Event, ItemId, ItemResolution, RoomId, WorldState};
+use core::{Direction, DirectionResolution, Event, ObjectId, ObjectResolution, RoomId, WorldState};
 
 /// Whether the current room lists `name` among its visible items.
 fn room_shows(world: &WorldState, name: &str) -> bool {
-    world.room_item_names().iter().any(|n| n == name)
+    world.room_object_names().iter().any(|n| n == name)
 }
 
 /// Whether the current room hides an item under `id` (i.e. it is not among
 /// the visible room items).
 fn room_hides(world: &WorldState, id: i32) -> bool {
-    world.get_item_from_room(ItemId::new(id)) == ItemResolution::NotFound
+    world.get_object_from_room(ObjectId::new(id)) == ObjectResolution::NotFound
 }
 
 mod hidden_items {
@@ -41,18 +41,18 @@ mod hidden_items {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("take stale bread"),
-            vec![Event::TookItemNotFound {
-                item: "stale bread".to_string()
+            vec![Event::TookObjectNotFound {
+                object: "stale bread".to_string()
             }]
         );
     }
 
     #[test]
-    fn reveal_item_moves_it_to_visible_items() {
+    fn reveal_object_moves_it_to_visible_items() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().reveal_item(ItemId::new(5)),
-            ItemResolution::Found(ItemId::new(5))
+            engine.world_mut().reveal_object(ObjectId::new(5)),
+            ObjectResolution::Found(ObjectId::new(5))
         );
         assert!(room_shows(engine.world(), "stale bread"));
         assert!(!room_hides(engine.world(), 5));
@@ -62,20 +62,20 @@ mod hidden_items {
     fn reveal_unknown_item_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().reveal_item(ItemId::new(99)),
-            ItemResolution::NotFound
+            engine.world_mut().reveal_object(ObjectId::new(99)),
+            ObjectResolution::NotFound
         );
     }
 
     #[test]
     fn revealed_item_can_be_taken() {
         let mut engine = setup_engine();
-        engine.world_mut().reveal_item(ItemId::new(5));
+        engine.world_mut().reveal_object(ObjectId::new(5));
         assert_eq!(
             engine.handle_input("take stale bread"),
             vec![Event::Took {
-                item_id: ItemId::new(5),
-                item: "stale bread".to_string()
+                object_id: ObjectId::new(5),
+                object: "stale bread".to_string()
             }]
         );
     }
@@ -84,8 +84,8 @@ mod hidden_items {
     fn hide_visible_item_moves_it_to_hidden() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().hide_item(ItemId::new(1)),
-            ItemResolution::Found(ItemId::new(1))
+            engine.world_mut().hide_object(ObjectId::new(1)),
+            ObjectResolution::Found(ObjectId::new(1))
         );
         assert!(!room_shows(engine.world(), "glowing mysterious sword"));
         assert!(room_hides(engine.world(), 1));
@@ -94,11 +94,11 @@ mod hidden_items {
     #[test]
     fn hidden_item_cannot_be_taken_after_hide() {
         let mut engine = setup_engine();
-        engine.world_mut().hide_item(ItemId::new(2));
+        engine.world_mut().hide_object(ObjectId::new(2));
         assert_eq!(
             engine.handle_input("take iron key"),
-            vec![Event::TookItemNotFound {
-                item: "iron key".to_string()
+            vec![Event::TookObjectNotFound {
+                object: "iron key".to_string()
             }]
         );
     }
@@ -107,18 +107,18 @@ mod hidden_items {
     fn hiding_unknown_item_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().hide_item(ItemId::new(99)),
-            ItemResolution::NotFound
+            engine.world_mut().hide_object(ObjectId::new(99)),
+            ObjectResolution::NotFound
         );
     }
 
     #[test]
     fn hide_reveal_round_trip_restores_item() {
         let mut engine = setup_engine();
-        engine.world_mut().hide_item(ItemId::new(1));
+        engine.world_mut().hide_object(ObjectId::new(1));
         assert_eq!(
-            engine.world_mut().reveal_item(ItemId::new(1)),
-            ItemResolution::Found(ItemId::new(1))
+            engine.world_mut().reveal_object(ObjectId::new(1)),
+            ObjectResolution::Found(ObjectId::new(1))
         );
         assert!(room_shows(engine.world(), "glowing mysterious sword"));
         assert!(!room_hides(engine.world(), 1));
@@ -127,10 +127,10 @@ mod hidden_items {
     #[test]
     fn reveal_then_hide_round_trip_restores_hidden() {
         let mut engine = setup_engine();
-        engine.world_mut().reveal_item(ItemId::new(5));
+        engine.world_mut().reveal_object(ObjectId::new(5));
         assert_eq!(
-            engine.world_mut().hide_item(ItemId::new(5)),
-            ItemResolution::Found(ItemId::new(5))
+            engine.world_mut().hide_object(ObjectId::new(5)),
+            ObjectResolution::Found(ObjectId::new(5))
         );
         assert!(!room_shows(engine.world(), "stale bread"));
         assert!(room_hides(engine.world(), 5));

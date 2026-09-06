@@ -1,13 +1,8 @@
 rooms:
   - id: 1
     name: The Damp Cellar
-    visible_items: [1, 2, 3, 4]
-    hidden_items: [5]
-    exits:
-      north: 
-        to: 2
-        hidden: false
-        locked: false 
+    visible_objects: [1, 2, 3, 4, 8]
+    hidden_objects: [5]
     extra:
       dark: true
       gui:
@@ -15,35 +10,10 @@ rooms:
 
   - id: 2
     name: The Torchlit Corridor
-    visible_items: [6, 7]
-    hidden_items: []
-    exits:
-      south: 
-        to: 1
-        hidden: false
-        locked: false 
-      east: 
-        to: 3
-        hidden: false
-        locked: false 
+    visible_objects: [6, 7, 9, 10]
+    hidden_objects: []
 
   - id: 3
     name: The Dusty Study
-    visible_items: []
-    hidden_items: []
-    exits:
-      north:
-        to: 1
-        hidden: true
-      west:
-        to: 2
-      south:
-        to: 1
-        hidden: true
-        locked: true
-      east:
-        to: 2
-        locked: true
-        extra: 
-          material: oak
-          name: oak door 
+    visible_objects: [11, 14]
+    hidden_objects: [12, 13]

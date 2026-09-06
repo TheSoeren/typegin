@@ -1,4 +1,4 @@
-items:
+objects:
   - id: 1
     primary_name: glowing mysterious sword
     aliases: [glowing sword, sword]
@@ -34,3 +34,64 @@ items:
   - id: 7
     primary_name: old map
     aliases: [map]
+
+  - id: 8
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: north
+      to: 2
+
+  - id: 9
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: south
+      to: 1
+
+  - id: 10
+    primary_name: study door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 3
+
+  - id: 11
+    primary_name: wooden door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: west
+      to: 2
+
+  - id: 12
+    primary_name: secret passage
+    aliases: [passage]
+    kind: Scene
+    door:
+      direction: north
+      to: 1
+
+  - id: 13
+    primary_name: hidden vault
+    aliases: [vault]
+    kind: Scene
+    door:
+      direction: south
+      to: 1
+      locked: true
+
+  - id: 14
+    primary_name: oak door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 2
+      locked: true
+      gated_by: 2
+    extra:
+      material: oak

@@ -23,7 +23,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, TakeRules);
+    let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, GameRules);
 
     let view = view::TextView;
 
@@ -53,50 +53,15 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// This game's rules: how the player actually picks items up.
+/// This game's rules: room-specific discovery.
 ///
-/// The core's default `BasicRules` is intentionally inert — moving items
-/// between the room and the inventory is behaviour supplied by the game.
-struct TakeRules;
+/// The core's default `BasicRules` supplies stock behaviour (taking items,
+/// refusing to take scene objects, unlocking `gated_by` doors). This game only
+/// adds an authored beat: looking around in the study reveals the hidden
+/// passage door.
+struct GameRules;
 
-impl typegin_core::Rules for TakeRules {
-    fn on_take(
-        &mut self,
-        world: &mut typegin_core::WorldState,
-        name: &str,
-        resolution: typegin_core::ItemResolution,
-    ) -> Vec<typegin_core::Event> {
-        match resolution {
-            typegin_core::ItemResolution::Found(item_id) => match world.player_take_item(item_id) {
-                typegin_core::TakeResult::Success => {
-                    vec![typegin_core::Event::Took {
-                        item_id,
-                        item: name.to_string(),
-                    }]
-                }
-                typegin_core::TakeResult::Fail => {
-                    vec![typegin_core::Event::TookItemNotFound {
-                        item: name.to_string(),
-                    }]
-                }
-            },
-            typegin_core::ItemResolution::Ambiguous {
-                ids,
-                alias: item_name,
-            } => {
-                vec![typegin_core::Event::TookItemAmbiguous {
-                    item_ids: ids,
-                    item: item_name,
-                }]
-            }
-            typegin_core::ItemResolution::NotFound => {
-                vec![typegin_core::Event::TookItemNotFound {
-                    item: name.to_string(),
-                }]
-            }
-        }
-    }
-
+impl typegin_core::Rules for GameRules {
     fn on_look(&mut self, world: &mut typegin_core::WorldState) -> Vec<typegin_core::Event> {
         if world.current_room_id() == typegin_core::RoomId::new(3) {
             world.reveal_exit(typegin_core::Direction::North);

@@ -38,65 +38,99 @@ impl TextView {
             typegin_core::Event::WentExitLocked(direction) => {
                 format!("The {direction:?} door is locked.")
             }
-            typegin_core::Event::Took { item_id: _, item } => {
-                format!("You take the {item}.")
+            typegin_core::Event::UnlockedExit { direction } => {
+                format!("The {direction:?} door swings open.")
             }
-            typegin_core::Event::TookItemNotFound { item } => {
-                format!("I don't see any {item} here.")
+            typegin_core::Event::CannotUse { item, target } => {
+                format!("That doesn't work with the {item} on the {target}.")
             }
-            typegin_core::Event::TookItemAmbiguous { item_ids: _, item } => {
-                format!("Which {item} do you mean? Be more specific.")
+            typegin_core::Event::Custom { name } => format!("({name})"),
+            typegin_core::Event::Took {
+                object_id: _,
+                object,
+            } => {
+                format!("You take the {object}.")
             }
-            typegin_core::Event::Dropped { item_id: _, item } => {
-                format!("You dropped the {item}.")
+            typegin_core::Event::TookObjectNotFound { object } => {
+                format!("I don't see any {object} here.")
             }
-            typegin_core::Event::DroppedItemNotFound { item } => {
-                format!("You aren't carrying any {item}.")
+            typegin_core::Event::TookObjectAmbiguous {
+                object_ids: _,
+                object,
+            } => {
+                format!("Which {object} do you mean? Be more specific.")
             }
-            typegin_core::Event::DroppedItemAmbiguous { item_ids: _, item } => {
-                format!("Which {item} do you mean? Be more specific.")
+            typegin_core::Event::CantTake { object } => {
+                format!("You can't carry the {object}.")
+            }
+            typegin_core::Event::Dropped {
+                object_id: _,
+                object,
+            } => {
+                format!("You dropped the {object}.")
+            }
+            typegin_core::Event::DroppedObjectNotFound { object } => {
+                format!("You aren't carrying any {object}.")
+            }
+            typegin_core::Event::DroppedObjectAmbiguous {
+                object_ids: _,
+                object,
+            } => {
+                format!("Which {object} do you mean? Be more specific.")
             }
             typegin_core::Event::Used {
-                item_id: _,
-                item,
+                object_id: _,
+                object,
                 target_id: _,
                 target,
             } => match target {
-                Some(target) => format!("You use the {item} on the {target}."),
-                None => format!("You use the {item}."),
+                Some(target) => format!("You use the {object} on the {target}."),
+                None => format!("You use the {object}."),
             },
-            typegin_core::Event::UsedItemNotFound { item } => {
-                format!("You don't have a {item}.")
+            typegin_core::Event::UsedObjectNotFound { object } => {
+                format!("You don't have a {object}.")
             }
-            typegin_core::Event::UsedItemAmbiguous { item_ids: _, item } => {
-                format!("Which {item} do you mean? Be more specific.")
+            typegin_core::Event::UsedObjectAmbiguous {
+                object_ids: _,
+                object,
+            } => {
+                format!("Which {object} do you mean? Be more specific.")
             }
-            typegin_core::Event::UsedTargetNeeded { item_id: _, item } => {
-                format!("You need to use the {item} on something.")
+            typegin_core::Event::UsedTargetNeeded {
+                object_id: _,
+                object,
+            } => {
+                format!("You need to use the {object} on something.")
             }
             typegin_core::Event::UsedTargetNotFound {
-                item_id: _,
-                item,
+                object_id: _,
+                object,
                 target,
             } => {
-                format!("You can't use the {item} on {target}.")
+                format!("You can't use the {object} on {target}.")
             }
             typegin_core::Event::UsedTargetAmbiguous {
-                item_id: _,
-                item,
+                object_id: _,
+                object,
                 target_ids: _,
                 target: _,
             } => {
-                format!("Which target do you want to use the {item} on?")
+                format!("Which target do you want to use the {object} on?")
             }
-            typegin_core::Event::Examined { item_id: _, item } => {
-                format!("You examine the {item}.")
+            typegin_core::Event::Examined {
+                object_id: _,
+                object,
+            } => {
+                format!("You examine the {object}.")
             }
-            typegin_core::Event::ExaminedItemNotFound { item } => {
-                format!("There is no {item}.")
+            typegin_core::Event::ExaminedObjectNotFound { object } => {
+                format!("There is no {object}.")
             }
-            typegin_core::Event::ExaminedItemAmbiguous { item_ids: _, item } => {
-                format!("Which {item} do you mean? Be more specific.")
+            typegin_core::Event::ExaminedObjectAmbiguous {
+                object_ids: _,
+                object,
+            } => {
+                format!("Which {object} do you mean? Be more specific.")
             }
             typegin_core::Event::UnknownEvent { name } => {
                 format!("I don't understand \"{name}\".")
@@ -107,8 +141,8 @@ impl TextView {
 }
 
 fn render_look(world: &typegin_core::WorldState) -> Vec<String> {
-    let room_items = world.room_item_names();
-    let inventory = world.player_item_names();
+    let room_items = world.room_object_names();
+    let inventory = world.player_object_names();
 
     let mut parts = vec!["You are in a room.".to_string()];
 

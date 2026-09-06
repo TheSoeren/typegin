@@ -8,7 +8,7 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, Event, ItemId, RoomId};
+use core::{Direction, Event, ObjectId, RoomId};
 
 // --- on_look ---
 
@@ -88,17 +88,19 @@ mod on_take {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string()
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string()
             }]
         );
         assert!(
-            engine.world().get_item_from_room(core::ItemId::new(2))
-                == core::ItemResolution::NotFound
+            engine.world().get_object_from_room(core::ObjectId::new(2))
+                == core::ObjectResolution::NotFound
         );
         assert!(
-            engine.world().get_item_from_player(core::ItemId::new(2))
-                != core::ItemResolution::NotFound
+            engine
+                .world()
+                .get_object_from_player(core::ObjectId::new(2))
+                != core::ObjectResolution::NotFound
         );
     }
 
@@ -107,8 +109,8 @@ mod on_take {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("take bogus"),
-            vec![Event::TookItemNotFound {
-                item: "bogus".to_string()
+            vec![Event::TookObjectNotFound {
+                object: "bogus".to_string()
             }]
         );
     }
@@ -119,9 +121,9 @@ mod on_take {
         // "key" matches both item 2 (iron key) and item 4 (brass key) in room 1.
         assert_eq!(
             engine.handle_input("take key"),
-            vec![Event::TookItemAmbiguous {
-                item_ids: vec![ItemId::new(2), ItemId::new(4)],
-                item: "key".to_string()
+            vec![Event::TookObjectAmbiguous {
+                object_ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                object: "key".to_string()
             }]
         );
     }
@@ -133,8 +135,8 @@ mod on_take {
         // The item is no longer in the room, so a second take matches nothing.
         assert_eq!(
             engine.handle_input("take iron key"),
-            vec![Event::TookItemNotFound {
-                item: "iron key".to_string()
+            vec![Event::TookObjectNotFound {
+                object: "iron key".to_string()
             }]
         );
     }
@@ -152,17 +154,19 @@ mod on_drop {
         assert_eq!(
             engine.handle_input("drop iron key"),
             vec![Event::Dropped {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string()
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string()
             }]
         );
         assert!(
-            engine.world().get_item_from_player(core::ItemId::new(2))
-                == core::ItemResolution::NotFound
+            engine
+                .world()
+                .get_object_from_player(core::ObjectId::new(2))
+                == core::ObjectResolution::NotFound
         );
         assert!(
-            engine.world().get_item_from_room(core::ItemId::new(2))
-                != core::ItemResolution::NotFound
+            engine.world().get_object_from_room(core::ObjectId::new(2))
+                != core::ObjectResolution::NotFound
         );
     }
 
@@ -171,8 +175,8 @@ mod on_drop {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("drop iron key"),
-            vec![Event::DroppedItemNotFound {
-                item: "iron key".to_string()
+            vec![Event::DroppedObjectNotFound {
+                object: "iron key".to_string()
             }]
         );
     }
@@ -184,9 +188,9 @@ mod on_drop {
         engine.handle_input("take brass key");
         assert_eq!(
             engine.handle_input("drop key"),
-            vec![Event::DroppedItemAmbiguous {
-                item_ids: vec![ItemId::new(2), ItemId::new(4)],
-                item: "key".to_string()
+            vec![Event::DroppedObjectAmbiguous {
+                object_ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                object: "key".to_string()
             }]
         );
     }
@@ -203,8 +207,8 @@ mod on_examine {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string(),
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string(),
             }]
         );
     }
@@ -214,8 +218,8 @@ mod on_examine {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("examine bogus"),
-            vec![Event::ExaminedItemNotFound {
-                item: "bogus".to_string()
+            vec![Event::ExaminedObjectNotFound {
+                object: "bogus".to_string()
             }]
         );
     }
@@ -225,9 +229,9 @@ mod on_examine {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("examine key"),
-            vec![Event::ExaminedItemAmbiguous {
-                item_ids: vec![ItemId::new(2), ItemId::new(4)],
-                item: "key".to_string()
+            vec![Event::ExaminedObjectAmbiguous {
+                object_ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                object: "key".to_string()
             }]
         );
     }
@@ -243,8 +247,8 @@ mod on_use {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("use sword"),
-            vec![Event::UsedItemNotFound {
-                item: "sword".to_string()
+            vec![Event::UsedObjectNotFound {
+                object: "sword".to_string()
             }]
         );
     }
@@ -256,8 +260,8 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key"),
             vec![Event::UsedTargetNeeded {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string()
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string()
             }]
         );
     }
@@ -269,9 +273,9 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key on chest"),
             vec![Event::Used {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string(),
-                target_id: Some(ItemId::new(3)),
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string(),
+                target_id: Some(ObjectId::new(3)),
                 target: Some("chest".to_string()),
             }]
         );
@@ -285,9 +289,9 @@ mod on_use {
         // The player holds both keys, so "key" is ambiguous.
         assert_eq!(
             engine.handle_input("use key on chest"),
-            vec![Event::UsedItemAmbiguous {
-                item_ids: vec![ItemId::new(2), ItemId::new(4)],
-                item: "key".to_string()
+            vec![Event::UsedObjectAmbiguous {
+                object_ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                object: "key".to_string()
             }]
         );
     }

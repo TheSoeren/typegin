@@ -13,8 +13,8 @@ mod common;
 
 use common::{setup_engine, setup_engine_with_rules};
 use core::{
-    Direction, Event, ItemId, Rules,
-    world::{WorldState, item},
+    Direction, Event, GameEngine, Interaction, ObjectId, Rules, TargetFilter, Verb,
+    world::{WorldState, object},
 };
 
 /// Overrides every hook to return a distinctive marker event so a test can
@@ -42,7 +42,7 @@ impl Rules for TestRules {
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: item::ItemResolution,
+        _resolution: object::ObjectResolution,
     ) -> Vec<Event> {
         Self::override_event("take")
     }
@@ -51,7 +51,7 @@ impl Rules for TestRules {
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: item::ItemResolution,
+        _resolution: object::ObjectResolution,
     ) -> Vec<Event> {
         Self::override_event("drop")
     }
@@ -60,7 +60,7 @@ impl Rules for TestRules {
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: item::ItemResolution,
+        _resolution: object::ObjectResolution,
     ) -> Vec<Event> {
         Self::override_event("examine")
     }
@@ -70,8 +70,8 @@ impl Rules for TestRules {
         _world: &mut WorldState,
         _item: &str,
         _target: Option<&str>,
-        _item_resolution: item::ItemResolution,
-        _target_resolution: item::ItemResolution,
+        _item_resolution: object::ObjectResolution,
+        _target_resolution: object::ObjectResolution,
     ) -> Vec<Event> {
         Self::override_event("use")
     }
@@ -114,8 +114,8 @@ mod everything_overridden {
         assert_eq!(marker("take"), custom.handle_input("take iron key"));
         assert_eq!(
             vec![Event::Took {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string()
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string()
             }],
             default.handle_input("take iron key")
         );
@@ -134,8 +134,8 @@ mod everything_overridden {
         assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
             vec![Event::Examined {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string(),
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string(),
             }],
             default.handle_input("examine iron key")
         );
@@ -149,8 +149,8 @@ mod everything_overridden {
         default.handle_input("take iron key");
         assert_eq!(
             vec![Event::UsedTargetNeeded {
-                item_id: ItemId::new(2),
-                item: "iron key".to_string()
+                object_id: ObjectId::new(2),
+                object: "iron key".to_string()
             }],
             default.handle_input("use iron key")
         );
@@ -166,6 +166,40 @@ mod everything_overridden {
                 name: "dance wildly".to_string()
             }],
             default.handle_input("dance wildly")
+        );
+    }
+
+    #[test]
+    fn interaction_without_condition_runs_instead_of_default() {
+        // A consumer `Rules` type that only *adds* authored interactions and
+        // keeps the stock hooks runs them before the default `UsedTargetNeeded`
+        // fallback, because `BasicRules::on_use` consults `interactions()`.
+        struct Authored(Vec<Interaction>);
+        impl Rules for Authored {
+            fn interactions(&self) -> &[Interaction] {
+                &self.0
+            }
+        }
+
+        let interactions = vec![Interaction::build(
+            Verb::Use,
+            None,
+            TargetFilter::Any,
+            None,
+            Box::new(|_world, _context| {
+                vec![Event::UnknownEvent {
+                    name: "authored".to_string(),
+                }]
+            }),
+        )];
+        let mut engine =
+            GameEngine::get_with_rules(&common::multi_room_world_data(), Authored(interactions));
+        engine.handle_input("take iron key");
+        assert_eq!(
+            engine.handle_input("use iron key"),
+            vec![Event::UnknownEvent {
+                name: "authored".to_string()
+            }]
         );
     }
 }

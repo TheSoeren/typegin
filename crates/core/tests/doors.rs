@@ -1,12 +1,14 @@
-//! Spec (red phase) for exit state.
+//! Spec (red phase) for door state.
 //!
-//! An exit is a value — it has a destination plus two independent flags:
-//! `hidden` and `locked`. An exit can be both (a secret door that also needs
-//! a key). Both refuse movement; the engine reports the reason
+//! A door is a Scene object in the room's object list carrying optional door
+//! data: a destination plus a `locked` flag. An exit's *hidden* flag no longer
+//! lives on the door — hidden-ness is list membership: a hidden door is an
+//! object sitting in the room's `hidden_objects` until revealed. Both locked
+//! and hidden refuse movement; the engine reports the reason
 //! (`WentExitHidden` vs `WentExitLocked`) so the consumer decides how a
 //! hidden exit reads (undiscovered passage vs dead end). World data declares
-//! one `exits` table per room, so exit state lives in a single map on the
-//! room instead of parallel per-flag maps.
+//! door objects once in the object table; each room just lists which of them
+//! it holds.
 
 mod common;
 
@@ -14,7 +16,7 @@ use core::Direction;
 use core::DirectionResolution;
 use core::{Event, RoomId};
 
-/// Navigate from room 1 (start) to room 3, whose exits are:
+/// Navigate from room 1 (start) to room 3, whose doors are:
 /// west (open), north (hidden), east (locked), south (hidden + locked).
 fn engine_at_room_3() -> core::GameEngine {
     let mut engine = common::setup_engine();
@@ -36,42 +38,45 @@ mod data_parsing {
     use super::*;
 
     #[test]
-    fn room_data_parses_exit_destinations() {
+    fn door_object_parses_destination() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(1).expect("room 1 exists");
-        let north = room.exits.get("north").expect("north exit");
-        assert_eq!(north.to, 2);
-        assert!(!north.locked);
-        assert!(!north.hidden);
+        let stairs = data.find_object(8).expect("door object 8 exists");
+        let door = stairs.door.as_ref().expect("door data");
+        assert_eq!(door.to, 2);
+        assert_eq!(door.direction, "north".to_string());
+        assert!(!door.locked);
+        assert_eq!(stairs.kind, core::ObjectKind::Scene);
     }
 
     #[test]
-    fn room_data_parses_locked_and_hidden_flags() {
+    fn door_object_parses_locked_and_gated_flags() {
+        let data = common::multi_room_world_data();
+        let oak = data.find_object(14).expect("oak door");
+        let oak_door = oak.door.as_ref().expect("door data");
+        assert_eq!(oak_door.to, 2);
+        assert!(oak_door.locked);
+        assert_eq!(oak_door.gated_by, Some(2));
+
+        let vault = data.find_object(13).expect("hidden vault");
+        assert!(vault.door.as_ref().expect("door data").locked);
+    }
+
+    #[test]
+    fn hidden_door_is_listed_as_hidden_in_its_room() {
         let data = common::multi_room_world_data();
         let room = data.find_room(3).expect("room 3 exists");
-        let east = room.exits.get("east").expect("east exit");
-        assert_eq!(east.to, 2);
-        assert!(east.locked);
-        assert!(!east.hidden);
-
-        let north = room.exits.get("north").expect("north exit");
-        assert_eq!(north.to, 1);
-        assert!(!north.locked);
-        assert!(north.hidden);
-
-        let south = room.exits.get("south").expect("south exit");
-        assert_eq!(south.to, 1);
-        assert!(south.locked);
-        assert!(south.hidden);
+        assert!(room.hidden_objects.contains(&12)); // secret passage
+        assert!(room.hidden_objects.contains(&13)); // hidden vault
+        assert!(room.visible_objects.contains(&11)); // wooden door is visible
     }
 
     #[test]
-    fn exit_without_flags_defaults_to_open() {
+    fn door_without_flags_defaults_to_open() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(2).expect("room 2 exists");
-        for exit in room.exits.values() {
-            assert!(!exit.locked);
-            assert!(!exit.hidden);
+        for id in [8, 9, 10, 11] {
+            let object = data.find_object(id).expect("door object exists");
+            let door = object.door.as_ref().expect("door data");
+            assert!(!door.locked, "door {id} must default to unlocked");
         }
     }
 }

@@ -1,4 +1,5 @@
-use crate::{ItemId, input::Direction};
+use crate::input::direction::Direction;
+use crate::world::object::ObjectId;
 
 /// Structured result of executing an `Action` against the world.
 ///
@@ -13,6 +14,13 @@ pub enum Event {
         name: String,
     },
 
+    /// An opaque, game-authored beat, emitted by custom rules or a `Custom`
+    /// interaction effect. Consumers that don't recognise `name` may ignore
+    /// or render it generically.
+    Custom {
+        name: String,
+    },
+
     /// The player looked around the current room; the world can be re-rendered.
     Looked,
 
@@ -22,72 +30,92 @@ pub enum Event {
     WentExitLocked(Direction),
     WentInvalidDirection(Direction),
 
-    /// The player took an item into inventory.
+    /// A locked exit was unlocked (typically by using a matching `gated_by`
+    /// object on it).
+    UnlockedExit {
+        direction: Direction,
+    },
+
+    /// An attempted interaction that makes no sense ("use the sword on the
+    /// open door"): the entities resolved fine but the combination does not
+    /// apply. The generic fallback answer.
+    CannotUse {
+        item: String,
+        target: String,
+    },
+
+    /// The player took an object into inventory.
     Took {
-        item_id: ItemId,
-        item: String,
+        object_id: ObjectId,
+        object: String,
     },
-    TookItemNotFound {
-        item: String,
+    TookObjectNotFound {
+        object: String,
     },
-    TookItemAmbiguous {
-        item_ids: Vec<ItemId>,
-        item: String,
+    TookObjectAmbiguous {
+        object_ids: Vec<ObjectId>,
+        object: String,
     },
 
-    /// The player dropped an item from inventory.
+    /// The player tried to take a scene object (furniture, a door, ...). Scene
+    /// objects stay in the world; only `Item`s are portable.
+    CantTake {
+        object: String,
+    },
+
+    /// The player dropped an object from inventory.
     Dropped {
-        item_id: ItemId,
-        item: String,
+        object_id: ObjectId,
+        object: String,
     },
-    DroppedItemNotFound {
-        item: String,
+    DroppedObjectNotFound {
+        object: String,
     },
-    DroppedItemAmbiguous {
-        item_ids: Vec<ItemId>,
-        item: String,
+    DroppedObjectAmbiguous {
+        object_ids: Vec<ObjectId>,
+        object: String,
     },
 
-    /// The player used one item, optionally on a target.
+    /// The player used one object, optionally on a target.
     Used {
-        item_id: ItemId,
-        item: String,
-        target_id: Option<ItemId>,
+        object_id: ObjectId,
+        object: String,
+        target_id: Option<ObjectId>,
         target: Option<String>,
     },
-    UsedItemNotFound {
-        item: String,
+    UsedObjectNotFound {
+        object: String,
     },
-    UsedItemAmbiguous {
-        item_ids: Vec<ItemId>,
-        item: String,
+    UsedObjectAmbiguous {
+        object_ids: Vec<ObjectId>,
+        object: String,
     },
     UsedTargetNeeded {
-        item_id: ItemId,
-        item: String,
+        object_id: ObjectId,
+        object: String,
     },
     UsedTargetNotFound {
-        item_id: ItemId,
-        item: String,
+        object_id: ObjectId,
+        object: String,
         target: String,
     },
     UsedTargetAmbiguous {
-        item_id: ItemId,
-        item: String,
-        target_ids: Vec<ItemId>,
+        object_id: ObjectId,
+        object: String,
+        target_ids: Vec<ObjectId>,
         target: String,
     },
 
-    /// The player examined an item
+    /// The player examined an object
     Examined {
-        item_id: ItemId,
-        item: String,
+        object_id: ObjectId,
+        object: String,
     },
-    ExaminedItemNotFound {
-        item: String,
+    ExaminedObjectNotFound {
+        object: String,
     },
-    ExaminedItemAmbiguous {
-        item_ids: Vec<ItemId>,
-        item: String,
+    ExaminedObjectAmbiguous {
+        object_ids: Vec<ObjectId>,
+        object: String,
     },
 }
