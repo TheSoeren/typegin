@@ -83,11 +83,13 @@ pub struct WorldData {
 
 impl WorldData {
     /// Look up an object definition by id, if present.
+    #[must_use]
     pub fn find_object(&self, id: i32) -> Option<&ObjectData> {
         self.objects.iter().find(|object| object.id == id)
     }
 
     /// Look up a room definition by id, if present.
+    #[must_use]
     pub fn find_room(&self, id: i32) -> Option<&RoomData> {
         self.rooms.iter().find(|room| room.id == id)
     }
@@ -140,6 +142,12 @@ impl From<serde_yaml_ng::Error> for WorldDataError {
 }
 
 impl WorldData {
+    /// Build the world data from raw YAML strings.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`serde_yaml_ng::Error`] if either YAML string is malformed or
+    /// does not match the expected item/room shape.
     pub fn from_yaml(items_yaml: &str, rooms_yaml: &str) -> Result<Self, serde_yaml_ng::Error> {
         let items: ItemsFile = serde_yaml_ng::from_str(items_yaml)?;
         let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
@@ -150,6 +158,12 @@ impl WorldData {
         })
     }
 
+    /// Load world data from the given items and rooms YAML files on disk.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`WorldDataError`] if either file cannot be read, or if either
+    /// file's contents fail to parse as world data.
     pub fn load(
         items_path: impl AsRef<Path>,
         rooms_path: impl AsRef<Path>,

@@ -2,10 +2,20 @@
 members = ["crates/core"]
 resolver = "2"
 
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "deny", priority = 1 }
+redundant_clone = { level = "deny", priority = 2 }
+clone_on_copy = { level = "deny", priority = 2 }
+needless_collect = { level = "deny", priority = 2 }
+
 [package]
 name = "typegin"
 version = "0.1.0"
 edition = "2024"
+
+[lints]
+workspace = true
 
 [dependencies]
 env_logger = "0.11.11"

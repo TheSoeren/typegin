@@ -7,7 +7,7 @@
 //! `TestRules` that overrides every hook with a distinctive result, proving the
 //! override wins over the default.
 //!
-//! Run with: cd crates/core && cargo test --test rules_override
+//! Run with: `cd crates/core && cargo test --test rules_override`
 
 mod common;
 

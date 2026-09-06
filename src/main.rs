@@ -10,8 +10,7 @@ fn main() -> ExitCode {
 
     let data_dir = env::args_os()
         .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("data"));
+        .map_or_else(|| PathBuf::from("data"), PathBuf::from);
     let items_path = data_dir.join("items.yaml");
     let rooms_path = data_dir.join("rooms.yaml");
 

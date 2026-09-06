@@ -10,10 +10,12 @@ use crate::world::room::RoomId;
 pub struct ObjectId(pub(crate) i32);
 
 impl ObjectId {
+    #[must_use]
     pub fn new(value: i32) -> Self {
         ObjectId(value)
     }
 
+    #[must_use]
     pub fn get(self) -> i32 {
         self.0
     }
@@ -65,10 +67,12 @@ pub struct DoorState {
 }
 
 impl Object {
+    #[must_use]
     pub fn has_name(&self, name: &str) -> bool {
         self.primary_name == name || self.aliases.split(';').any(|alias| alias == name)
     }
 
+    #[must_use]
     pub fn resolve_by_name(objects: &[Object], name: &str) -> ObjectResolution {
         let matching: Vec<ObjectId> = objects
             .iter()

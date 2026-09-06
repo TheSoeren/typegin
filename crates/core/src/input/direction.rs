@@ -32,6 +32,7 @@ impl Direction {
     /// Accepts the full word or its one-letter abbreviation
     /// (`n`/`north`, `s`/`south`, `e`/`east`, `w`/`west`), case-sensitively.
     /// Returns [`None`] for anything else.
+    #[must_use]
     pub fn parse(raw: &str) -> Option<Direction> {
         match raw {
             "n" | "north" => Some(Direction::North),

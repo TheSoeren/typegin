@@ -147,7 +147,7 @@ mod parse {
 
     #[test]
     fn empty_input() {
-        assert_eq!(Action::Unknown("".to_string()), parses(""));
+        assert_eq!(Action::Unknown(String::new()), parses(""));
     }
 
     #[test]

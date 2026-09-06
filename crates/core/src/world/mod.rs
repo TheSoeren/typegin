@@ -43,6 +43,7 @@ impl WorldState {
     ///
     /// Hidden and locked exits are not traversable, so they resolve to `None`
     /// just like a direction with no exit at all.
+    #[must_use]
     pub fn get_room_id_by_exit_direction(
         &self,
         direction: direction::Direction,
@@ -56,28 +57,32 @@ impl WorldState {
             self.current_room_id = room_id;
             action::MoveResult::Success
         } else {
-            warn!("Tried to move to unknown room (id: {})!", room_id);
+            warn!("Tried to move to unknown room (id: {room_id})!");
             action::MoveResult::Fail
         }
     }
 
     /// Whether the exit in `direction` is locked (blocks traversal).
+    #[must_use]
     pub fn is_exit_locked(&self, direction: direction::Direction) -> bool {
         self.current_room().is_exit_locked(direction)
     }
 
     /// Whether the exit in `direction` is hidden (not yet discovered by the player).
+    #[must_use]
     pub fn is_exit_hidden(&self, direction: direction::Direction) -> bool {
         self.current_room().is_exit_hidden(direction)
     }
 
     /// The id of the object that unlocks the exit in `direction`, if one is
     /// declared. The gate link is data; unlocking behaviour is a rule.
+    #[must_use]
     pub fn exit_gated_by(&self, direction: direction::Direction) -> Option<ObjectId> {
         self.current_room().exit_gated_by(direction)
     }
 
     /// Public details about the exit in `direction`, if there is one.
+    #[must_use]
     pub fn exit_info(&self, direction: direction::Direction) -> Option<ObjectInfo> {
         self.current_room().door_in_direction_info(direction)
     }
@@ -85,11 +90,13 @@ impl WorldState {
     /// Directions with an open (passable) exit from the current room.
     ///
     /// Locked and hidden exits are excluded. Note: order is unspecified.
+    #[must_use]
     pub fn exit_directions(&self) -> Vec<direction::Direction> {
         self.current_room().exit_directions()
     }
 
     /// The opaque `extra` data attached to the exit in `direction`, if any.
+    #[must_use]
     pub fn exit_extra(
         &self,
         direction: direction::Direction,
@@ -122,6 +129,7 @@ impl WorldState {
 
 /// Room helpers
 impl WorldState {
+    #[must_use]
     pub fn get_object_from_room(&self, id: ObjectId) -> ObjectResolution {
         self.current_room().get_object(id)
     }
@@ -131,6 +139,7 @@ impl WorldState {
     }
 
     /// Names of the objects currently visible in the current room.
+    #[must_use]
     pub fn room_object_names(&self) -> Vec<String> {
         self.current_room()
             .objects()
@@ -147,6 +156,7 @@ impl WorldState {
         self.current_room_mut().hide_object(id)
     }
 
+    #[must_use]
     pub fn current_room_extra(&self) -> HashMap<String, data::ExtraValue> {
         self.current_room().extra().clone()
     }
@@ -154,6 +164,7 @@ impl WorldState {
 
 /// Player helpers
 impl WorldState {
+    #[must_use]
     pub fn get_object_from_player(&self, id: ObjectId) -> ObjectResolution {
         self.player.get_object(id)
     }
@@ -163,11 +174,13 @@ impl WorldState {
     }
 
     /// Whether the player currently holds the object with `id`.
+    #[must_use]
     pub fn player_holds(&self, id: ObjectId) -> bool {
         self.player.holds(id)
     }
 
     /// Names of the objects currently held by the player.
+    #[must_use]
     pub fn player_object_names(&self) -> Vec<String> {
         self.player
             .objects()
@@ -218,17 +231,20 @@ impl WorldState {
     }
 
     /// The kind of the object with `id`, if it is anywhere in scope.
+    #[must_use]
     pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
         self.any_object(id).map(|object| object.kind)
     }
 
     /// Whether the object with `id` is a scene object (stays in the world).
+    #[must_use]
     pub fn object_is_scene(&self, id: ObjectId) -> bool {
         self.any_object(id)
             .is_some_and(|object| object.kind == ObjectKind::Scene)
     }
 
     /// Whether the object with `id` is a door (a scene object with door data).
+    #[must_use]
     pub fn object_is_door(&self, id: ObjectId) -> bool {
         self.any_object(id)
             .is_some_and(|object| object.door.is_some())
@@ -237,6 +253,7 @@ impl WorldState {
     /// The direction the door object with `id` occupies in its room, if it is
     /// a door. Works while the door is hidden too (the object is still in the
     /// world); hidden doors still do not resolve as targets.
+    #[must_use]
     pub fn exit_direction_of(&self, id: ObjectId) -> Option<direction::Direction> {
         self.any_object(id)
             .and_then(|object| object.door.as_ref())
@@ -246,21 +263,25 @@ impl WorldState {
     /// Resolve a noun against everything currently in the player's scope:
     /// visible room objects and carried objects. Doors are ordinary scene
     /// objects, so they resolve here exactly like any other visible object.
+    #[must_use]
     pub fn resolve_target(&self, name: &str) -> ObjectResolution {
         object::Object::resolve_by_name(&self.get_available_objects(), name)
     }
 
     /// Resolve a noun against the objects in the current room only.
+    #[must_use]
     pub fn resolve_room_object(&self, name: &str) -> ObjectResolution {
         self.current_room().find_object(name)
     }
 
     /// Resolve a noun against the objects the player is carrying.
+    #[must_use]
     pub fn resolve_player_object(&self, name: &str) -> ObjectResolution {
         self.player.find_object(name)
     }
 
     /// Whether a given target is currently in the player's scope.
+    #[must_use]
     pub fn target_in_scope(&self, target: ObjectId) -> bool {
         self.current_room().holds(target) || self.player.holds(target)
     }
@@ -306,9 +327,10 @@ impl WorldState {
             );
         }
 
-        if !rooms.contains_key(&first_room_id) {
-            panic!("first room id {first_room_id} not found in rooms");
-        }
+        assert!(
+            rooms.contains_key(&first_room_id),
+            "first room id {first_room_id} not found in rooms"
+        );
 
         WorldState {
             player: player::Player::new(),

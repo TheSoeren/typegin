@@ -36,6 +36,7 @@ pub struct GameEngine {
 impl GameEngine {
     /// Open the engine with the world defined by `data`.
     /// Uses the stock [`BasicRules`]
+    #[must_use]
     pub fn get(data: &WorldData) -> Self {
         Self::get_with_rules(data, BasicRules)
     }
@@ -112,6 +113,7 @@ impl GameEngine {
     /// *authored* interactions only; a front-end combines the result with the
     /// world's own state (e.g. a locked door whose `gated_by` object is held)
     /// to decide what to offer.
+    #[must_use]
     pub fn interactions_for(
         &self,
         item: Option<ObjectId>,

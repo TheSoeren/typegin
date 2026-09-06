@@ -3,7 +3,7 @@
 //! `GameEngine::open` uses `BasicRules`, so these tests exercise every default
 //! hook through the public `handle_input` API.
 //!
-//! Run with: cd crates/core && cargo test --test default_rules
+//! Run with: `cd crates/core && cargo test --test default_rules`
 
 mod common;
 
@@ -92,15 +92,15 @@ mod on_take {
                 object: "iron key".to_string()
             }]
         );
-        assert!(
-            engine.world().get_object_from_room(core::ObjectId::new(2))
-                == core::ObjectResolution::NotFound
+        assert_eq!(
+            engine.world().get_object_from_room(core::ObjectId::new(2)),
+            core::ObjectResolution::NotFound
         );
-        assert!(
+        assert_ne!(
             engine
                 .world()
-                .get_object_from_player(core::ObjectId::new(2))
-                != core::ObjectResolution::NotFound
+                .get_object_from_player(core::ObjectId::new(2)),
+            core::ObjectResolution::NotFound
         );
     }
 
@@ -158,15 +158,15 @@ mod on_drop {
                 object: "iron key".to_string()
             }]
         );
-        assert!(
+        assert_eq!(
             engine
                 .world()
-                .get_object_from_player(core::ObjectId::new(2))
-                == core::ObjectResolution::NotFound
+                .get_object_from_player(core::ObjectId::new(2)),
+            core::ObjectResolution::NotFound
         );
-        assert!(
-            engine.world().get_object_from_room(core::ObjectId::new(2))
-                != core::ObjectResolution::NotFound
+        assert_ne!(
+            engine.world().get_object_from_room(core::ObjectId::new(2)),
+            core::ObjectResolution::NotFound
         );
     }
 

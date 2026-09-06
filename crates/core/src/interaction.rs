@@ -20,6 +20,7 @@ impl Verb {
     ///
     /// `Unknown` actions have no verb; `Use` with or without a target is the
     /// same verb (the target lives in the context, not the verb).
+    #[must_use]
     pub fn from_action(action: &Action) -> Option<Verb> {
         match action {
             Action::Look => Some(Verb::Look),
@@ -46,6 +47,7 @@ pub struct ActionContext {
 }
 
 impl ActionContext {
+    #[must_use]
     pub fn new(verb: Option<Verb>, item: Option<ObjectId>, target: Option<ObjectId>) -> Self {
         ActionContext { verb, item, target }
     }
@@ -68,7 +70,7 @@ pub enum TargetFilter {
 }
 
 impl TargetFilter {
-    pub(crate) fn matches(&self, world: &WorldState, target: Option<ObjectId>) -> bool {
+    pub(crate) fn matches(self, world: &WorldState, target: Option<ObjectId>) -> bool {
         match self {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
@@ -120,6 +122,7 @@ impl Interaction {
     ///   also when a front-end *queries* available interactions, so the query
     ///   only reports things that currently make sense.
     /// * `effect` — the behaviour; returns the events to emit.
+    #[must_use]
     pub fn build(
         verb: Verb,
         item: Option<ObjectId>,
@@ -137,16 +140,19 @@ impl Interaction {
     }
 
     /// The verb this interaction reacts to.
+    #[must_use]
     pub fn verb(&self) -> Verb {
         self.verb
     }
 
     /// The object this interaction requires (or `None` for "any").
+    #[must_use]
     pub fn item(&self) -> Option<ObjectId> {
         self.item
     }
 
     /// The coarse target filter this interaction accepts.
+    #[must_use]
     pub fn target(&self) -> TargetFilter {
         self.target
     }
@@ -154,6 +160,7 @@ impl Interaction {
     /// Whether this interaction applies to the given context under the given
     /// world state. Used both by the dispatcher (run it) and by the query
     /// API (list it).
+    #[must_use]
     pub fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
         let item_ok = match self.item {
             Some(id) => context.item == Some(id),

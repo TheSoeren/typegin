@@ -16,10 +16,12 @@ pub const DIRECTIONS: [input::Direction; 4] = [
 pub struct RoomId(i32);
 
 impl RoomId {
+    #[must_use]
     pub fn new(value: i32) -> Self {
         RoomId(value)
     }
 
+    #[must_use]
     pub fn get(self) -> i32 {
         self.0
     }
@@ -272,9 +274,8 @@ impl Room {
     /// contents. Hidden-ness is list membership; the door object itself keeps
     /// its state.
     pub(crate) fn hide_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
-        let id = match self.door_id(direction) {
-            Some(id) => id,
-            None => return input::DirectionResolution::NotFound,
+        let Some(id) = self.door_id(direction) else {
+            return input::DirectionResolution::NotFound;
         };
         if self.is_exit_hidden(direction) {
             return input::DirectionResolution::NotFound;
@@ -292,9 +293,8 @@ impl Room {
         &mut self,
         direction: input::Direction,
     ) -> input::DirectionResolution {
-        let id = match self.door_id(direction) {
-            Some(id) => id,
-            None => return input::DirectionResolution::NotFound,
+        let Some(id) = self.door_id(direction) else {
+            return input::DirectionResolution::NotFound;
         };
         if !self.is_exit_hidden(direction) {
             return input::DirectionResolution::NotFound;

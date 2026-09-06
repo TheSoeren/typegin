@@ -3,33 +3,40 @@ use super::direction::Direction;
 
 const USE_WORDS: &[&str] = &["on", "with"];
 
+#[must_use]
 pub fn lex(tokens: &[&str]) -> Action {
+    // The `go <direction>` and bare `<direction>` arms share a body but differ
+    // in arity (two tokens vs one), so they cannot be merged into one pattern.
+    #[expect(clippy::match_same_arms)]
     match tokens {
         ["look" | "l"] => Action::Look,
-        ["examine" | "x", rest @ ..] => match !rest.is_empty() {
-            true => Action::Examine(rest.join(" ")),
-            false => Action::Unknown(tokens.join(" ")),
-        },
-        ["take" | "get", rest @ ..] => match !rest.is_empty() {
-            true => Action::Take(rest.join(" ")),
-            false => Action::Unknown(tokens.join(" ")),
-        },
-        ["drop" | "d", rest @ ..] => match !rest.is_empty() {
-            true => Action::Drop(rest.join(" ")),
-            false => Action::Unknown(tokens.join(" ")),
-        },
+        ["examine" | "x", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Examine(rest.join(" "))
+            }
+        }
+        ["take" | "get", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Take(rest.join(" "))
+            }
+        }
+        ["drop" | "d", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Drop(rest.join(" "))
+            }
+        }
         ["use", rest @ ..] => match get_use(rest) {
             Some(action) => action,
             None => Action::Unknown("use".to_string()),
         },
-        ["go", direction] => match Direction::parse(direction) {
-            Some(d) => Action::Go(d),
-            None => Action::Unknown(tokens.join(" ")),
-        },
-        [direction] => match Direction::parse(direction) {
-            Some(d) => Action::Go(d),
-            None => Action::Unknown(tokens.join(" ")),
-        },
+        ["go", direction] => direction_to_action(direction, tokens),
+        [direction] => direction_to_action(direction, tokens),
         _ => Action::Unknown(tokens.join(" ")),
     }
 }
@@ -58,5 +65,12 @@ fn get_use(rest: &[&str]) -> Option<Action> {
             item: rest.join(" "),
             target: None,
         }),
+    }
+}
+
+fn direction_to_action(direction: &str, tokens: &[&str]) -> Action {
+    match Direction::parse(direction) {
+        Some(d) => Action::Go(d),
+        None => Action::Unknown(tokens.join(" ")),
     }
 }
