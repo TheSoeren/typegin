@@ -13,7 +13,6 @@ pub enum Verb {
     Take,
     Drop,
     Use,
-    Any,
 }
 
 impl Verb {
