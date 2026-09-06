@@ -2,10 +2,12 @@ objects:
   - id: 1
     primary_name: glowing mysterious sword
     aliases: [glowing sword, sword]
+    kind: Item
 
   - id: 2
     primary_name: iron key
     aliases: [key, rusty key]
+    kind: Item
     extra:
       weight: 3
       opens: chest
@@ -18,22 +20,27 @@ objects:
   - id: 3
     primary_name: locked chest
     aliases: [chest]
+    kind: Item
 
   - id: 4
     primary_name: brass key
     aliases: [key]
+    kind: Item
 
   - id: 5
     primary_name: stale bread
     aliases: [bread]
+    kind: Item
 
   - id: 6
     primary_name: rusty lamp
     aliases: [lamp]
+    kind: Item
 
   - id: 7
     primary_name: old map
     aliases: [map]
+    kind: Item
 
   - id: 8
     primary_name: cellar stairs

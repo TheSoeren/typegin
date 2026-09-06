@@ -37,7 +37,7 @@ say so explicitly when handing off a spec.
 
 ### Non-negotiable: it stays an ENGINE, and the consumer stays in control
 
-Edna & Harvey is a *benchmark to test completeness*, never a spec to hardcode.
+Edna & Harvey is a _benchmark to test completeness_, never a spec to hardcode.
 The engine must remain general-purpose so it can ship **other, different
 adventure games** too. In particular:
 
@@ -74,15 +74,15 @@ adventure games** too. In particular:
 
 ## Commands
 
-| Task                | Command                                                                                                                 |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Build               | `cargo build`                                                                                                           |
-| Run                 | `cargo run`                                                                                                             |
-| Test (all)          | `cargo test`                                                                                                            |
+| Task                | Command                                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Build               | `cargo build`                                                                                                                              |
+| Run                 | `cargo run`                                                                                                                                |
+| Test (all)          | `cargo test`                                                                                                                               |
 | Test (single suite) | `cargo test --test <name>` (names: `input`, `world`, `navigation`, `drop`, `default_rules`, `rules_override`, `hidden`, `extras`, `doors`) |
-| Lint                | `cargo clippy --workspace --all-targets`                                                                                |
-| Format              | `cargo fmt`                                                                                                             |
-| Format check        | `cargo fmt --check`                                                                                                     |
+| Lint                | `cargo clippy --workspace --all-targets`                                                                                                   |
+| Format              | `cargo fmt`                                                                                                                                |
+| Format check        | `cargo fmt --check`                                                                                                                        |
 
 Recommended verification order: `cargo fmt --check && cargo clippy --workspace --all-targets && cargo test`
 
@@ -102,8 +102,3 @@ Recommended verification order: `cargo fmt --check && cargo clippy --workspace -
 `text input → tokenizer → lexer → Action → GameEngine.handle_input → Rules hook → Events + mutated WorldState → View.render (RenderCommand stream) → front-end interpreter`
 
 Public API surface is re-exported from `crates/core/src/lib.rs`. The `input` module is private to the crate.
-
-## Backlog
-
-- **Opaque game event passthrough** — add something like `Event::Custom { name: String }` so custom `Rules` can emit game-specific beats and consumer `View`s render them; the last big engine reusability unlock.
-- **Game-side proof of doors** — front-end `Rules` making "use iron key on door" read the exit `extra` (`opens_with`), call `unlock_exit`, and reveal a hidden door, proving the lock/door/extra loop end-to-end from the consumer side.

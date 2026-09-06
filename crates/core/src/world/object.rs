@@ -87,14 +87,6 @@ impl Object {
     }
 
     pub(crate) fn from_data(object: &data::ObjectData) -> Self {
-        // A door is inherently a scene object: it stays in the world and is
-        // never portable. Declaring door data forces the kind, so the two-kind
-        // invariant always holds at runtime.
-        let kind = if object.door.is_some() {
-            ObjectKind::Scene
-        } else {
-            object.kind
-        };
         let door = object.door.as_ref().and_then(|door_data| {
             Direction::parse(&door_data.direction).map(|direction| DoorState {
                 direction,
@@ -103,11 +95,12 @@ impl Object {
                 gated_by: door_data.gated_by.map(ObjectId::from),
             })
         });
+
         Object {
             id: object.id.into(),
             primary_name: object.primary_name.clone(),
             aliases: object.aliases.join(";"),
-            kind,
+            kind: object.kind,
             door,
             extra: object.extra.clone(),
         }
