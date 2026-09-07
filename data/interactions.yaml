@@ -1,2 +1,46 @@
 interactions:
-  []
+  # - verb: use               # Verb, lowercase ("look", "go", "examine", "take", "drop", "use"); item is an object
+  #   item: iron-key          # key, omitted to match any carried object
+  #   target:
+  #     kind: scene           # target: {kind: scene} or {object: <key>}; omitted matches any target incl. self-use
+  #   condition:              # conditions AND together; empty = always
+  #     - room: study
+  #     - player_holds: brass-key
+  #     - exit_locked: east
+  #     - exit_hidden: west
+  #     - is_door: true       # target is (not) a door — door-ness is a property, expressed as a condition; this
+  #                           # is *how* you target "any door" after the kind taxonomy kept door out of the filters
+  #     - not: { room: study }
+  #   effect:
+  #     - emit: beat-name     # Event::Custom ( name = beat-name )
+  #     - take: iron-key      # Event::Took (no-op if object absent)
+  #     - drop: iron-key      # Event::Dropped (no-op if absent)
+  #     - unlock_exit: east   # Event::UnlockedExit (no-op if absent)
+  #     - lock_exit: east     # silent
+  #     - reveal_exit: north  # silent
+  #     - hide_exit: east     # silent
+  #     - reveal_object: stale-bread  # silent
+  #     - hide_object: stale-bread    # silent
+  - verb: take
+    item: chair
+    effect:
+      - reveal_object: chair-leg
+      - take: chair-leg
+      - emit: Broke off chair leg
+
+  - verb: use
+    item: chair-leg
+    target:
+      kind: scene
+    effect:
+      - drop: chair-leg
+      - reveal_object: chipped-chair-leg
+      - take: chipped-chair-leg
+      - emit: The chair leg got chipped
+
+  - verb: use
+    item: nail-clipper
+    effect:
+      - reveal_object: fingernail
+      - take: fingernail
+      - emit: You clipped your nail

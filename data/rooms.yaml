@@ -1,21 +1,24 @@
 rooms:
-  - key: cellar
-    name: The Damp Cellar
-    visible_objects: [glowing-sword, iron-key, locked-chest, brass-key, cellar-stairs]
-    hidden_objects: [stale-bread]
+  - key: player-cell
+    name: Psych Ward Cell
+    visible_objects: [chair, table, exit-door, wall-polster, nail-clipper]
+    hidden_objects: [vent, chair-leg, chipped-chair-leg, fingernail]
     extra:
-      description: Stone walls glisten with moisture and the air reeks of rot.
+      description: An ordinary psych ward cell. Its walls are lined with polster.
 
-  - key: corridor
-    name: The Torchlit Corridor
-    visible_objects: [rusty-lamp, old-map, corridor-stairs, study-door]
+  - key: vent-corridor
+    name: Vent
+    visible_objects: []
+    hidden_objects: []
+
+  - key: headmaster-office
+    name: The Headmasters Office
+    visible_objects: []
     hidden_objects: []
     extra:
-      description: Flickering torches line the corridor walls.
+      description: A big, robust table. Someone is compensating for something
 
-  - key: study
-    name: The Dusty Study
-    visible_objects: [wooden-door, oak-door]
-    hidden_objects: [secret-passage]
-    extra:
-      description: Bookshelves crowd the room, thick with dust.
+  - key: corridor
+    name: Unused Corridor
+    visible_objects: []
+    hidden_objects: []

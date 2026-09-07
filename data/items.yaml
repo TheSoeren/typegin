@@ -1,132 +1,64 @@
 objects:
-  - key: glowing-sword
-    primary_name: glowing mysterious sword
-    aliases: [glowing sword, sword]
+  # Objects in the players cell
+  - key: chair
+    primary_name: Chair
+    aliases: [chair]
+    kind: Item
     extra:
-      description: A sword that hums with a faint blue glow.
-      weight: 30
-      opens: chest
-      materials: [metal, iron]
+      description: A plain old chair
 
-  - key: iron-key
-    primary_name: iron key
-    aliases: [key, rusty key]
-    extra:
-      description: A heavy iron key, cool to the touch.
-      weight: 1
-      opens: chest
-      materials: [metal, iron]
-
-  - key: locked-chest
-    primary_name: locked chest
-    aliases: [chest]
-    extra:
-      description: A sturdy chest with a gleaming keyhole.
-      weight: 100
-      materials: [wood, iron]
-
-  - key: brass-key
-    primary_name: brass key
-    aliases: [key]
-    extra:
-      description: A small brass key on a worn ring.
-      weight: 1
-      materials: [brass]
-
-  - key: stale-bread
-    primary_name: stale bread
-    aliases: [bread]
-    extra:
-      description: A crusty loaf, hard as a brick.
-      weight: 1
-      materials: [wheat]
-
-  - key: rusty-lamp
-    primary_name: rusty lamp
-    aliases: [lamp]
-    extra:
-      description: A lamp crusted with rust, its glass black with soot.
-      weight: 2
-      materials: [metal, glass]
-
-  - key: old-map
-    primary_name: old map
-    aliases: [map]
-    extra:
-      description: A faded map of the dungeon.
-      weight: 1
-      materials: [paper]
-
-  - key: cellar-stairs
-    primary_name: cellar stairs
-    aliases: [stairs]
+  - key: table
+    primary_name: Table
+    aliases: [table]
     kind: Scene
-    door:
-      direction: north
-      to: corridor
     extra:
-      description: A narrow stone stairway climbs north.
+      description: A plain old table
 
-  - key: corridor-stairs
-    primary_name: cellar stairs
-    aliases: [stairs]
-    kind: Scene
-    door:
-      direction: south
-      to: cellar
-    extra:
-      description: The stairway descends south.
-
-  - key: study-door
-    primary_name: study door
-    aliases: [door]
-    kind: Scene
-    door:
-      direction: east
-      to: study
-    extra:
-      description: A heavy oak-framed door leading east.
-
-  - key: wooden-door
-    primary_name: wooden door
-    aliases: [door]
-    kind: Scene
-    door:
-      direction: west
-      to: corridor
-    extra:
-      description: A plain wooden door leading west.
-
-  - key: secret-passage
-    primary_name: secret passage
-    aliases: [passage]
-    kind: Scene
-    door:
-      direction: north
-      to: cellar
-    extra:
-      description: A concealed passage hidden behind the shelves.
-
-  - key: hidden-vault
-    primary_name: hidden vault
-    aliases: [vault]
-    kind: Scene
-    door:
-      direction: south
-      to: cellar
-      locked: true
-    extra:
-      description: A steel vault door sealed tight.
-
-  - key: oak-door
-    primary_name: oak door
-    aliases: [door]
+  - key: exit-door
+    primary_name: Cell Door
+    aliases: [cell door, door]
     kind: Scene
     door:
       direction: east
       to: corridor
       locked: true
-      gated_by: iron-key
     extra:
-      description: A sturdy oak door with an iron lock.
-      material: oak
+      description: A plain old table
+
+  - key: wall-polster
+    primary_name: Wall Polster
+    aliases: [wall polster, polster]
+    kind: Scene
+    extra:
+      description: All walls are lined with this thick, soft polster
+
+  - key: vent
+    primary_name: Vent
+    aliases: [vent]
+    kind: Scene
+    door:
+      direction: north
+      to: vent-corridor
+      locked: true
+      hidden: true
+      gated_by: fingernail
+
+  - key: fingernail
+    primary_name: Fingernail
+    aliases: [fingernail]
+    kind: Item
+
+  - key: chair-leg
+    primary_name: Chair leg
+    aliases: [chair leg, leg]
+    kind: Item
+
+  - key: chipped-chair-leg
+    primary_name: Chipped Chair Leg
+    aliases: [chipped chair leg, chipped leg, chair leg, leg]
+    kind: Item
+
+  - key: nail-clipper
+    primary_name: Nail clipper
+    aliases: [nail clipper, clipper]
+    kind: Item
