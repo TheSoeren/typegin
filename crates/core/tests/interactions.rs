@@ -26,7 +26,7 @@ use core::{
     TargetFilter, Verb, WorldState,
 };
 
-/// Takes the iron key (room 1), walks north (room 2) and east (room 3) so the
+/// Takes the iron key (cellar), walks north (corridor) and east (study) so the
 /// player stands in the Dusty Study facing the locked oak door.
 fn setup_engine_in_study_with_iron_key() -> GameEngine {
     let mut engine = setup_engine();
@@ -36,7 +36,7 @@ fn setup_engine_in_study_with_iron_key() -> GameEngine {
     engine
 }
 
-/// Takes the brass key (room 1) and walks to the study.
+/// Takes the brass key (cellar) and walks to the study.
 fn setup_engine_in_study_with_brass_key() -> GameEngine {
     let mut engine = setup_engine();
     engine.handle_input("take brass key");
@@ -70,7 +70,10 @@ mod unlock {
             engine.handle_input("go east"),
             vec![Event::Went(Direction::East)]
         );
-        assert_eq!(engine.world().current_room_id(), core::RoomId::new(2));
+        assert_eq!(
+            engine.world().current_room_id(),
+            core::RoomId::new("corridor")
+        );
     }
 
     #[test]
@@ -119,7 +122,7 @@ mod unlock {
         assert_eq!(
             engine.handle_input("use iron key on hidden vault"),
             vec![Event::UsedTargetNotFound {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
                 target: "hidden vault".to_string(),
             }]
@@ -136,11 +139,11 @@ mod resolve_target {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
             engine.world().resolve_target("oak door"),
-            ObjectResolution::Found(ObjectId::new(14))
+            ObjectResolution::Found(ObjectId::new("oak-door"))
         );
         assert_eq!(
             engine.world().resolve_target("wooden door"),
-            ObjectResolution::Found(ObjectId::new(11))
+            ObjectResolution::Found(ObjectId::new("wooden-door"))
         );
     }
 
@@ -149,11 +152,11 @@ mod resolve_target {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
             engine.world().resolve_target("iron key"),
-            ObjectResolution::Found(ObjectId::new(2))
+            ObjectResolution::Found(ObjectId::new("iron-key"))
         );
         assert_eq!(
             engine.world().resolve_target("oak door"),
-            ObjectResolution::Found(ObjectId::new(14))
+            ObjectResolution::Found(ObjectId::new("oak-door"))
         );
     }
 
@@ -178,7 +181,7 @@ mod resolve_target {
         assert_eq!(
             engine.world().resolve_target("key"),
             ObjectResolution::Ambiguous {
-                ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
                 alias: "key".to_string(),
             }
         );
@@ -211,30 +214,30 @@ mod scene_vs_inventory {
                 .contains(&"oak door".to_string())
         );
         assert!(!engine.world().is_exit_locked(Direction::West));
-        assert_eq!(engine.world().current_room_id(), core::RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), core::RoomId::new("study"));
     }
 
     #[test]
     fn carryable_items_are_the_default_kind() {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
-            engine.world().object_kind(ObjectId::new(2)),
+            engine.world().object_kind(&ObjectId::new("iron-key")),
             Some(ObjectKind::Item)
         );
-        assert!(engine.world().player_holds(ObjectId::new(2)));
+        assert!(engine.world().player_holds(&ObjectId::new("iron-key")));
     }
 
     #[test]
     fn doors_are_scene_objects_with_door_data() {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
-            engine.world().object_kind(ObjectId::new(14)),
+            engine.world().object_kind(&ObjectId::new("oak-door")),
             Some(ObjectKind::Scene)
         );
-        assert!(engine.world().object_is_door(ObjectId::new(14)));
-        assert!(!engine.world().object_is_scene(ObjectId::new(2)));
+        assert!(engine.world().object_is_door(&ObjectId::new("oak-door")));
+        assert!(!engine.world().object_is_scene(&ObjectId::new("iron-key")));
         assert_eq!(
-            engine.world().exit_direction_of(ObjectId::new(14)),
+            engine.world().exit_direction_of(&ObjectId::new("oak-door")),
             Some(Direction::East)
         );
     }
@@ -245,7 +248,7 @@ mod scene_vs_inventory {
         assert_eq!(
             engine.handle_input("examine oak door"),
             vec![Event::Examined {
-                object_id: ObjectId::new(14),
+                object_id: ObjectId::new("oak-door"),
                 object: "oak door".to_string(),
             }]
         );
@@ -258,14 +261,18 @@ mod target_in_scope {
     #[test]
     fn carried_item_and_visible_door_are_in_scope() {
         let engine = setup_engine_in_study_with_iron_key();
-        assert!(engine.world().target_in_scope(ObjectId::new(2)));
-        assert!(engine.world().target_in_scope(ObjectId::new(14)));
+        assert!(engine.world().target_in_scope(&ObjectId::new("iron-key")));
+        assert!(engine.world().target_in_scope(&ObjectId::new("oak-door")));
     }
 
     #[test]
     fn hidden_door_is_not_in_scope() {
         let engine = setup_engine_in_study_with_iron_key();
-        assert!(!engine.world().target_in_scope(ObjectId::new(13)));
+        assert!(
+            !engine
+                .world()
+                .target_in_scope(&ObjectId::new("hidden-vault"))
+        );
     }
 }
 
@@ -277,7 +284,10 @@ mod interactions_for {
         let engine = setup_engine_in_study_with_iron_key();
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .is_empty()
         );
     }
@@ -298,11 +308,14 @@ mod interactions_for {
 
         let interactions = vec![Interaction::build(
             Verb::Use,
-            Some(ObjectId::new(2)),
+            Some(ObjectId::new("iron-key")),
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 world.is_exit_locked(Direction::East)
-                    && context.target.is_some_and(|id| world.object_is_door(id))
+                    && context
+                        .target
+                        .as_ref()
+                        .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|world: &mut WorldState, _context: &ActionContext| {
                 world.unlock_exit(Direction::East);
@@ -323,7 +336,10 @@ mod interactions_for {
         // (custom unlock event) instead of the stock UnlockedExit.
         assert_eq!(
             engine
-                .interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .len(),
             1
         );
@@ -339,7 +355,10 @@ mod interactions_for {
         // and the dispatcher falls through to the CannotUse spine.
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .is_empty()
         );
         assert_eq!(
@@ -362,10 +381,13 @@ mod interactions_for {
 
         let interactions = vec![Interaction::build(
             Verb::Use,
-            Some(ObjectId::new(2)),
+            Some(ObjectId::new("iron-key")),
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
-                context.target.is_some_and(|id| world.object_is_door(id))
+                context
+                    .target
+                    .as_ref()
+                    .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
         )];
@@ -377,14 +399,20 @@ mod interactions_for {
 
         assert_eq!(
             engine
-                .interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .len(),
             1
         );
         // Iron key in hand but querying with a different carried object.
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new(4)), Some(ObjectId::new(14)))
+                .interactions_for(
+                    Some(ObjectId::new("brass-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .is_empty()
         );
     }
@@ -426,11 +454,11 @@ mod non_use_verbs {
         // "Examining the oak door in the study reveals the secret passage."
         let interactions = vec![Interaction::build(
             Verb::Examine,
-            Some(ObjectId::new(14)),
+            Some(ObjectId::new("oak-door")),
             TargetFilter::Any,
             None,
             Box::new(|world: &mut WorldState, _context: &ActionContext| {
-                let _ = world.reveal_object(ObjectId::new(12));
+                let _ = world.reveal_object(&ObjectId::new("secret-passage"));
                 vec![Event::Custom {
                     name: "passage-found".to_string(),
                 }]
@@ -450,7 +478,7 @@ mod non_use_verbs {
         // ...and its world mutation took effect: the hidden door is now visible.
         assert_eq!(
             engine.world().resolve_target("secret passage"),
-            ObjectResolution::Found(ObjectId::new(12))
+            ObjectResolution::Found(ObjectId::new("secret-passage"))
         );
         assert!(!engine.world().is_exit_hidden(Direction::North));
     }
@@ -459,7 +487,7 @@ mod non_use_verbs {
     fn stock_examine_runs_for_objects_with_no_interaction() {
         let interactions = vec![Interaction::build(
             Verb::Examine,
-            Some(ObjectId::new(14)),
+            Some(ObjectId::new("oak-door")),
             TargetFilter::Any,
             None,
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
@@ -471,7 +499,7 @@ mod non_use_verbs {
         assert_eq!(
             engine.handle_input("examine wooden door"),
             vec![Event::Examined {
-                object_id: ObjectId::new(11),
+                object_id: ObjectId::new("wooden-door"),
                 object: "wooden door".to_string(),
             }]
         );
@@ -482,13 +510,13 @@ mod non_use_verbs {
         // "The sword can only be lifted while holding the lamp."
         let interactions = vec![Interaction::build(
             Verb::Take,
-            Some(ObjectId::new(1)),
+            Some(ObjectId::new("glowing-sword")),
             TargetFilter::Any,
             Some(Box::new(|world: &WorldState, _context: &ActionContext| {
-                world.player_holds(ObjectId::new(6))
+                world.player_holds(&ObjectId::new("rusty-lamp"))
             })),
             Box::new(|world: &mut WorldState, _context: &ActionContext| {
-                let _ = world.player_take_object(ObjectId::new(1));
+                let _ = world.player_take_object(&ObjectId::new("glowing-sword"));
                 vec![Event::Custom {
                     name: "sword-taken-under-light".to_string(),
                 }]
@@ -499,7 +527,7 @@ mod non_use_verbs {
         // interaction is not listed.
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new(1)), None)
+                .interactions_for(Some(ObjectId::new("glowing-sword")), None)
                 .is_empty()
         );
 
@@ -507,7 +535,7 @@ mod non_use_verbs {
         assert_eq!(
             engine.handle_input("take sword"),
             vec![Event::Took {
-                object_id: ObjectId::new(1),
+                object_id: ObjectId::new("glowing-sword"),
                 object: "sword".to_string(),
             }]
         );
@@ -519,7 +547,9 @@ mod non_use_verbs {
         engine.handle_input("go south");
         // Lamp in hand: the condition holds, so the query now lists it.
         assert_eq!(
-            engine.interactions_for(Some(ObjectId::new(1)), None).len(),
+            engine
+                .interactions_for(Some(ObjectId::new("glowing-sword")), None)
+                .len(),
             1
         );
         assert_eq!(
@@ -528,14 +558,14 @@ mod non_use_verbs {
                 name: "sword-taken-under-light".to_string(),
             }]
         );
-        assert!(engine.world().player_holds(ObjectId::new(1)));
+        assert!(engine.world().player_holds(&ObjectId::new("glowing-sword")));
     }
 
     #[test]
     fn drop_interaction_replaces_stock_drop_and_owns_the_mutation() {
         let interactions = vec![Interaction::build(
             Verb::Drop,
-            Some(ObjectId::new(7)),
+            Some(ObjectId::new("old-map")),
             TargetFilter::Any,
             None,
             Box::new(|_world: &mut WorldState, _context: &ActionContext| {
@@ -557,7 +587,7 @@ mod non_use_verbs {
                 name: "map-returned".to_string(),
             }]
         );
-        assert!(engine.world().player_holds(ObjectId::new(7)));
+        assert!(engine.world().player_holds(&ObjectId::new("old-map")));
         assert!(
             !engine
                 .world()
@@ -575,7 +605,7 @@ mod non_use_verbs {
         assert_eq!(
             engine.handle_input("drop iron key"),
             vec![Event::Dropped {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -612,7 +642,7 @@ mod non_use_verbs {
                 name: "intercepted".to_string(),
             }]
         );
-        assert!(!engine.world().player_holds(ObjectId::new(1)));
+        assert!(!engine.world().player_holds(&ObjectId::new("glowing-sword")));
     }
 
     #[test]
@@ -620,54 +650,60 @@ mod non_use_verbs {
         let interactions = vec![
             Interaction::build(
                 Verb::Examine,
-                Some(ObjectId::new(14)),
+                Some(ObjectId::new("oak-door")),
                 TargetFilter::Any,
                 None,
                 Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
             ),
             Interaction::build(
                 Verb::Take,
-                Some(ObjectId::new(1)),
+                Some(ObjectId::new("glowing-sword")),
                 TargetFilter::Any,
                 None,
                 Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
             ),
             Interaction::build(
                 Verb::Drop,
-                Some(ObjectId::new(7)),
+                Some(ObjectId::new("old-map")),
                 TargetFilter::Any,
                 None,
                 Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
             ),
             Interaction::build(
                 Verb::Use,
-                Some(ObjectId::new(2)),
+                Some(ObjectId::new("iron-key")),
                 TargetFilter::Scene,
                 Some(Box::new(|world: &WorldState, context: &ActionContext| {
-                    context.target.is_some_and(|id| world.object_is_door(id))
+                    context
+                        .target
+                        .as_ref()
+                        .is_some_and(|id| world.object_is_door(id))
                 })),
                 Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
             ),
         ];
-        // Navigate to room 3 so the oak door is in scope for TargetFilter::Scene.
+        // Navigate to the study so the oak door is in scope for TargetFilter::Scene.
         let mut engine = engine_with(interactions);
         engine.handle_input("go north");
         engine.handle_input("go east");
 
         // Each item returns its matching interaction — verb-independent.
-        let examine = engine.interactions_for(Some(ObjectId::new(14)), None);
+        let examine = engine.interactions_for(Some(ObjectId::new("oak-door")), None);
         assert_eq!(examine.len(), 1);
         assert_eq!(examine[0].verb(), Verb::Examine);
 
-        let take = engine.interactions_for(Some(ObjectId::new(1)), None);
+        let take = engine.interactions_for(Some(ObjectId::new("glowing-sword")), None);
         assert_eq!(take.len(), 1);
         assert_eq!(take[0].verb(), Verb::Take);
 
-        let drop = engine.interactions_for(Some(ObjectId::new(7)), None);
+        let drop = engine.interactions_for(Some(ObjectId::new("old-map")), None);
         assert_eq!(drop.len(), 1);
         assert_eq!(drop[0].verb(), Verb::Drop);
 
-        let use_it = engine.interactions_for(Some(ObjectId::new(2)), Some(ObjectId::new(14)));
+        let use_it = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(ObjectId::new("oak-door")),
+        );
         assert_eq!(use_it.len(), 1);
         assert_eq!(use_it[0].verb(), Verb::Use);
     }

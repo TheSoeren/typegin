@@ -1,70 +1,73 @@
+# Canonical authored fixtures for the data-driven interactions suite
+# (`crates/core/tests/interactions.rs` and `symbolic_keys.rs`). Identity is a
+# stable `key` string; all cross-references are keys.
 objects:
-  - id: 101
+  - key: iron-key
     primary_name: iron key
     aliases: [key, rusty key]
     kind: Item
 
-  - id: 102
+  - key: brass-key
     primary_name: brass key
     aliases: [key]
     kind: Item
 
-  - id: 103
+  - key: rusty-lamp
     primary_name: rusty lamp
     aliases: [lamp]
     kind: Item
 
-  - id: 104
+  - key: stale-bread
     primary_name: stale bread
     aliases: [bread]
     kind: Item
 
-  - id: 105
+  - key: cellar-stairs
     primary_name: cellar stairs
     aliases: [stairs]
     kind: Scene
     door:
       direction: north
-      to: 2
+      to: corridor
 
-  - id: 106
+  - key: corridor-stairs
     primary_name: cellar stairs
     aliases: [stairs]
     kind: Scene
     door:
       direction: south
-      to: 1
+      to: cellar
 
-  - id: 107
+  - key: study-door
     primary_name: study door
     aliases: [door]
     kind: Scene
     door:
       direction: east
-      to: 3
+      to: study
 
-  - id: 108
+  - key: wooden-door
     primary_name: wooden door
     aliases: [door]
     kind: Scene
     door:
       direction: west
-      to: 2
+      to: corridor
 
-  - id: 109
+  - key: secret-passage
     primary_name: secret passage
     aliases: [passage]
     kind: Scene
     door:
       direction: north
-      to: 1
+      to: cellar
 
-  - id: 110
+  - key: oak-door
     primary_name: oak door
     aliases: [door]
     kind: Scene
     door:
       direction: east
-      to: 2
+      to: corridor
       locked: true
-      gated_by: 101
+      gated_by: iron-key

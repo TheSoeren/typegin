@@ -14,9 +14,9 @@ mod common;
 
 use core::Direction;
 use core::DirectionResolution;
-use core::{Event, RoomId};
+use core::{Event, ObjectId, RoomId};
 
-/// Navigate from room 1 (start) to room 3, whose doors are:
+/// Navigate from the cellar (start) to the study, whose doors are:
 /// west (open), north (hidden), east (locked), south (hidden + locked).
 fn engine_at_room_3() -> core::GameEngine {
     let mut engine = common::setup_engine();
@@ -28,11 +28,11 @@ fn engine_at_room_3() -> core::GameEngine {
         engine.handle_input("go east"),
         vec![Event::Went(Direction::East)]
     );
-    assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     engine
 }
 
-// --- TOML data parsing ---
+// --- YAML data parsing ---
 
 mod data_parsing {
     use core::object_data::ObjectKind;
@@ -42,9 +42,11 @@ mod data_parsing {
     #[test]
     fn door_object_parses_destination() {
         let data = common::multi_room_world_data();
-        let stairs = data.find_object(8).expect("door object 8 exists");
+        let stairs = data
+            .find_object(&ObjectId::new("cellar-stairs"))
+            .expect("cellar stairs object exists");
         let door = stairs.door.as_ref().expect("door data");
-        assert_eq!(door.to, 2);
+        assert_eq!(door.to, "corridor".to_string());
         assert_eq!(door.direction, "north".to_string());
         assert!(!door.locked);
         assert_eq!(stairs.kind, ObjectKind::Scene);
@@ -53,32 +55,46 @@ mod data_parsing {
     #[test]
     fn door_object_parses_locked_and_gated_flags() {
         let data = common::multi_room_world_data();
-        let oak = data.find_object(14).expect("oak door");
+        let oak = data
+            .find_object(&ObjectId::new("oak-door"))
+            .expect("oak door");
         let oak_door = oak.door.as_ref().expect("door data");
-        assert_eq!(oak_door.to, 2);
+        assert_eq!(oak_door.to, "corridor".to_string());
         assert!(oak_door.locked);
-        assert_eq!(oak_door.gated_by, Some(2));
+        assert_eq!(oak_door.gated_by, Some("iron-key".to_string()));
 
-        let vault = data.find_object(13).expect("hidden vault");
+        let vault = data
+            .find_object(&ObjectId::new("hidden-vault"))
+            .expect("hidden vault");
         assert!(vault.door.as_ref().expect("door data").locked);
     }
 
     #[test]
     fn hidden_door_is_listed_as_hidden_in_its_room() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(3).expect("room 3 exists");
-        assert!(room.hidden_objects.contains(&12)); // secret passage
-        assert!(room.hidden_objects.contains(&13)); // hidden vault
-        assert!(room.visible_objects.contains(&11)); // wooden door is visible
+        let room = data.find_room(&RoomId::new("study")).expect("study exists");
+        assert!(
+            room.hidden_objects
+                .contains(&ObjectId::new("secret-passage"))
+        );
+        assert!(room.hidden_objects.contains(&ObjectId::new("hidden-vault")));
+        assert!(room.visible_objects.contains(&ObjectId::new("wooden-door")));
     }
 
     #[test]
     fn door_without_flags_defaults_to_open() {
         let data = common::multi_room_world_data();
-        for id in [8, 9, 10, 11] {
-            let object = data.find_object(id).expect("door object exists");
+        for key in [
+            "cellar-stairs",
+            "corridor-stairs",
+            "study-door",
+            "wooden-door",
+        ] {
+            let object = data
+                .find_object(&ObjectId::new(key))
+                .expect("door object exists");
             let door = object.door.as_ref().expect("door data");
-            assert!(!door.locked, "door {id} must default to unlocked");
+            assert!(!door.locked, "door {key} must default to unlocked");
         }
     }
 }
@@ -95,7 +111,7 @@ mod world_state_doors {
             engine.handle_input("go east"),
             vec![Event::WentExitLocked(Direction::East)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
 
     #[test]
@@ -122,7 +138,7 @@ mod world_state_doors {
             engine.handle_input("go east"),
             vec![Event::Went(Direction::East)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
     }
 
     #[test]
@@ -146,7 +162,7 @@ mod world_state_doors {
             engine.handle_input("go north"),
             vec![Event::WentExitLocked(Direction::North)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 
     #[test]
@@ -195,7 +211,7 @@ mod world_state_doors {
             engine.handle_input("go north"),
             vec![Event::WentExitHidden(Direction::North)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
 
     #[test]
@@ -207,7 +223,7 @@ mod world_state_doors {
             engine.handle_input("go south"),
             vec![Event::WentExitHidden(Direction::South)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
 
     #[test]
@@ -223,7 +239,7 @@ mod world_state_doors {
             engine.handle_input("go south"),
             vec![Event::WentExitLocked(Direction::South)]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
 
     #[test]

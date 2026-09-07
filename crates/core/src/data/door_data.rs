@@ -11,9 +11,9 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 pub struct DoorData {
     pub direction: String,
-    pub to: i32,
+    pub to: String,
     #[serde(default)]
     pub locked: bool,
     #[serde(default)]
-    pub gated_by: Option<i32>,
+    pub gated_by: Option<String>,
 }

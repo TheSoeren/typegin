@@ -1,15 +1,17 @@
+# Canonical authored fixtures for the data-driven interactions suite. Room
+# identity is a `key` string; object memberships are object keys.
 rooms:
-  - id: 1
+  - key: cellar
     name: The Cellar
-    visible_objects: [101, 102, 103, 105]
-    hidden_objects: [104]
+    visible_objects: [iron-key, brass-key, rusty-lamp, cellar-stairs]
+    hidden_objects: [stale-bread]
 
-  - id: 2
+  - key: corridor
     name: The Corridor
-    visible_objects: [106, 107]
+    visible_objects: [corridor-stairs, study-door]
     hidden_objects: []
 
-  - id: 3
+  - key: study
     name: The Study
-    visible_objects: [108, 110]
-    hidden_objects: [109]
+    visible_objects: [wooden-door, oak-door]
+    hidden_objects: [secret-passage]

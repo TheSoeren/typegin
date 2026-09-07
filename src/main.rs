@@ -71,7 +71,7 @@ struct GameRules;
 
 impl typegin_core::Rules for GameRules {
     fn on_look(&mut self, world: &mut typegin_core::WorldState) -> Vec<typegin_core::Event> {
-        if world.current_room_id() == typegin_core::RoomId::new(3) {
+        if world.current_room_id() == typegin_core::RoomId::new("study") {
             world.reveal_exit(typegin_core::Direction::North);
         }
 

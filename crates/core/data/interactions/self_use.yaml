@@ -1,4 +1,4 @@
 - verb: use
-  item: 103
+  item: rusty-lamp
   effect:
     - emit: lamp-considered

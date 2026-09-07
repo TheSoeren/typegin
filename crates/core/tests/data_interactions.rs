@@ -6,9 +6,10 @@
 //!
 //! ## Test data (lives in `crates/core/data/`, loaded via `include_str!`)
 //!
-//! * `data_interactions_items.yaml` — the world's objects (ids 101-110).
-//! * `data_interactions_rooms.yaml` — the world's rooms (1 Cellar, 2
-//!   Corridor, 3 Study).
+//! * `data_interactions_items.yaml` — the world's objects (keys `iron-key`,
+//!   `brass-key`, …, `oak-door`).
+//! * `data_interactions_rooms.yaml` — the world's rooms (`cellar`, `corridor`,
+//!   `study`).
 //! * `interactions/<scenario>.yaml` — one snippet per distinct authored
 //!   interaction block; each is a standalone YAML sequence that the helper
 //!   appends under an `interactions:` key (mirroring the separate
@@ -19,26 +20,26 @@
 //! ```yaml
 //! interactions:
 //!   - verb: use               # Verb, lowercase ("look", "go", "examine",
-//!     item: 101               #   "take", "drop", "use"); item is an object
-//!     target:                 #   id, omitted to match any carried object
-//!       kind: scene           # target: {kind: scene} or {object: <id>};
+//!     item: iron-key          #   "take", "drop", "use"); item is an object
+//!     target:                 #   key, omitted to match any carried object
+//!       kind: scene           # target: {kind: scene} or {object: <key>};
 //!     condition:              #   omitted matches any target incl. self-use
-//!       - room: 3             # conditions AND together; empty = always
-//!       - player_holds: 102
+//!       - room: study         # conditions AND together; empty = always
+//!       - player_holds: brass-key
 //!       - exit_locked: east
 //!       - exit_hidden: west
 //!       - is_door: true       # target is (not) a door — door-ness is a
-//!       - not: { room: 3 }    #   property, expressed as a condition; this
+//!       - not: { room: study } #  property, expressed as a condition; this
 //!     effect:                 #   is *how* you target "any door" after the
 //!       - emit: beat-name     #   kind taxonomy kept door out of the filters
-//!       - take: 101           # Event::Took (no-op if object absent)
-//!       - drop: 101           # Event::Dropped (no-op if absent)
+//!       - take: iron-key      # Event::Took (no-op if object absent)
+//!       - drop: iron-key      # Event::Dropped (no-op if absent)
 //!       - unlock_exit: east   # Event::UnlockedExit (no-op if absent)
 //!       - lock_exit: east     # silent
 //!       - reveal_exit: north  # silent
 //!       - hide_exit: east     # silent
-//!       - reveal_object: 104  # silent
-//!       - hide_object: 104    # silent
+//!       - reveal_object: stale-bread  # silent
+//!       - hide_object: stale-bread    # silent
 //! ```
 //!
 //! Unknown condition/effect/target nodes are a **load error** (`from_yaml`
@@ -76,16 +77,16 @@ use core::{
     WorldData, WorldState,
 };
 
-/// The fixture world's item/scene objects (ids 101-110), from
+/// The fixture world's item/scene objects (keys `iron-key` … `oak-door`), from
 /// `data_interactions_items.yaml`.
 const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
 
 /// The fixture world's rooms (1 Cellar, 2 Corridor, 3 Study), from
 /// `data_interactions_rooms.yaml`.
 ///
-/// Layout mirrors the multi-room fixture: room 1 -> north -> room 2 -> east ->
-/// room 3. Room 3's exits: west (wooden door, open), north (secret passage,
-/// hidden), east (oak door, locked, `gated_by` the iron key 101).
+/// Layout mirrors the multi-room fixture: `cellar` -> north -> `corridor` ->
+/// east -> `study`. The study's exits: west (wooden door, open), north (secret
+/// passage, hidden), east (oak door, locked, `gated_by` the iron key).
 const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
 
 /// The base fixture world (no interactions). The interactions string has no
@@ -118,7 +119,7 @@ fn enter_study(engine: &mut GameEngine) {
         engine.handle_input("go east"),
         vec![Event::Went(Direction::East)]
     );
-    assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
 }
 
 /// Takes the iron key in The Cellar, then walks to The Study.
@@ -126,7 +127,7 @@ fn iron_key_in_study(engine: &mut GameEngine) {
     assert_eq!(
         engine.handle_input("take iron key"),
         vec![Event::Took {
-            object_id: ObjectId::new(101),
+            object_id: ObjectId::new("iron-key"),
             object: "iron key".to_string(),
         }]
     );
@@ -144,12 +145,14 @@ mod parse {
             vec![
                 InteractionData {
                     verb: Verb::Use,
-                    item: Some(ObjectId::new(101)),
+                    item: Some(ObjectId::new("iron-key")),
                     target: Some(DataTarget::Kind {
                         kind: DataTargetKind::Scene
                     }),
                     condition: vec![
-                        DataCondition::Room { room: 3 },
+                        DataCondition::Room {
+                            room: RoomId::new("study")
+                        },
                         DataCondition::ExitLocked {
                             exit_locked: Direction::East
                         },
@@ -166,26 +169,26 @@ mod parse {
                 },
                 InteractionData {
                     verb: Verb::Take,
-                    item: Some(ObjectId::new(104)),
+                    item: Some(ObjectId::new("stale-bread")),
                     target: None,
                     condition: vec![],
                     effect: vec![
                         DataEffect::Take {
-                            take: ObjectId::new(104)
+                            take: ObjectId::new("stale-bread")
                         },
                         DataEffect::Drop {
-                            drop: ObjectId::new(104)
+                            drop: ObjectId::new("stale-bread")
                         },
                         DataEffect::RevealObject {
-                            reveal_object: ObjectId::new(104)
+                            reveal_object: ObjectId::new("stale-bread")
                         },
                     ],
                 },
                 InteractionData {
                     verb: Verb::Examine,
-                    item: Some(ObjectId::new(103)),
+                    item: Some(ObjectId::new("rusty-lamp")),
                     target: Some(DataTarget::Object {
-                        object: ObjectId::new(108)
+                        object: ObjectId::new("wooden-door")
                     }),
                     condition: vec![],
                     effect: vec![],
@@ -255,14 +258,14 @@ mod dispatch {
             "../data/interactions/exact_object_target.yaml"
         ));
         iron_key_in_study(&mut engine);
-        // 108 matches the authored target.
+        // wooden-door matches the authored target.
         assert_eq!(
             engine.handle_input("use iron key on wooden door"),
             vec![Event::Custom {
                 name: "for-the-wooden-door".to_string()
             }]
         );
-        // 110 does not: the stock unlock still fires for its gated_by key.
+        // oak-door does not: the stock unlock still fires for its gated_by key.
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
             vec![Event::UnlockedExit {
@@ -307,7 +310,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new(103),
+                object_id: ObjectId::new("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
@@ -328,7 +331,10 @@ mod dispatch {
         iron_key_in_study(&mut without_brass);
         assert!(
             without_brass
-                .interactions_for(Some(ObjectId::new(101)), Some(ObjectId::new(110)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .is_empty()
         );
         assert_eq!(
@@ -345,21 +351,24 @@ mod dispatch {
         assert_eq!(
             with_brass.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new(101),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
         assert_eq!(
             with_brass.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new(102),
+                object_id: ObjectId::new("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
         enter_study(&mut with_brass);
         assert_eq!(
             with_brass
-                .interactions_for(Some(ObjectId::new(101)), Some(ObjectId::new(110)))
+                .interactions_for(
+                    Some(ObjectId::new("iron-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .len(),
             1
         );
@@ -380,7 +389,7 @@ mod dispatch {
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new(101),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -407,7 +416,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine oak door"),
             vec![Event::Examined {
-                object_id: ObjectId::new(110),
+                object_id: ObjectId::new("oak-door"),
                 object: "oak door".to_string(),
             }]
         );
@@ -469,7 +478,7 @@ mod effects {
         assert!(!engine.world().is_exit_hidden(Direction::North));
         assert_eq!(
             engine.world().resolve_target("secret passage"),
-            ObjectResolution::Found(ObjectId::new(109))
+            ObjectResolution::Found(ObjectId::new("secret-passage"))
         );
     }
 
@@ -479,7 +488,7 @@ mod effects {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new(101),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -490,12 +499,12 @@ mod effects {
                     name: "key-discarded".to_string()
                 },
                 Event::Dropped {
-                    object_id: ObjectId::new(101),
+                    object_id: ObjectId::new("iron-key"),
                     object: "iron key".to_string(),
                 },
             ]
         );
-        assert!(!engine.world().player_holds(ObjectId::new(101)));
+        assert!(!engine.world().player_holds(&ObjectId::new("iron-key")));
         assert!(
             engine
                 .world()
@@ -537,10 +546,13 @@ mod precedence_and_rules {
         let world = world_with(include_str!("../data/interactions/data_wins.yaml"));
         let closure = vec![Interaction::build(
             Verb::Use,
-            Some(ObjectId::new(101)),
+            Some(ObjectId::new("iron-key")),
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
-                context.target.is_some_and(|id| world.object_is_door(id))
+                context
+                    .target
+                    .as_ref()
+                    .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| {
                 vec![Event::Custom {
@@ -606,13 +618,19 @@ mod interactions_for {
     fn query_reports_matching_data_interactions() {
         let mut engine = engine_with(include_str!("../data/interactions/query_use.yaml"));
         iron_key_in_study(&mut engine);
-        let listed = engine.interactions_for(Some(ObjectId::new(101)), Some(ObjectId::new(110)));
+        let listed = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(ObjectId::new("oak-door")),
+        );
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].verb(), Verb::Use);
         // The wrong carried object does not match.
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new(102)), Some(ObjectId::new(110)))
+                .interactions_for(
+                    Some(ObjectId::new("brass-key")),
+                    Some(ObjectId::new("oak-door"))
+                )
                 .is_empty()
         );
     }
@@ -625,18 +643,24 @@ mod interactions_for {
             None,
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
-                context.target.is_some_and(|id| world.object_is_door(id))
+                context
+                    .target
+                    .as_ref()
+                    .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
         )];
         let mut engine = GameEngine::get_with_rules(&world, ClosureRules(closure));
         iron_key_in_study(&mut engine);
 
-        // The data interaction (item 101) is listed before the item-agnostic
-        // closure interaction.
-        let listed = engine.interactions_for(Some(ObjectId::new(101)), Some(ObjectId::new(110)));
+        // The data interaction (keyed to iron-key) is listed before the
+        // item-agnostic closure interaction.
+        let listed = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(ObjectId::new("oak-door")),
+        );
         assert_eq!(listed.len(), 2);
-        assert_eq!(listed[0].item(), Some(ObjectId::new(101)));
+        assert_eq!(listed[0].item(), Some(ObjectId::new("iron-key")));
         assert_eq!(listed[1].item(), None);
     }
 }

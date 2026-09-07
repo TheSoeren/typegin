@@ -1,5 +1,5 @@
 - verb: examine
-  item: 110
+  item: oak-door
   condition:
     - not:
         exit_locked: east

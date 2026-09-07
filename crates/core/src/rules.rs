@@ -94,13 +94,13 @@ pub trait Rules {
             };
         };
 
-        if let Some(object_data::ObjectKind::Scene) = world.object_kind(object_id) {
+        if let Some(object_data::ObjectKind::Scene) = world.object_kind(&object_id) {
             return vec![event::Event::CantTake {
                 object: name.to_string(),
             }];
         }
 
-        let context = ActionContext::new(Some(Verb::Take), Some(object_id), None);
+        let context = ActionContext::new(Some(Verb::Take), Some(object_id.clone()), None);
         if let Some(events) = interactions_data::dispatch_data(world, &context) {
             return events;
         }
@@ -112,7 +112,7 @@ pub trait Rules {
             return interaction.run(world, &context);
         }
 
-        match world.player_take_object(object_id) {
+        match world.player_take_object(&object_id) {
             action::TakeResult::Success => vec![event::Event::Took {
                 object_id,
                 object: name.to_string(),
@@ -146,7 +146,7 @@ pub trait Rules {
             };
         };
 
-        let context = ActionContext::new(Some(Verb::Drop), Some(object_id), None);
+        let context = ActionContext::new(Some(Verb::Drop), Some(object_id.clone()), None);
         if let Some(events) = interactions_data::dispatch_data(world, &context) {
             return events;
         }
@@ -158,7 +158,7 @@ pub trait Rules {
             return interaction.run(world, &context);
         }
 
-        match world.player_drop_object(object_id) {
+        match world.player_drop_object(&object_id) {
             action::DropResult::Success => vec![event::Event::Dropped {
                 object_id,
                 object: name.to_string(),
@@ -192,7 +192,7 @@ pub trait Rules {
             };
         };
 
-        let context = ActionContext::new(Some(Verb::Examine), Some(object_id), None);
+        let context = ActionContext::new(Some(Verb::Examine), Some(object_id.clone()), None);
         if let Some(events) = interactions_data::dispatch_data(world, &context) {
             return events;
         }
@@ -244,11 +244,11 @@ pub trait Rules {
             };
         };
 
-        let target_id = match target_resolution {
-            ObjectResolution::Found(id) => Some(id),
+        let target_id = match &target_resolution {
+            ObjectResolution::Found(id) => Some(id.clone()),
             _ => None,
         };
-        let context = ActionContext::new(Some(Verb::Use), Some(item_id), target_id);
+        let context = ActionContext::new(Some(Verb::Use), Some(item_id.clone()), target_id);
         if let Some(events) = interactions_data::dispatch_data(world, &context) {
             return events;
         }
@@ -263,7 +263,7 @@ pub trait Rules {
         let target_text = target.map(str::to_string);
         match target_resolution {
             ObjectResolution::Found(target_id) => {
-                if let Some(direction) = world.exit_direction_of(target_id) {
+                if let Some(direction) = world.exit_direction_of(&target_id) {
                     // It's a door.
                     if world.is_exit_locked(direction)
                         && world.exit_gated_by(direction) == Some(item_id)

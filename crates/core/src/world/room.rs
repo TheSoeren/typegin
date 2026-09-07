@@ -1,4 +1,5 @@
 use getset::{Getters, MutGetters};
+use serde::Deserialize;
 use std::collections::HashMap;
 
 use crate::data;
@@ -12,17 +13,24 @@ pub const DIRECTIONS: [input::Direction; 4] = [
     input::Direction::West,
 ];
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct RoomId(i32);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+pub struct RoomId(String);
 
 impl RoomId {
     #[must_use]
-    pub fn new(value: i32) -> Self {
-        RoomId(value)
+    pub fn new(value: &str) -> Self {
+        RoomId(value.to_string())
     }
 
+    /// The key as a string slice.
     #[must_use]
-    pub fn get(self) -> i32 {
+    pub fn get(&self) -> &str {
+        &self.0
+    }
+
+    /// Consume the id, returning the key.
+    #[must_use]
+    pub fn into_key(self) -> String {
         self.0
     }
 }
@@ -33,15 +41,21 @@ impl std::fmt::Display for RoomId {
     }
 }
 
-impl From<i32> for RoomId {
-    fn from(value: i32) -> Self {
+impl From<&str> for RoomId {
+    fn from(value: &str) -> Self {
         RoomId::new(value)
     }
 }
 
-impl From<RoomId> for i32 {
-    fn from(id: RoomId) -> i32 {
-        id.get()
+impl From<String> for RoomId {
+    fn from(value: String) -> Self {
+        RoomId(value)
+    }
+}
+
+impl From<RoomId> for String {
+    fn from(id: RoomId) -> Self {
+        id.0
     }
 }
 
@@ -68,7 +82,7 @@ impl Room {
         let mut directions = HashMap::new();
         for object in objects.iter().chain(hidden_objects.iter()) {
             if let Some(door) = &object.door {
-                directions.insert(door.direction, object.id);
+                directions.insert(door.direction, object.id.clone());
             }
         }
         Room {
@@ -82,9 +96,9 @@ impl Room {
 
 // Object management
 impl Room {
-    pub(crate) fn get_object(&self, id: object::ObjectId) -> object::ObjectResolution {
-        match self.objects.iter().find(|object| object.id == id) {
-            Some(object) => object::ObjectResolution::Found(object.id),
+    pub(crate) fn get_object(&self, id: &object::ObjectId) -> object::ObjectResolution {
+        match self.objects.iter().find(|object| object.id == *id) {
+            Some(object) => object::ObjectResolution::Found(object.id.clone()),
             None => object::ObjectResolution::NotFound,
         }
     }
@@ -93,24 +107,24 @@ impl Room {
         object::Object::resolve_by_name(self.objects(), name)
     }
 
-    pub(crate) fn holds(&self, id: object::ObjectId) -> bool {
-        self.objects.iter().any(|object| object.id == id)
+    pub(crate) fn holds(&self, id: &object::ObjectId) -> bool {
+        self.objects.iter().any(|object| object.id == *id)
     }
 
     /// Find an object by id across visible and hidden contents.
-    pub(crate) fn find_any(&self, id: object::ObjectId) -> Option<&object::Object> {
+    pub(crate) fn find_any(&self, id: &object::ObjectId) -> Option<&object::Object> {
         self.objects
             .iter()
             .chain(self.hidden_objects.iter())
-            .find(|object| object.id == id)
+            .find(|object| object.id == *id)
     }
 
     /// Mutably find an object by id across visible and hidden contents.
-    pub(crate) fn find_any_mut(&mut self, id: object::ObjectId) -> Option<&mut object::Object> {
+    pub(crate) fn find_any_mut(&mut self, id: &object::ObjectId) -> Option<&mut object::Object> {
         self.objects
             .iter_mut()
             .chain(self.hidden_objects.iter_mut())
-            .find(|object| object.id == id)
+            .find(|object| object.id == *id)
     }
 
     pub(crate) fn add_object(&mut self, object: object::Object) {
@@ -121,39 +135,39 @@ impl Room {
         self.hidden_objects_mut().push(object);
     }
 
-    pub(crate) fn remove_object(&mut self, id: object::ObjectId) -> Option<object::Object> {
+    pub(crate) fn remove_object(&mut self, id: &object::ObjectId) -> Option<object::Object> {
         Room::remove_object_from_list(self.objects_mut(), id)
     }
 
-    pub(crate) fn remove_hidden_object(&mut self, id: object::ObjectId) -> Option<object::Object> {
+    pub(crate) fn remove_hidden_object(&mut self, id: &object::ObjectId) -> Option<object::Object> {
         Room::remove_object_from_list(self.hidden_objects_mut(), id)
     }
 
     fn remove_object_from_list(
         objects: &mut Vec<object::Object>,
-        id: object::ObjectId,
+        id: &object::ObjectId,
     ) -> Option<object::Object> {
-        let position = objects.iter().position(|object| object.id == id);
+        let position = objects.iter().position(|object| object.id == *id);
         position.map(|pos| objects.remove(pos))
     }
 
-    pub(crate) fn reveal_object(&mut self, id: object::ObjectId) -> object::ObjectResolution {
+    pub(crate) fn reveal_object(&mut self, id: &object::ObjectId) -> object::ObjectResolution {
         let removed = self.remove_hidden_object(id);
         match removed {
             Some(object) => {
                 self.add_object(object);
-                object::ObjectResolution::Found(id)
+                object::ObjectResolution::Found(id.clone())
             }
             None => object::ObjectResolution::NotFound,
         }
     }
 
-    pub(crate) fn hide_object(&mut self, id: object::ObjectId) -> object::ObjectResolution {
+    pub(crate) fn hide_object(&mut self, id: &object::ObjectId) -> object::ObjectResolution {
         let removed = self.remove_object(id);
         match removed {
             Some(object) => {
                 self.add_hidden_object(object);
-                object::ObjectResolution::Found(id)
+                object::ObjectResolution::Found(id.clone())
             }
             None => object::ObjectResolution::NotFound,
         }
@@ -164,12 +178,12 @@ impl Room {
 impl Room {
     /// The id of the scene object occupying `direction`, if any.
     fn door_id(&self, direction: input::Direction) -> Option<object::ObjectId> {
-        self.directions.get(&direction).copied()
+        self.directions.get(&direction).cloned()
     }
 
     /// The door object occupying `direction`, if any (visible or hidden).
     fn door_in_direction(&self, direction: input::Direction) -> Option<&object::Object> {
-        self.door_id(direction).and_then(|id| self.find_any(id))
+        self.door_id(direction).and_then(|id| self.find_any(&id))
     }
 
     fn door_in_direction_mut(
@@ -177,7 +191,7 @@ impl Room {
         direction: input::Direction,
     ) -> Option<&mut object::Object> {
         let id = self.door_id(direction)?;
-        self.find_any_mut(id)
+        self.find_any_mut(&id)
     }
 
     /// The destination of an *open* exit in `direction`, if one exists.
@@ -193,7 +207,7 @@ impl Room {
         if state.locked || self.is_exit_hidden(direction) {
             None
         } else {
-            Some(state.to)
+            Some(state.to.clone())
         }
     }
 
@@ -214,7 +228,7 @@ impl Room {
     pub(crate) fn exit_gated_by(&self, direction: input::Direction) -> Option<object::ObjectId> {
         self.door_in_direction(direction)
             .and_then(|object| object.door.as_ref())
-            .and_then(|door| door.gated_by)
+            .and_then(|door| door.gated_by.clone())
     }
 
     /// Directions leading to an *open* (passable) exit in this room.
@@ -280,7 +294,7 @@ impl Room {
         if self.is_exit_hidden(direction) {
             return input::DirectionResolution::NotFound;
         }
-        match self.remove_object(id) {
+        match self.remove_object(&id) {
             Some(object) => {
                 self.add_hidden_object(object);
                 input::DirectionResolution::Found(direction)
@@ -299,7 +313,7 @@ impl Room {
         if !self.is_exit_hidden(direction) {
             return input::DirectionResolution::NotFound;
         }
-        match self.remove_hidden_object(id) {
+        match self.remove_hidden_object(&id) {
             Some(object) => {
                 self.add_object(object);
                 input::DirectionResolution::Found(direction)

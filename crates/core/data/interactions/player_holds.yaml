@@ -1,9 +1,9 @@
 - verb: use
-  item: 101
+  item: iron-key
   target:
     kind: scene
   condition:
     - is_door: true
-    - player_holds: 102
+    - player_holds: brass-key
   effect:
     - emit: brass-holder-key-worked

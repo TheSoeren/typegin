@@ -1,5 +1,5 @@
 - verb: use
   target:
-    object: 110
+    object: oak-door
   effect:
     - emit: anything-used-on-the-oak

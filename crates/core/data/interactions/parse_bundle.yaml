@@ -1,21 +1,21 @@
 - verb: use
-  item: 101
+  item: iron-key
   target:
     kind: scene
   condition:
-    - room: 3
+    - room: study
     - exit_locked: east
     - is_door: true
   effect:
     - emit: door-unlocked
     - unlock_exit: east
 - verb: take
-  item: 104
+  item: stale-bread
   effect:
-    - take: 104
-    - drop: 104
-    - reveal_object: 104
+    - take: stale-bread
+    - drop: stale-bread
+    - reveal_object: stale-bread
 - verb: examine
-  item: 103
+  item: rusty-lamp
   target:
-    object: 108
+    object: wooden-door

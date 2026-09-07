@@ -5,7 +5,7 @@
 mod common;
 
 use common::{multi_room_world_data, setup_engine};
-use core::{Direction, Event, RoomId};
+use core::{Direction, Event, ObjectId, RoomId};
 
 mod room_door_data {
     use super::*;
@@ -13,8 +13,13 @@ mod room_door_data {
     #[test]
     fn door_object_leads_where_the_exit_used_to() {
         let data = multi_room_world_data();
-        let stairs = data.find_object(8).expect("door object 8 exists");
-        assert_eq!(stairs.door.as_ref().expect("door data").to, 2);
+        let stairs = data
+            .find_object(&ObjectId::new("cellar-stairs"))
+            .expect("cellar stairs object exists");
+        assert_eq!(
+            stairs.door.as_ref().expect("door data").to,
+            "corridor".to_string()
+        );
         assert_eq!(
             stairs.door.as_ref().expect("door data").direction,
             "north".to_string()
@@ -24,20 +29,30 @@ mod room_door_data {
     #[test]
     fn multiple_doors_serve_one_room() {
         let data = multi_room_world_data();
-        let room2 = data.find_room(2).expect("room 2 exists");
-        assert!(room2.visible_objects.contains(&9)); // cellar stairs → room 1
-        assert!(room2.visible_objects.contains(&10)); // study door → room 3
+        let corridor = data
+            .find_room(&RoomId::new("corridor"))
+            .expect("corridor exists");
+        assert!(
+            corridor
+                .visible_objects
+                .contains(&ObjectId::new("corridor-stairs"))
+        );
+        assert!(
+            corridor
+                .visible_objects
+                .contains(&ObjectId::new("study-door"))
+        );
     }
 
     #[test]
     fn dead_end_room_holds_one_open_door() {
         let data = multi_room_world_data();
-        let room3 = data.find_room(3).expect("room 3 exists");
-        let open = room3
+        let study = data.find_room(&RoomId::new("study")).expect("study exists");
+        let open = study
             .visible_objects
             .iter()
             .filter(|id| {
-                let object = data.find_object(**id).expect("object in room");
+                let object = data.find_object(id).expect("object in room");
                 object.door.as_ref().is_some_and(|door| !door.locked)
             })
             .count();
@@ -51,14 +66,14 @@ mod world_state_navigation {
     #[test]
     fn world_tracks_current_room_id() {
         let engine = setup_engine();
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 
     #[test]
     fn world_can_change_room() {
         let mut engine = setup_engine();
-        engine.world_mut().move_to_room(RoomId::new(2));
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        engine.world_mut().move_to_room(RoomId::new("corridor"));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
     }
 
     #[test]
@@ -71,7 +86,7 @@ mod world_state_navigation {
                 .contains(&"glowing mysterious sword".to_string())
         );
 
-        engine.world_mut().move_to_room(RoomId::new(2));
+        engine.world_mut().move_to_room(RoomId::new("corridor"));
         assert!(
             engine
                 .world()
@@ -93,7 +108,7 @@ mod world_state_navigation {
             .world()
             .get_room_id_by_exit_direction(Direction::West);
         assert_eq!(target, None);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 
     #[test]
@@ -102,18 +117,18 @@ mod world_state_navigation {
         let target = engine
             .world()
             .get_room_id_by_exit_direction(Direction::North);
-        assert_eq!(target, Some(RoomId::new(2)));
+        assert_eq!(target, Some(RoomId::new("corridor")));
     }
 
     #[test]
     fn move_from_dead_end_fails() {
         let mut engine = setup_engine();
-        engine.world_mut().move_to_room(RoomId::new(3)); // dead end
+        engine.world_mut().move_to_room(RoomId::new("study")); // dead end
         let target = engine
             .world()
             .get_room_id_by_exit_direction(Direction::North);
         assert_eq!(target, None);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
 
     #[test]
@@ -126,7 +141,7 @@ mod world_state_navigation {
     fn locked_and_hidden_exits_are_not_listed_as_open() {
         let mut engine = setup_engine();
         engine.handle_input("go north");
-        engine.handle_input("go east"); // now in room 3
+        engine.handle_input("go east"); // now in study
         assert_eq!(engine.world().exit_directions(), vec![Direction::West]);
     }
 }
@@ -135,20 +150,20 @@ mod engine_navigation {
     use super::*;
 
     #[test]
-    fn go_north_moves_to_room_2() {
+    fn go_north_moves_to_corridor() {
         let mut engine = setup_engine();
         let events = engine.handle_input("go north");
         assert_eq!(events, vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
     }
 
     #[test]
-    fn go_south_from_room_2_returns_to_room_1() {
+    fn go_south_from_corridor_returns_to_cellar() {
         let mut engine = setup_engine();
         engine.handle_input("go north");
         let events = engine.handle_input("go south");
         assert_eq!(events, vec![Event::Went(Direction::South)]);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 
     #[test]
@@ -156,11 +171,11 @@ mod engine_navigation {
         let mut engine = setup_engine();
         engine.handle_input("go north");
         engine.handle_input("go east");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
 
         let events = engine.handle_input("go west");
         assert_eq!(events, vec![Event::Went(Direction::West)]);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
     }
 
     #[test]
@@ -168,7 +183,7 @@ mod engine_navigation {
         let mut engine = setup_engine();
         let events = engine.handle_input("go west");
         assert_eq!(events, vec![Event::WentInvalidDirection(Direction::West)]);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 
     #[test]
@@ -176,7 +191,7 @@ mod engine_navigation {
         let mut engine = setup_engine();
         let events = engine.handle_input("n");
         assert_eq!(events, vec![Event::Went(Direction::North)]);
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
     }
 
     #[test]

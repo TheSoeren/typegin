@@ -72,7 +72,7 @@ pub enum TargetFilter {
 }
 
 impl TargetFilter {
-    pub(crate) fn matches(self, world: &WorldState, target: Option<ObjectId>) -> bool {
+    pub(crate) fn matches(self, world: &WorldState, target: Option<&ObjectId>) -> bool {
         match self {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
@@ -149,7 +149,7 @@ impl Interaction {
     /// The object this interaction requires (or `None` for "any").
     #[must_use]
     pub fn item(&self) -> Option<ObjectId> {
-        self.item
+        self.item.clone()
     }
 
     /// The coarse target filter this interaction accepts.
@@ -163,13 +163,13 @@ impl Interaction {
     /// API (list it).
     #[must_use]
     pub fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
-        let item_ok = match self.item {
-            Some(id) => context.item == Some(id),
+        let item_ok = match &self.item {
+            Some(id) => context.item.as_ref() == Some(id),
             None => true,
         };
         item_ok
             && context.verb.is_none_or(|v| self.verb() == v)
-            && self.target.matches(world, context.target)
+            && self.target.matches(world, context.target.as_ref())
             && self.condition_applies(world, context)
     }
 

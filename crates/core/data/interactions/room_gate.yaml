@@ -1,6 +1,6 @@
 - verb: examine
-  item: 101
+  item: iron-key
   condition:
-    - room: 3
+    - room: study
   effect:
     - emit: key-in-study

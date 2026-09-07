@@ -1,21 +1,21 @@
 rooms:
-  - id: 1
+  - key: cellar
     name: The Damp Cellar
-    visible_objects: [1, 2, 3, 4, 8]
-    hidden_objects: [5]
+    visible_objects: [glowing-sword, iron-key, locked-chest, brass-key, cellar-stairs]
+    hidden_objects: [stale-bread]
     extra:
       description: Stone walls glisten with moisture and the air reeks of rot.
 
-  - id: 2
+  - key: corridor
     name: The Torchlit Corridor
-    visible_objects: [6, 7, 9, 10]
+    visible_objects: [rusty-lamp, old-map, corridor-stairs, study-door]
     hidden_objects: []
     extra:
       description: Flickering torches line the corridor walls.
 
-  - id: 3
+  - key: study
     name: The Dusty Study
-    visible_objects: [11, 14]
-    hidden_objects: [12]
+    visible_objects: [wooden-door, oak-door]
+    hidden_objects: [secret-passage]
     extra:
       description: Bookshelves crowd the room, thick with dust.

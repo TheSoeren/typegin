@@ -1,6 +1,6 @@
 - verb: use
-  item: 101
+  item: iron-key
   target:
-    object: 110
+    object: oak-door
   effect:
     - emit: key-does-not-work

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 
+use crate::data::{WorldData, WorldDataError};
 use crate::event::Event;
 use crate::input::action::{DropResult, TakeResult};
 use crate::input::direction::{Direction, DirectionResolution};
@@ -7,6 +8,39 @@ use crate::interaction::{ActionContext, Interaction, TargetFilter, Verb};
 use crate::world::WorldState;
 use crate::world::object::ObjectId;
 use crate::world::room::RoomId;
+
+impl InteractionData {
+    /// Verify that every key this interaction references exists in `data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
+    pub(crate) fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+        if let Some(item) = &self.item {
+            data.find_object(item).ok_or_else(|| {
+                WorldDataError::Validation(format!(
+                    "interaction with verb `{:?}` references unknown object key `{}`",
+                    self.verb, item
+                ))
+            })?;
+        }
+        if let Some(DataTarget::Object { object }) = &self.target {
+            data.find_object(object).ok_or_else(|| {
+                WorldDataError::Validation(format!(
+                    "interaction with verb `{:?}` references unknown object key `{}`",
+                    self.verb, object
+                ))
+            })?;
+        }
+        for condition in &self.condition {
+            condition.validate_references(data)?;
+        }
+        for effect in &self.effect {
+            effect.validate_references(data)?;
+        }
+        Ok(())
+    }
+}
 
 /// A single authored interaction shipped in world data (YAML) instead of a
 /// Rust closure: "when the player does *verb* with *object* (optionally on a
@@ -32,20 +66,20 @@ impl InteractionData {
     /// Whether this interaction applies to the given context.
     #[must_use]
     pub(crate) fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
-        let item_ok = match self.item {
-            Some(id) => context.item == Some(id),
+        let item_ok = match &self.item {
+            Some(id) => context.item.as_ref() == Some(id),
             None => true,
         };
         item_ok
             && context.verb.is_none_or(|verb| self.verb == verb)
-            && self.target_matches(world, context.target)
+            && self.target_matches(world, context.target.as_ref())
             && self.condition_applies(world, context)
     }
 
-    fn target_matches(&self, world: &WorldState, target: Option<ObjectId>) -> bool {
+    fn target_matches(&self, world: &WorldState, target: Option<&ObjectId>) -> bool {
         match &self.target {
             None => true,
-            Some(DataTarget::Object { object }) => target == Some(*object),
+            Some(DataTarget::Object { object }) => target == Some(object),
             Some(DataTarget::Kind { kind }) => match kind {
                 DataTargetKind::Scene => target.is_some_and(|id| world.object_is_scene(id)),
             },
@@ -77,12 +111,12 @@ impl InteractionData {
         let (filter, exact_target) = match &self.target {
             None => (TargetFilter::Any, None),
             Some(DataTarget::Object { object }) => {
-                let object = *object;
+                let object = object.clone();
                 (
                     TargetFilter::Targeted,
                     Some(
                         Box::new(move |_world: &WorldState, context: &ActionContext| {
-                            context.target == Some(object)
+                            context.target == Some(object.clone())
                         }) as Box<InteractionConditionFn>,
                     ),
                 )
@@ -95,7 +129,7 @@ impl InteractionData {
         let effect_data = self.clone();
         Interaction::build(
             self.verb,
-            self.item,
+            self.item.clone(),
             filter,
             Some(Box::new(
                 move |world: &WorldState, context: &ActionContext| {
@@ -136,8 +170,8 @@ pub enum DataTargetKind {
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum DataCondition {
-    /// The player's current room has this id.
-    Room { room: i32 },
+    /// The player's current room has this key.
+    Room { room: RoomId },
     /// The player is carrying this object.
     PlayerHolds { player_holds: ObjectId },
     /// The exit in `direction` from the current room is locked.
@@ -154,14 +188,40 @@ impl DataCondition {
     #[must_use]
     fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
         match self {
-            DataCondition::Room { room } => world.current_room_id() == RoomId::new(*room),
-            DataCondition::PlayerHolds { player_holds } => world.player_holds(*player_holds),
+            DataCondition::Room { room } => *room == world.current_room_id(),
+            DataCondition::PlayerHolds { player_holds } => world.player_holds(player_holds),
             DataCondition::ExitLocked { exit_locked } => world.is_exit_locked(*exit_locked),
             DataCondition::ExitHidden { exit_hidden } => world.is_exit_hidden(*exit_hidden),
             DataCondition::IsDoor { is_door } => {
-                context.target.map(|id| world.object_is_door(id)) == Some(*is_door)
+                context.target.as_ref().map(|id| world.object_is_door(id)) == Some(*is_door)
             }
             DataCondition::Not { not } => !not.matches(world, context),
+        }
+    }
+
+    /// Verify that every key this condition references exists in `data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
+    fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+        match self {
+            DataCondition::Room { room } => data.find_room(room).map(|_| ()).ok_or_else(|| {
+                WorldDataError::Validation(format!(
+                    "condition references unknown room key `{room}`",
+                ))
+            }),
+            DataCondition::PlayerHolds { player_holds } => {
+                data.find_object(player_holds).map(|_| ()).ok_or_else(|| {
+                    WorldDataError::Validation(format!(
+                        "condition references unknown object key `{player_holds}`",
+                    ))
+                })
+            }
+            DataCondition::Not { not } => not.validate_references(data),
+            DataCondition::ExitLocked { .. }
+            | DataCondition::ExitHidden { .. }
+            | DataCondition::IsDoor { .. } => Ok(()),
         }
     }
 }
@@ -201,8 +261,8 @@ impl DataEffect {
     fn apply(&self, world: &mut WorldState) -> Option<Event> {
         match self {
             DataEffect::Emit { emit } => Some(Event::Custom { name: emit.clone() }),
-            DataEffect::Take { take } => take_into_inventory(world, *take),
-            DataEffect::Drop { drop } => drop_into_room(world, *drop),
+            DataEffect::Take { take } => take_into_inventory(world, take.clone()),
+            DataEffect::Drop { drop } => drop_into_room(world, drop.clone()),
             DataEffect::UnlockExit { unlock_exit } => match world.unlock_exit(*unlock_exit) {
                 DirectionResolution::Found(_) => Some(Event::UnlockedExit {
                     direction: *unlock_exit,
@@ -222,20 +282,42 @@ impl DataEffect {
                 None
             }
             DataEffect::RevealObject { reveal_object } => {
-                world.reveal_object(*reveal_object);
+                world.reveal_object(reveal_object);
                 None
             }
             DataEffect::HideObject { hide_object } => {
-                world.hide_object(*hide_object);
+                world.hide_object(hide_object);
                 None
             }
         }
     }
+
+    /// Verify that every object key this effect references exists in `data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
+    fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+        let id = match self {
+            DataEffect::Take { take } => take,
+            DataEffect::Drop { drop } => drop,
+            DataEffect::RevealObject { reveal_object } => reveal_object,
+            DataEffect::HideObject { hide_object } => hide_object,
+            DataEffect::Emit { .. }
+            | DataEffect::UnlockExit { .. }
+            | DataEffect::LockExit { .. }
+            | DataEffect::RevealExit { .. }
+            | DataEffect::HideExit { .. } => return Ok(()),
+        };
+        data.find_object(id).map(|_| ()).ok_or_else(|| {
+            WorldDataError::Validation(format!("effect references unknown object key `{id}`"))
+        })
+    }
 }
 
 fn take_into_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
-    let name = world.object_info(id)?.name;
-    match world.player_take_object(id) {
+    let name = world.object_info(&id)?.name;
+    match world.player_take_object(&id) {
         TakeResult::Success => Some(Event::Took {
             object_id: id,
             object: name,
@@ -245,8 +327,8 @@ fn take_into_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
 }
 
 fn drop_into_room(world: &mut WorldState, id: ObjectId) -> Option<Event> {
-    let name = world.object_info(id)?.name;
-    match world.player_drop_object(id) {
+    let name = world.object_info(&id)?.name;
+    match world.player_drop_object(&id) {
         DropResult::Success => Some(Event::Dropped {
             object_id: id,
             object: name,

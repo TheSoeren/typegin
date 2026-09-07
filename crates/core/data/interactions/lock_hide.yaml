@@ -1,5 +1,5 @@
 - verb: use
-  item: 101
+  item: iron-key
   target:
     kind: scene
   condition:

@@ -1,6 +1,6 @@
 - verb: use
-  item: 101
+  item: iron-key
   target:
-    object: 108
+    object: wooden-door
   effect:
     - emit: for-the-wooden-door

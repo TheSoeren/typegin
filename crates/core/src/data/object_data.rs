@@ -2,7 +2,10 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::data::{ExtraValue, door_data::DoorData};
+use crate::{
+    ObjectId,
+    data::{ExtraValue, door_data::DoorData},
+};
 
 /// The two object kinds of the Visionaire model:
 ///
@@ -22,7 +25,8 @@ pub enum ObjectKind {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ObjectData {
-    pub id: i32,
+    #[serde(rename = "key")]
+    pub id: ObjectId,
     pub primary_name: String,
     #[serde(default)]
     pub aliases: Vec<String>,

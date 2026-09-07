@@ -1,5 +1,5 @@
 - verb: drop
-  item: iron-key
+  item: brass-key
   effect:
     - emit: key-discarded
-    - drop: iron-key
+    - drop: brass-key
