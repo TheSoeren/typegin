@@ -1,132 +1,144 @@
 objects:
-  - id: 1
-    primary_name: glowing mysterious sword
-    aliases: [glowing sword, sword]
-    extra:
-      description: A sword that hums with a faint blue glow.
-      weight: 30
-      opens: chest
-      materials: [metal, iron]
-
-  - id: 2
-    primary_name: iron key
-    aliases: [key, rusty key]
-    extra:
-      description: A heavy iron key, cool to the touch.
-      weight: 1
-      opens: chest
-      materials: [metal, iron]
-
-  - id: 3
-    primary_name: locked chest
-    aliases: [chest]
-    extra:
-      description: A sturdy chest with a gleaming keyhole.
-      weight: 100
-      materials: [wood, iron]
-
-  - id: 4
-    primary_name: brass key
-    aliases: [key]
-    extra:
-      description: A small brass key on a worn ring.
-      weight: 1
-      materials: [brass]
-
-  - id: 5
-    primary_name: stale bread
-    aliases: [bread]
-    extra:
-      description: A crusty loaf, hard as a brick.
-      weight: 1
-      materials: [wheat]
-
-  - id: 6
-    primary_name: rusty lamp
-    aliases: [lamp]
-    extra:
-      description: A lamp crusted with rust, its glass black with soot.
-      weight: 2
-      materials: [metal, glass]
-
-  - id: 7
-    primary_name: old map
-    aliases: [map]
-    extra:
-      description: A faded map of the dungeon.
-      weight: 1
-      materials: [paper]
-
-  - id: 8
-    primary_name: cellar stairs
-    aliases: [stairs]
+  ### PLAYER-CELL — Edna & Harvey: The Breakout opening cell
+  - key: chair
+    primary_name: Hardwood chair
+    aliases: [chair]
     kind: Scene
-    door:
-      direction: north
-      to: 2
     extra:
-      description: A narrow stone stairway climbs north.
+      description: A hardwood chair, worn smooth.
 
-  - id: 9
-    primary_name: cellar stairs
-    aliases: [stairs]
+  - key: chair-leg
+    primary_name: Chair leg
+    aliases: [chair leg, leg]
+    kind: Item
+    extra:
+      description: A solid chair leg, about to become a tool.
+
+  - key: broken-chair-leg
+    primary_name: Splintered chair leg
+    aliases: [splintered chair leg, broken chair leg, sharp stick, stick]
+    kind: Item
+    extra:
+      description: A chair leg snapped into a splintered, weaponlike stick.
+
+  - key: table
+    primary_name: Table
+    aliases: [table]
     kind: Scene
-    door:
-      direction: south
-      to: 1
     extra:
-      description: The stairway descends south.
+      description: A plain wooden table.
 
-  - id: 10
-    primary_name: study door
-    aliases: [door]
+  - key: wall-polster
+    primary_name: Wall polster
+    aliases: [wall polster, polster, padding, pads]
+    kind: Scene
+    extra:
+      description: Endless layers of thick, soft wall padding. The top-left pad on the back wall bulges oddly.
+
+  - key: door-grate
+    primary_name: Door grate
+    aliases: [door grate, grate]
+    kind: Scene
+    extra:
+      description: A small grate high in the cell door, the only window to the guard corridor.
+
+  - key: cell-door
+    primary_name: Cell door
+    aliases: [cell door, door]
     kind: Scene
     door:
       direction: east
-      to: 3
+      to: corridor
+      locked: true
     extra:
-      description: A heavy oak-framed door leading east.
+      description: The locked cell door. Solid, with a small grate up high.
 
-  - id: 11
-    primary_name: wooden door
-    aliases: [door]
+  - key: fan
+    primary_name: Air-conditioning fan
+    aliases: [air conditioning fan, ac fan, fan, ventilator]
+    kind: Scene
+    extra:
+      description: A big air-conditioning fan hidden behind the wall padding. Silent for now.
+
+  - key: vent-grille
+    primary_name: Vent grille
+    aliases: [vent, grille, vent grille, air vent]
+    kind: Scene
+    door:
+      direction: north
+      to: air-chute
+      locked: true
+      hidden: true
+    extra:
+      description: 'A grille held by four screws. Behind it: the air chute.'
+
+  - key: toenail
+    primary_name: Toenail
+    aliases: [toenail, toe nail, nail]
+    kind: Item
+    extra:
+      description: A long, sturdy toenail. The shape of a tiny crowbar.
+
+  # NOTE: stand-in for the real opening's "Harvey 1: Toenails" memory item. A
+  # faithful intro would carry that memory in Edna's starting inventory (engine
+  # gap: initial inventory not yet supported), so the nail is clipped here.
+  - key: nail-clipper
+    primary_name: Nail clipper
+    aliases: [nail clipper, clipper]
+    kind: Item
+    extra:
+      description: A nail clipper. It has no business being in a padded cell.
+
+  ### AIR-CHUTE
+  - key: air-chute-to-cell
+    primary_name: Vent to the cell
+    aliases: [cell vent]
+    kind: Scene
+    door:
+      direction: south
+      to: player-cell
+
+  - key: air-chute-to-office
+    primary_name: Office vent grate
+    aliases: [office vent, chute grate]
+    kind: Scene
+    door:
+      direction: east
+      to: dr-marcel-office
+
+  ### DR. MARCEL'S OFFICE
+  - key: office-to-air-chute
+    primary_name: Vent back to the chute
+    aliases: [chute vent]
     kind: Scene
     door:
       direction: west
-      to: 2
-    extra:
-      description: A plain wooden door leading west.
+      to: air-chute
 
-  - id: 12
-    primary_name: secret passage
-    aliases: [passage]
-    kind: Scene
-    door:
-      direction: north
-      to: 1
+  - key: encyclopedia
+    primary_name: Encyclopedia
+    aliases: [encyclopedia, book]
+    kind: Item
     extra:
-      description: A concealed passage hidden behind the shelves.
+      description: A heavy encyclopedia, first volume.
 
-  - id: 13
-    primary_name: hidden vault
-    aliases: [vault]
-    kind: Scene
-    door:
-      direction: south
-      to: 1
-      locked: true
+  - key: polo-mallet
+    primary_name: Polo mallet
+    aliases: [polo mallet, mallet]
+    kind: Item
     extra:
-      description: A steel vault door sealed tight.
+      description: A wooden polo mallet. Odd in a doctor's office.
 
-  - id: 14
-    primary_name: oak door
-    aliases: [door]
-    kind: Scene
-    door:
-      direction: east
-      to: 2
-      locked: true
-      gated_by: 2
+  - key: ballpoint-pen
+    primary_name: Ballpoint pen
+    aliases: [ballpoint pen, pen]
+    kind: Item
     extra:
-      description: A sturdy oak door with an iron lock.
-      material: oak
+      description: A ballpoint pen. It has something to say.
+
+  - key: cabinet
+    primary_name: Cabinet
+    aliases: [cabinet]
+    kind: Scene
+    extra:
+      description: A tall cabinet, large enough to hide a full-grown warden in.

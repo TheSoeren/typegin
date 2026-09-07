@@ -1,0 +1,16 @@
+- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - emit: first-wins
+- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - emit: shadowed

@@ -1,21 +1,30 @@
 rooms:
-  - id: 1
-    name: The Damp Cellar
-    visible_objects: [1, 2, 3, 4, 8]
-    hidden_objects: [5]
+  - key: player-cell
+    name: The Padded Cell
+    visible_objects: [chair, table, wall-polster, door-grate, cell-door,
+      nail-clipper]
+    hidden_objects: [chair-leg, fan, vent-grille]
     extra:
-      description: Stone walls glisten with moisture and the air reeks of rot.
+      description: A padded cell, every wall bundled in soft polster. Edna's head hurts.
 
-  - id: 2
-    name: The Torchlit Corridor
-    visible_objects: [6, 7, 9, 10]
+  - key: air-chute
+    name: The Air Chute
+    visible_objects: [air-chute-to-cell, air-chute-to-office]
     hidden_objects: []
     extra:
-      description: Flickering torches line the corridor walls.
+      description: A cramped, dusty ventilation chute.
 
-  - id: 3
-    name: The Dusty Study
-    visible_objects: [11, 14]
-    hidden_objects: [12]
+  - key: dr-marcel-office
+    name: Dr. Marcel's Office
+    visible_objects: [office-to-air-chute, encyclopedia, polo-mallet, ballpoint-pen,
+      cabinet]
+    hidden_objects: []
     extra:
-      description: Bookshelves crowd the room, thick with dust.
+      description: The office of Dr. Marcel. Books, a diploma, and somewhere to hide.
+
+  - key: corridor
+    name: The Guard Corridor
+    visible_objects: []
+    hidden_objects: []
+    extra:
+      description: The corridor outside the cell. A guard polishes his putter.

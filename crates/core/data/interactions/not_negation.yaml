@@ -1,0 +1,7 @@
+- verb: examine
+  item: oak-door
+  condition:
+    - not:
+        exit_locked: east
+  effect:
+    - emit: door-checked-twice

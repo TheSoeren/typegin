@@ -1,10 +1,10 @@
 objects:
-  - id: 1
+  - key: glowing-sword
     primary_name: glowing mysterious sword
     aliases: [glowing sword, sword]
     kind: Item
 
-  - id: 2
+  - key: iron-key
     primary_name: iron key
     aliases: [key, rusty key]
     kind: Item
@@ -17,88 +17,88 @@ objects:
       gui:
         icon: sprites/key.png
 
-  - id: 3
+  - key: locked-chest
     primary_name: locked chest
     aliases: [chest]
     kind: Item
 
-  - id: 4
+  - key: brass-key
     primary_name: brass key
     aliases: [key]
     kind: Item
 
-  - id: 5
+  - key: stale-bread
     primary_name: stale bread
     aliases: [bread]
     kind: Item
 
-  - id: 6
+  - key: rusty-lamp
     primary_name: rusty lamp
     aliases: [lamp]
     kind: Item
 
-  - id: 7
+  - key: old-map
     primary_name: old map
     aliases: [map]
     kind: Item
 
-  - id: 8
+  - key: cellar-stairs
     primary_name: cellar stairs
     aliases: [stairs]
     kind: Scene
     door:
       direction: north
-      to: 2
+      to: corridor
 
-  - id: 9
+  - key: corridor-stairs
     primary_name: cellar stairs
     aliases: [stairs]
     kind: Scene
     door:
       direction: south
-      to: 1
+      to: cellar
 
-  - id: 10
+  - key: study-door
     primary_name: study door
     aliases: [door]
     kind: Scene
     door:
       direction: east
-      to: 3
+      to: study
 
-  - id: 11
+  - key: wooden-door
     primary_name: wooden door
     aliases: [door]
     kind: Scene
     door:
       direction: west
-      to: 2
+      to: corridor
 
-  - id: 12
+  - key: secret-passage
     primary_name: secret passage
     aliases: [passage]
     kind: Scene
     door:
       direction: north
-      to: 1
+      to: cellar
 
-  - id: 13
+  - key: hidden-vault
     primary_name: hidden vault
     aliases: [vault]
     kind: Scene
     door:
       direction: south
-      to: 1
+      to: cellar
       locked: true
 
-  - id: 14
+  - key: oak-door
     primary_name: oak door
     aliases: [door]
     kind: Scene
     door:
       direction: east
-      to: 2
+      to: corridor
       locked: true
-      gated_by: 2
+      gated_by: iron-key
     extra:
       material: oak

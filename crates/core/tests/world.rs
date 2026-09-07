@@ -10,26 +10,21 @@ use core::{
     world::WorldState,
 };
 
-/// A fresh engine over the single-room world, whose room 1 holds items
-/// 1, 2, 3, 4 visibly and item 5 hidden.
+/// A fresh engine over the single-room world, whose room `cellar` holds the
+/// sword, iron key, locked chest and brass key visibly, and the stale bread
+/// hidden.
 fn engine() -> GameEngine {
     single_room_engine()
 }
 
 /// Assert the current room holds (or not) an item by id.
-fn room_has_item(world: &WorldState, id: i32) -> bool {
-    matches!(
-        world.get_object_from_room(ObjectId::new(id)),
-        ObjectResolution::Found(_)
-    )
+fn room_has_item(world: &WorldState, id: &ObjectId) -> bool {
+    matches!(world.get_object_from_room(id), ObjectResolution::Found(_))
 }
 
 /// Assert the player holds (or not) an item by id.
-fn player_has_item(world: &WorldState, id: i32) -> bool {
-    matches!(
-        world.get_object_from_player(ObjectId::new(id)),
-        ObjectResolution::Found(_)
-    )
+fn player_has_item(world: &WorldState, id: &ObjectId) -> bool {
+    matches!(world.get_object_from_player(id), ObjectResolution::Found(_))
 }
 
 mod resolution {
@@ -42,7 +37,7 @@ mod resolution {
     #[test]
     fn exact_full_name() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new(1)),
+            ObjectResolution::Found(ObjectId::new("glowing-sword")),
             resolves("glowing mysterious sword")
         );
     }
@@ -50,7 +45,7 @@ mod resolution {
     #[test]
     fn partial_alias_match() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new(1)),
+            ObjectResolution::Found(ObjectId::new("glowing-sword")),
             resolves("glowing sword")
         );
     }
@@ -58,7 +53,7 @@ mod resolution {
     #[test]
     fn alias_match() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new(2)),
+            ObjectResolution::Found(ObjectId::new("iron-key")),
             resolves("iron key")
         );
     }
@@ -67,7 +62,7 @@ mod resolution {
     fn ambiguous_key() {
         assert_eq!(
             ObjectResolution::Ambiguous {
-                ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
                 alias: "key".to_string()
             },
             resolves("key")
@@ -86,57 +81,80 @@ mod worlds_inventory {
     #[test]
     fn seed_populates_room_items_and_empty_inventory() {
         let engine = engine();
-        assert!(room_has_item(engine.world(), 1));
-        assert!(room_has_item(engine.world(), 2));
-        assert!(!room_has_item(engine.world(), 5)); // hidden item is not visible
+        assert!(room_has_item(
+            engine.world(),
+            &ObjectId::new("glowing-sword")
+        ));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(!room_has_item(
+            engine.world(),
+            &ObjectId::new("stale-bread")
+        ));
         assert!(engine.world().player_object_names().is_empty());
     }
 
     #[test]
     fn take_item_success() {
         let mut engine = engine();
-        let result = engine.world_mut().player_take_object(ObjectId::new(2));
+        let result = engine
+            .world_mut()
+            .player_take_object(&ObjectId::new("iron-key"));
         assert_eq!(result, TakeResult::Success);
-        assert!(!room_has_item(engine.world(), 2));
-        assert!(player_has_item(engine.world(), 2));
+        assert!(!room_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
     #[test]
     fn take_item_not_in_room_fails() {
         let mut engine = engine();
-        // Item 5 is hidden, so taking it from the room is not possible.
-        let result = engine.world_mut().player_take_object(ObjectId::new(5));
+        // Stale bread is hidden in this world, so taking it from the room is
+        // not possible.
+        let result = engine
+            .world_mut()
+            .player_take_object(&ObjectId::new("stale-bread"));
         assert_eq!(result, TakeResult::Fail);
-        assert!(!room_has_item(engine.world(), 5));
-        assert!(!player_has_item(engine.world(), 5));
+        assert!(!room_has_item(
+            engine.world(),
+            &ObjectId::new("stale-bread")
+        ));
+        assert!(!player_has_item(
+            engine.world(),
+            &ObjectId::new("stale-bread")
+        ));
     }
 
     #[test]
     fn drop_item_returns_to_room() {
         let mut engine = engine();
-        engine.world_mut().player_take_object(ObjectId::new(2));
-        let result = engine.world_mut().player_drop_object(ObjectId::new(2));
+        engine
+            .world_mut()
+            .player_take_object(&ObjectId::new("iron-key"));
+        let result = engine
+            .world_mut()
+            .player_drop_object(&ObjectId::new("iron-key"));
         assert_eq!(result, DropResult::Success);
-        assert!(!player_has_item(engine.world(), 2));
-        assert!(room_has_item(engine.world(), 2));
+        assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
     #[test]
     fn drop_item_not_held_fails() {
         let mut engine = engine();
-        let result = engine.world_mut().player_drop_object(ObjectId::new(2));
+        let result = engine
+            .world_mut()
+            .player_drop_object(&ObjectId::new("iron-key"));
         assert_eq!(result, DropResult::Fail);
-        assert!(room_has_item(engine.world(), 2));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
     #[test]
     fn move_to_unknown_room_fails() {
         let mut engine = engine();
-        // The single-room world has no room 2.
+        // The single-room world has no other room.
         assert_eq!(
-            engine.world_mut().move_to_room(RoomId::new(2)),
+            engine.world_mut().move_to_room(RoomId::new("nonexistent")),
             MoveResult::Fail
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }
 }

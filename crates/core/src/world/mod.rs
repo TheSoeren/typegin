@@ -4,27 +4,38 @@ pub mod room;
 
 use std::collections::HashMap;
 
-use getset::{CopyGetters, Getters};
+use getset::Getters;
 use log::warn;
 
 use crate::data;
-use crate::data::ObjectKind;
+use crate::data::interactions_data::InteractionData;
+use crate::data::object_data;
 use crate::input::action;
 use crate::input::direction;
 use crate::world::object::{ObjectId, ObjectInfo, ObjectResolution};
 
-#[derive(Debug, Getters, CopyGetters)]
+#[derive(Debug, Getters)]
 pub struct WorldState {
     #[getset(get = "pub")]
     player: player::Player,
     #[getset(get = "pub")]
     rooms: HashMap<room::RoomId, room::Room>,
-    #[getset(get_copy = "pub")]
     current_room_id: room::RoomId,
+    /// Authored data-driven interactions shipped in world data. Queried by the
+    /// default rules hooks *before* `Rules::interactions()` closures.
+    data_interactions: Vec<InteractionData>,
+    /// Object templates from world data, used to materialise an object into
+    /// the player's inventory that is not placed in any room (`grant`).
+    object_templates: HashMap<ObjectId, object::Object>,
 }
 
 /// Navigation: location and movement within the world.
 impl WorldState {
+    /// The id of the room the player is currently in.
+    #[must_use]
+    pub fn current_room_id(&self) -> room::RoomId {
+        self.current_room_id.clone()
+    }
     /// The room the player is currently in.
     fn current_room(&self) -> &room::Room {
         self.rooms
@@ -130,11 +141,11 @@ impl WorldState {
 /// Room helpers
 impl WorldState {
     #[must_use]
-    pub fn get_object_from_room(&self, id: ObjectId) -> ObjectResolution {
+    pub fn get_object_from_room(&self, id: &ObjectId) -> ObjectResolution {
         self.current_room().get_object(id)
     }
 
-    pub fn remove_object_from_room(&mut self, id: ObjectId) -> Option<object::Object> {
+    pub fn remove_object_from_room(&mut self, id: &ObjectId) -> Option<object::Object> {
         self.current_room_mut().remove_object(id)
     }
 
@@ -148,11 +159,11 @@ impl WorldState {
             .collect()
     }
 
-    pub fn reveal_object(&mut self, id: ObjectId) -> ObjectResolution {
+    pub fn reveal_object(&mut self, id: &ObjectId) -> ObjectResolution {
         self.current_room_mut().reveal_object(id)
     }
 
-    pub fn hide_object(&mut self, id: ObjectId) -> ObjectResolution {
+    pub fn hide_object(&mut self, id: &ObjectId) -> ObjectResolution {
         self.current_room_mut().hide_object(id)
     }
 
@@ -165,17 +176,17 @@ impl WorldState {
 /// Player helpers
 impl WorldState {
     #[must_use]
-    pub fn get_object_from_player(&self, id: ObjectId) -> ObjectResolution {
+    pub fn get_object_from_player(&self, id: &ObjectId) -> ObjectResolution {
         self.player.get_object(id)
     }
 
-    pub fn remove_object_from_player(&mut self, id: ObjectId) -> Option<object::Object> {
+    pub fn remove_object_from_player(&mut self, id: &ObjectId) -> Option<object::Object> {
         self.player.remove_object(id)
     }
 
     /// Whether the player currently holds the object with `id`.
     #[must_use]
-    pub fn player_holds(&self, id: ObjectId) -> bool {
+    pub fn player_holds(&self, id: &ObjectId) -> bool {
         self.player.holds(id)
     }
 
@@ -192,7 +203,7 @@ impl WorldState {
 
 /// Object transfer management
 impl WorldState {
-    pub fn player_take_object(&mut self, id: ObjectId) -> action::TakeResult {
+    pub fn player_take_object(&mut self, id: &ObjectId) -> action::TakeResult {
         let removed = self.remove_object_from_room(id);
         match removed {
             Some(object) => {
@@ -203,7 +214,21 @@ impl WorldState {
         }
     }
 
-    pub fn player_drop_object(&mut self, id: ObjectId) -> action::DropResult {
+    /// Materialise the object with `id` into the player's inventory from the
+    /// world-data object templates, regardless of where (if anywhere) the
+    /// object is placed. A no-op if the player already holds the object.
+    pub fn player_grant_object(&mut self, id: &ObjectId) -> action::GrantResult {
+        if self.player_holds(id) {
+            return action::GrantResult::Fail;
+        }
+        let Some(template) = self.object_templates.get(id) else {
+            return action::GrantResult::Fail;
+        };
+        self.player.add_object(template.clone());
+        action::GrantResult::Success
+    }
+
+    pub fn player_drop_object(&mut self, id: &ObjectId) -> action::DropResult {
         let removed = self.remove_object_from_player(id);
         match removed {
             Some(object) => {
@@ -213,18 +238,27 @@ impl WorldState {
             None => action::DropResult::Fail,
         }
     }
+
+    /// Remove the carried object with `id` from the player's inventory without
+    /// placing it in the room (consumed). A no-op if the object is not carried.
+    pub fn player_discard_object(&mut self, id: &ObjectId) -> action::DiscardResult {
+        match self.remove_object_from_player(id) {
+            Some(_) => action::DiscardResult::Success,
+            None => action::DiscardResult::Fail,
+        }
+    }
 }
 
 /// Object helpers over everything in the player's scope.
 impl WorldState {
     /// Details about an object visible to the player (in the room or inventory).
-    pub fn object_info(&self, id: ObjectId) -> Option<ObjectInfo> {
+    pub fn object_info(&self, id: &ObjectId) -> Option<ObjectInfo> {
         self.any_object(id).map(ObjectInfo::from_object)
     }
 
     /// Find an object by id across the current room (visible or hidden) and
     /// the player's inventory.
-    fn any_object(&self, id: ObjectId) -> Option<&object::Object> {
+    fn any_object(&self, id: &ObjectId) -> Option<&object::Object> {
         self.current_room()
             .find_any(id)
             .or_else(|| self.player.find_by_id(id))
@@ -232,20 +266,20 @@ impl WorldState {
 
     /// The kind of the object with `id`, if it is anywhere in scope.
     #[must_use]
-    pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
+    pub fn object_kind(&self, id: &ObjectId) -> Option<object_data::ObjectKind> {
         self.any_object(id).map(|object| object.kind)
     }
 
     /// Whether the object with `id` is a scene object (stays in the world).
     #[must_use]
-    pub fn object_is_scene(&self, id: ObjectId) -> bool {
+    pub fn object_is_scene(&self, id: &ObjectId) -> bool {
         self.any_object(id)
-            .is_some_and(|object| object.kind == ObjectKind::Scene)
+            .is_some_and(|object| object.kind == object_data::ObjectKind::Scene)
     }
 
     /// Whether the object with `id` is a door (a scene object with door data).
     #[must_use]
-    pub fn object_is_door(&self, id: ObjectId) -> bool {
+    pub fn object_is_door(&self, id: &ObjectId) -> bool {
         self.any_object(id)
             .is_some_and(|object| object.door.is_some())
     }
@@ -254,7 +288,7 @@ impl WorldState {
     /// a door. Works while the door is hidden too (the object is still in the
     /// world); hidden doors still do not resolve as targets.
     #[must_use]
-    pub fn exit_direction_of(&self, id: ObjectId) -> Option<direction::Direction> {
+    pub fn exit_direction_of(&self, id: &ObjectId) -> Option<direction::Direction> {
         self.any_object(id)
             .and_then(|object| object.door.as_ref())
             .map(|door| door.direction)
@@ -282,7 +316,7 @@ impl WorldState {
 
     /// Whether a given target is currently in the player's scope.
     #[must_use]
-    pub fn target_in_scope(&self, target: ObjectId) -> bool {
+    pub fn target_in_scope(&self, target: &ObjectId) -> bool {
         self.current_room().holds(target) || self.player.holds(target)
     }
 
@@ -296,33 +330,47 @@ impl WorldState {
 }
 
 impl WorldState {
+    /// The authored data-driven interactions, in declaration order.
+    pub(crate) fn data_interactions(&self) -> &[InteractionData] {
+        &self.data_interactions
+    }
+}
+
+impl WorldState {
     /// Build a `WorldState` directly from world data (YAML), with no database.
     pub(crate) fn from_data(data: &data::WorldData) -> Self {
-        let first_room_id: room::RoomId = data
+        let first_room_id = data
             .rooms
             .first()
             .expect("world data must contain at least one room")
             .id
-            .into();
+            .clone();
+
+        let object_templates: HashMap<ObjectId, object::Object> = data
+            .objects
+            .iter()
+            .map(object::Object::from_data)
+            .map(|object| (object.id.clone(), object))
+            .collect();
 
         let mut rooms = HashMap::new();
         for room_data in &data.rooms {
             let objects: Vec<object::Object> = room_data
                 .visible_objects
                 .iter()
-                .filter_map(|id| data.find_object(*id))
+                .filter_map(|id| data.find_object(id))
                 .map(object::Object::from_data)
                 .collect();
 
             let hidden_objects: Vec<object::Object> = room_data
                 .hidden_objects
                 .iter()
-                .filter_map(|id| data.find_object(*id))
+                .filter_map(|id| data.find_object(id))
                 .map(object::Object::from_data)
                 .collect();
 
             rooms.insert(
-                room_data.id.into(),
+                room_data.id.clone(),
                 room::Room::new(objects, hidden_objects, room_data.extra.clone()),
             );
         }
@@ -336,6 +384,8 @@ impl WorldState {
             player: player::Player::new(),
             rooms,
             current_room_id: first_room_id,
+            data_interactions: data.interactions.clone(),
+            object_templates,
         }
     }
 }

@@ -11,12 +11,12 @@ use core::{
     parse_input,
 };
 
-fn player_has_item(world: &core::world::WorldState, id: i32) -> bool {
-    world.get_object_from_player(ObjectId::new(id)) != ObjectResolution::NotFound
+fn player_has_item(world: &core::world::WorldState, id: &ObjectId) -> bool {
+    world.get_object_from_player(id) != ObjectResolution::NotFound
 }
 
-fn room_has_item(world: &core::world::WorldState, id: i32) -> bool {
-    world.get_object_from_room(ObjectId::new(id)) != ObjectResolution::NotFound
+fn room_has_item(world: &core::world::WorldState, id: &ObjectId) -> bool {
+    world.get_object_from_room(id) != ObjectResolution::NotFound
 }
 
 mod drop_lexer {
@@ -58,7 +58,7 @@ mod rules_drop_trait {
         assert_eq!(
             events,
             vec![Event::Dropped {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string()
             }]
         );
@@ -71,28 +71,36 @@ mod world_state_drop {
     #[test]
     fn move_item_from_inventory_to_room() {
         let mut engine = setup_engine();
-        engine.world_mut().player_take_object(ObjectId::new(2)); // take iron key
-        assert!(player_has_item(engine.world(), 2));
+        engine
+            .world_mut()
+            .player_take_object(&ObjectId::new("iron-key"));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
 
-        let moved = engine.world_mut().player_drop_object(ObjectId::new(2));
+        let moved = engine
+            .world_mut()
+            .player_drop_object(&ObjectId::new("iron-key"));
         assert_eq!(moved, DropResult::Success);
-        assert!(!player_has_item(engine.world(), 2));
-        assert!(room_has_item(engine.world(), 2));
+        assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
     #[test]
     fn drop_item_not_in_inventory_fails() {
         let mut engine = setup_engine();
-        let moved = engine.world_mut().player_drop_object(ObjectId::new(99));
+        let moved = engine
+            .world_mut()
+            .player_drop_object(&ObjectId::new("nonexistent"));
         assert_eq!(moved, DropResult::Fail);
     }
 
     #[test]
     fn drop_item_not_held_fails() {
         let mut engine = setup_engine();
-        let moved = engine.world_mut().player_drop_object(ObjectId::new(2)); // not holding it
+        let moved = engine
+            .world_mut()
+            .player_drop_object(&ObjectId::new("iron-key")); // not holding it
         assert_eq!(moved, DropResult::Fail);
-        assert!(room_has_item(engine.world(), 2));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 }
 
@@ -103,18 +111,18 @@ mod engine_drop {
     fn drop_item_moves_it_to_room() {
         let mut engine = setup_engine();
         engine.handle_input("take iron key");
-        assert!(player_has_item(engine.world(), 2));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
 
         let events = engine.handle_input("drop iron key");
         assert_eq!(
             events,
             vec![Event::Dropped {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string()
             }]
         );
-        assert!(!player_has_item(engine.world(), 2));
-        assert!(room_has_item(engine.world(), 2));
+        assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
     #[test]
@@ -138,7 +146,7 @@ mod engine_drop {
         assert_eq!(
             events,
             vec![Event::DroppedObjectAmbiguous {
-                object_ids: vec![ObjectId::new(2), ObjectId::new(4)],
+                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
                 object: "key".to_string()
             }]
         );
@@ -160,15 +168,15 @@ mod engine_drop {
     fn drop_item_then_take_again() {
         let mut engine = setup_engine();
         engine.handle_input("take iron key");
-        assert!(player_has_item(engine.world(), 2));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
 
         engine.handle_input("drop iron key");
-        assert!(!player_has_item(engine.world(), 2));
-        assert!(room_has_item(engine.world(), 2));
+        assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
 
         engine.handle_input("take iron key");
-        assert!(player_has_item(engine.world(), 2));
-        assert!(!room_has_item(engine.world(), 2));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(!room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 }
 
@@ -180,18 +188,30 @@ mod integration {
         let mut engine = setup_engine();
 
         engine.handle_input("take sword");
-        assert!(player_has_item(engine.world(), 1));
+        assert!(player_has_item(
+            engine.world(),
+            &ObjectId::new("glowing-sword")
+        ));
 
         engine.handle_input("n");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
 
         engine.handle_input("drop sword");
-        assert!(!player_has_item(engine.world(), 1));
-        assert!(room_has_item(engine.world(), 1));
+        assert!(!player_has_item(
+            engine.world(),
+            &ObjectId::new("glowing-sword")
+        ));
+        assert!(room_has_item(
+            engine.world(),
+            &ObjectId::new("glowing-sword")
+        ));
 
         engine.handle_input("s");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
-        assert!(!room_has_item(engine.world(), 1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert!(!room_has_item(
+            engine.world(),
+            &ObjectId::new("glowing-sword")
+        ));
     }
 
     #[test]
@@ -212,7 +232,7 @@ mod integration {
         assert_eq!(engine.world().player_object_names().len(), 2);
 
         engine.handle_input("go north");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
 
         let events = engine.handle_input("look");
         assert_eq!(events, vec![Event::Looked]);
@@ -224,25 +244,31 @@ mod integration {
         );
 
         engine.handle_input("take lamp");
-        assert!(player_has_item(engine.world(), 6));
+        assert!(player_has_item(
+            engine.world(),
+            &ObjectId::new("rusty-lamp")
+        ));
 
         engine.handle_input("go east");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(3));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
 
         let events = engine.handle_input("go north");
         assert_eq!(events, vec![Event::WentExitHidden(Direction::North)]);
 
         engine.handle_input("go west");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(2));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
 
         engine.handle_input("drop lamp");
-        assert!(!player_has_item(engine.world(), 6));
-        assert!(room_has_item(engine.world(), 6));
+        assert!(!player_has_item(
+            engine.world(),
+            &ObjectId::new("rusty-lamp")
+        ));
+        assert!(room_has_item(engine.world(), &ObjectId::new("rusty-lamp")));
 
         engine.handle_input("go south");
-        assert_eq!(engine.world().current_room_id(), RoomId::new(1));
+        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
 
-        assert!(player_has_item(engine.world(), 2));
-        assert!(player_has_item(engine.world(), 4));
+        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(player_has_item(engine.world(), &ObjectId::new("brass-key")));
     }
 }

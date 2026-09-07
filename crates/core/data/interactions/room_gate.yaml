@@ -1,0 +1,6 @@
+- verb: examine
+  item: iron-key
+  condition:
+    - room: study
+  effect:
+    - emit: key-in-study

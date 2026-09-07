@@ -7,7 +7,12 @@ pub mod rules;
 pub mod view;
 pub mod world;
 
-pub use data::{ObjectData, ObjectKind, RoomData, WorldData, WorldDataError};
+pub use data::interactions_data::{
+    DataCondition, DataEffect, DataTarget, DataTargetKind, InteractionData,
+};
+pub use data::object_data;
+pub use data::room_data;
+pub use data::{WorldData, WorldDataError};
 pub use engine::GameEngine;
 pub use event::Event;
 pub use input::parse_input;

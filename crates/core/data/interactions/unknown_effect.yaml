@@ -1,0 +1,4 @@
+- verb: examine
+  item: stale-bread
+  effect:
+    - explode: true

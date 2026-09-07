@@ -1,0 +1,6 @@
+- verb: use
+  item: iron-key
+  target:
+    object: wooden-door
+  effect:
+    - emit: for-the-wooden-door

@@ -114,7 +114,7 @@ mod everything_overridden {
         assert_eq!(marker("take"), custom.handle_input("take iron key"));
         assert_eq!(
             vec![Event::Took {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string()
             }],
             default.handle_input("take iron key")
@@ -134,7 +134,7 @@ mod everything_overridden {
         assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
             vec![Event::Examined {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
             }],
             default.handle_input("examine iron key")
@@ -149,7 +149,7 @@ mod everything_overridden {
         default.handle_input("take iron key");
         assert_eq!(
             vec![Event::UsedTargetNeeded {
-                object_id: ObjectId::new(2),
+                object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string()
             }],
             default.handle_input("use iron key")

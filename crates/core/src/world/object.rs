@@ -1,35 +1,58 @@
 use std::collections::HashMap;
 
-use crate::data;
-use crate::data::ObjectKind;
+use serde::Deserialize;
+
+use crate::data::{self, object_data};
 use crate::input::direction::Direction;
 use crate::world::room::RoomId;
 
 /// Identifier for a world object. All interactables share one id space.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
-pub struct ObjectId(pub(crate) i32);
+///
+/// The id is the object's stable symbolic `key` from the authored world data
+/// (e.g. `iron-key`); numeric ids never appear in authored YAML.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+pub struct ObjectId(String);
 
 impl ObjectId {
     #[must_use]
-    pub fn new(value: i32) -> Self {
-        ObjectId(value)
+    pub fn new(value: &str) -> Self {
+        ObjectId(value.to_string())
     }
 
+    /// The key as a string slice.
     #[must_use]
-    pub fn get(self) -> i32 {
+    pub fn get(&self) -> &str {
+        &self.0
+    }
+
+    /// Consume the id, returning the key.
+    #[must_use]
+    pub fn into_key(self) -> String {
         self.0
     }
 }
 
-impl From<i32> for ObjectId {
-    fn from(value: i32) -> Self {
+impl From<&str> for ObjectId {
+    fn from(value: &str) -> Self {
         ObjectId::new(value)
     }
 }
 
-impl From<ObjectId> for i32 {
+impl From<String> for ObjectId {
+    fn from(value: String) -> Self {
+        ObjectId(value)
+    }
+}
+
+impl From<ObjectId> for String {
     fn from(id: ObjectId) -> Self {
-        id.get()
+        id.0
+    }
+}
+
+impl std::fmt::Display for ObjectId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -50,7 +73,7 @@ pub struct Object {
     pub(crate) id: ObjectId,
     pub(crate) primary_name: String,
     pub(crate) aliases: String,
-    pub(crate) kind: ObjectKind,
+    pub(crate) kind: object_data::ObjectKind,
     pub(crate) door: Option<DoorState>,
     pub(crate) extra: HashMap<String, data::ExtraValue>,
 }
@@ -74,15 +97,15 @@ impl Object {
 
     #[must_use]
     pub fn resolve_by_name(objects: &[Object], name: &str) -> ObjectResolution {
-        let matching: Vec<ObjectId> = objects
+        let mut matching: Vec<ObjectId> = objects
             .iter()
             .filter(|object| object.has_name(name))
-            .map(|object| object.id)
+            .map(|object| object.id.clone())
             .collect();
 
         match matching.len() {
             0 => ObjectResolution::NotFound,
-            1 => ObjectResolution::Found(matching[0]),
+            1 => ObjectResolution::Found(matching.remove(0)),
             _ => ObjectResolution::Ambiguous {
                 ids: matching,
                 alias: name.to_string(),
@@ -90,18 +113,18 @@ impl Object {
         }
     }
 
-    pub(crate) fn from_data(object: &data::ObjectData) -> Self {
+    pub(crate) fn from_data(object: &object_data::ObjectData) -> Self {
         let door = object.door.as_ref().and_then(|door_data| {
             Direction::parse(&door_data.direction).map(|direction| DoorState {
                 direction,
-                to: door_data.to.into(),
+                to: door_data.to.clone().into(),
                 locked: door_data.locked,
-                gated_by: door_data.gated_by.map(ObjectId::from),
+                gated_by: door_data.gated_by.clone().map(ObjectId::from),
             })
         });
 
         Object {
-            id: object.id.into(),
+            id: object.id.clone(),
             primary_name: object.primary_name.clone(),
             aliases: object.aliases.join(";"),
             kind: object.kind,
@@ -118,7 +141,7 @@ pub struct ObjectInfo {
     pub id: ObjectId,
     pub name: String,
     pub aliases: Vec<String>,
-    pub kind: ObjectKind,
+    pub kind: object_data::ObjectKind,
     pub door: Option<DoorInfo>,
     pub extra: HashMap<String, data::ExtraValue>,
 }
@@ -135,7 +158,7 @@ pub struct DoorInfo {
 impl ObjectInfo {
     pub(crate) fn from_object(object: &Object) -> Self {
         ObjectInfo {
-            id: object.id,
+            id: object.id.clone(),
             name: object.primary_name.clone(),
             aliases: object
                 .aliases
@@ -146,9 +169,9 @@ impl ObjectInfo {
             kind: object.kind,
             door: object.door.as_ref().map(|door| DoorInfo {
                 direction: door.direction,
-                to: door.to,
+                to: door.to.clone(),
                 locked: door.locked,
-                gated_by: door.gated_by,
+                gated_by: door.gated_by.clone(),
             }),
             extra: object.extra.clone(),
         }

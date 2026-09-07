@@ -1,0 +1,9 @@
+- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - room: study
+    - is_door: true
+  effect:
+    - emit: used-on-a-door

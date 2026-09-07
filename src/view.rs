@@ -59,7 +59,7 @@ impl typegin_core::View for TextView {
     }
 
     fn render_custom(&mut self, name: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("({name})"))]
+        vec![line(name.to_string())]
     }
 
     fn render_took(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
@@ -173,7 +173,7 @@ fn render_look(world: &typegin_core::WorldState) -> Vec<typegin_core::RenderComm
     let room_items = world.room_object_names();
     let inventory = world.player_object_names();
 
-    let mut parts = vec![line("You are in a room.".to_string())];
+    let mut parts = vec![line(room_description(world))];
 
     if room_items.is_empty() {
         parts.push(line("There is nothing notable here.".to_string()));
@@ -189,8 +189,52 @@ fn render_look(world: &typegin_core::WorldState) -> Vec<typegin_core::RenderComm
         parts.push(line(format!("You are carrying: {carried}.")));
     }
 
+    let exits = visible_exits(world);
+    if exits.is_empty() {
+        parts.push(line("There are no visible exits here.".to_string()));
+    } else {
+        let listed = join_list(&exits);
+        parts.push(line(format!("Exits: {listed}.")));
+    }
+
     // Yield one line per sentence so each is a distinct message.
     parts
+}
+
+fn visible_exits(world: &typegin_core::WorldState) -> Vec<String> {
+    const COMPASS: [typegin_core::Direction; 4] = [
+        typegin_core::Direction::North,
+        typegin_core::Direction::East,
+        typegin_core::Direction::South,
+        typegin_core::Direction::West,
+    ];
+
+    COMPASS
+        .into_iter()
+        .filter_map(|direction| {
+            if world.is_exit_hidden(direction) {
+                return None;
+            }
+            let exit = world.exit_info(direction)?;
+            let state = if world.is_exit_locked(direction) {
+                " (locked)"
+            } else {
+                ""
+            };
+            Some(format!("{direction} through the {}{state}", exit.name))
+        })
+        .collect()
+}
+
+fn room_description(world: &typegin_core::WorldState) -> String {
+    match world
+        .current_room_extra()
+        .get("description")
+        .map(typegin_core::data::ExtraValue::to_owned)
+    {
+        Some(typegin_core::data::ExtraValue::Str(desc)) => desc,
+        _ => "You are in a room.".to_string(),
+    }
 }
 
 fn join_list(list: &[String]) -> String {

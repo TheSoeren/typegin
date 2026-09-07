@@ -1,6 +1,6 @@
-# Architecture: a unified object model, Visionaire-style
+# Architecture: a unified object model, Visionaire-style, with a data-driven interaction layer
 
-This document explains the engine architecture after the rewrite: what changed,
+This document describes the engine as it is today: what the model looks like,
 why, and how to build on it.
 
 ## Why
@@ -13,141 +13,148 @@ The engine is meant to power three kinds of front-ends from one core:
 3. **Point-and-click adventure** — the player clicks; the GUI must know *what
    can be done with what* and translates the click into a game action.
 
-The old core couldn't satisfy #2 and #3:
-
-- **Items and exits lived on different planes.** `resolve_any_item` only
-  resolved things that could be carried; a door could be *passed through* but
-  never *addressed*. There was no way to express "use the iron key on the oak
-  door" as a noun/verb problem, and no way for a GUI to learn "this door can be
-  unlocked".
-- **Behaviour was hardcoded per verb.** A puzzle ("cut the rope") meant
-  overriding `on_use` wholesale, re-implementing the stock cases plus the new
-  one. Every custom interaction was a fork, not an addition.
-- **The lock/door loop wasn't proven from the consumer side.** `ExtraData` had
-  a key named `opens_with`, but unlocking was neither data-driven nor tested.
-
 We researched how classic engines solve this. Inform 7 / TADS unify *every*
 interactable into one "thing" and resolve nouns across a scope. Visionaire
 (and AGS) go further: **there are exactly two object kinds — scene objects and
 inventory objects**; verbs are *data*, interactions are authored per object,
-everything has a fallback answer, and the GUI can enumerate interactions. The
-rewrite follows the Visionaire path, because it maps most directly onto
-requirement #3.
+everything has a fallback answer, and the GUI can enumerate interactions. This
+engine follows the Visionaire path, because it maps most directly onto
+requirement #3 — and adds a *data-driven* interaction layer so the authoring
+surface is YAML, not Rust.
 
-## What changed
+## The model
 
 ### 1. One interactable: an `Object`, with exactly two kinds
 
-Every interactable is an `Object` with an id, names and opaque `extra`.
-An object has one of two kinds:
+Every interactable is an `Object` keyed by a **symbolic string** (`ObjectId`,
+e.g. `chair-leg`), with names and opaque `extra`. An object has one of two
+kinds:
 
-- `Item` — an inventory object: portable, taken into inventory (a key, a sword).
-  This is the default kind when world data omits it.
+- `Item` — an inventory object: portable, taken into inventory (a key, a
+  sword). This is the default kind when world data omits it.
 - `Scene` — a scene object: stays in the world, clickable/examinable but never
   portable (furniture, fixtures… and every door).
 
 A **door is just a Scene object carrying optional door data**:
 
 ```yaml
-- id: 14
-  primary_name: oak door
-  aliases: [door]
+- key: cell-door
+  primary_name: Cell door
+  aliases: [cell door, door]
   kind: Scene
   door:
     direction: east
-    to: 2
+    to: corridor
     locked: true
-    gated_by: 2
 ```
 
-So the three `ObjectTarget`s of the interim design (`Item | Exit`) are gone:
-`resolve_target(name)` now resolves one noun path against visible room objects
-and carried objects, and returns `Found(ObjectId)` / `Ambiguous { ids }` /
+`resolve_target(name)` resolves one noun path against visible room objects and
+carried objects, and returns `Found(ObjectId)` / `Ambiguous { ids }` /
 `NotFound`. Declaring `door` data forces the kind to `Scene`, keeping the
 two-kind invariant at runtime.
 
 ### 2. Rooms hold objects; the direction index is derived
 
-`Room` no longer stores an `exits:` map. It holds `objects`, `hidden_objects`
-and a *derived* `HashMap<Direction, ObjectId>` built once from the door objects
-in both lists — a cache for O(1) movement, not an identity store. "Hidden" is
-*list membership*, not a flag on the door: a hidden door is an object sitting in
-`hidden_objects` until revealed. The `locked` flag stays on the door data.
+`Room` holds `objects`, `hidden_objects` and a *derived*
+`HashMap<Direction, ObjectId>` built once from the door objects in both lists —
+a cache for O(1) movement, not an identity store. "Hidden" is *list
+membership*, not a flag on the door: a hidden door is an object sitting in
+`hidden_objects` until revealed. The `locked` flag stays on the door data
+(`gated_by` optionally links the door to its unlocking object as a pure fact).
 
-The old exit helpers survive as door helpers over the index:
-`get_room_id_by_exit_direction` (open → destination), `is_exit_locked` /
-`is_exit_hidden`, `exit_directions`, `exit_extra`, `unlock_exit` / `lock_exit`,
-`reveal_exit` / `hide_exit`. `reveal_object` and `reveal_exit` are now the same
-operation (move an object between `hidden_objects` and `objects`).
+Door helpers over the index: `get_room_id_by_exit_direction`,
+`is_exit_locked` / `is_exit_hidden`, `exit_directions` (open ones only),
+`exit_info` (the door's `ObjectInfo`), `exit_extra`, `exit_gated_by`,
+`unlock_exit` / `lock_exit`, `reveal_exit` / `hide_exit`. `reveal_object` and
+`reveal_exit` are the same operation but on different planes (pluck a hidden
+object vs. move a door between lists).
 
 ### 3. The scene-vs-inventory distinction is stock behaviour
 
-`BasicRules::on_take` is where the kind distinction bites (Visionaire's authored
-"is this portable" behaviour):
+`BasicRules::on_take` is where the kind distinction bites:
 
 - `Item` in the room → taken into inventory (`Took`),
-- `Scene` (including every door) → refused with `CantTake { object }` — the
-  player can't carry it,
+- `Scene` (including every door) → refused with `CantTake { object }`,
 - missing/ambiguous → the usual not-found/ambiguous events.
 
-Because *taking* is now default behaviour, the front-end's old `TakeRules`
-override is gone; the game only authors a `GameRules::on_look` that reveals the
-hidden passage door.
+Because stock behaviour covers take/drop/examine/use and the data layer covers
+the puzzles, the terminal front-end runs the stock `GameEngine::get` with no
+custom `Rules` implementation at all.
 
-### 4. Interactions are authored, and the fallback is stock
+### 4. Data-driven interactions: the authoring surface
 
-Behaviour is a small composition:
+The engine's flagship authoring surface lives in `data/interactions.yaml`, not
+Rust closures. Shape:
 
-- A **`Rules` trait hook** (`on_use`, `on_take`, ...) is the coarse overridable
-  layer.
-- In addition, a consumer can provide **`Interaction`s** (verb + item + target
-  filter + condition + effect) via `Rules::interactions()`.
-- The **default `on_use`** first runs any matching authored interaction, then
-  falls back to a stock spine:
+```yaml
+- verb: use
+  item: chair-leg
+  target:
+    object: table
+  effect:
+    - discard: chair-leg
+    - grant: broken-chair-leg
+    - emit: You lay the chair leg across the table...
+```
 
-  - a resolved target that is a door whose `gated_by` equals the used object →
-    `UnlockedExit` (door-ness detected backwards, via `exit_direction_of(target)`),
-  - use-on-object → `Used`,
-  - resolved-but-meaningless combinations → `CannotUse`,
-  - missing/ambiguous parts → `UsedTargetNeeded` / `UsedTargetNotFound` /
-    `UsedTargetAmbiguous`.
+- **`verb`** — one of `look`, `go`, `examine`, `take`, `drop`, `use`.
+- **`item`** — the object the player must be using/carrying; absent matches
+  any.
+- **`target`** — omitted matches any target *including self-use*; `object: <id>`
+  matches one exact target; `kind: scene` matches any scene target. The coarse
+  `kind` filter is complemented by door-specific conditions.
+- **`condition[]`** — all must hold (AND); gates both dispatch and the
+  `interactions_for` query. Catalog: `room`, `player_holds`, `exit_locked`,
+  `exit_hidden`, `is_door`, `not` (negation of any condition).
+- **`effect[]`** — run in order, each mutating the world and optionally
+  emitting one event:
+  - `emit` → `Event::Custom { name }` (game-authored prose beat),
+  - `take` → room → inventory (`Took`), `drop` → inventory → room (`Dropped`),
+  - `grant` → materialise into inventory **from the object-template registry,
+    even if the object sits in no room** (`Granted`),
+  - `discard` → remove a carried item without placing it in the room
+    (`Discarded`),
+  - `unlock_exit` / `lock_exit`, `reveal_exit` / `hide_exit`,
+    `reveal_object` / `hide_object` (mostly silent).
 
-  So a puzzle authors *one* interaction ("cut the rope with the knife") and the
-  engine answers for *everything else* without the author re-implementing
-  refusal cases.
+Validation is done at load time (`validate_references`) so a typo'd object key
+or duplicate key fails the build, not the playtest.
 
-The gated door is now **data + a stock rule**: a door object declares
-`gated_by: <object id>` (a pure fact), and the default `on_use` turns "use the
-gating object on the locked door" into an unlock. The front-end needs no custom
-unlock code.
-
-`TargetFilter` names the two kinds: `Any`, `Targeted`, `Scene`, `Door` — the
-door filter is how an interaction addresses "any door", with finer selection in
-the `condition`.
+**Dispatch precedence** in every verb hook: first matching data interaction
+(declaration order, first wins) → then consumer closure interactions
+`Rules::interactions()` → then the stock fallback spine. A puzzle authors one
+interaction ("use the toenail on the vent grille") and the engine answers for
+everything else with refusals (`UsedTargetNeeded`, `CannotUse`, not-found/
+ambiguous) without the author re-implementing them. Interactions can be gated
+on world state (`exit_hidden`, `player_holds`, ...) so a beat fires exactly
+once (e.g. "examine the chair to reveal the leg" only while the leg is still
+in the room).
 
 ### 5. The point-and-click hook: `GameEngine::interactions_for`
 
 A GUI asks "what can the player do with this target right now?":
 
 ```rust
-engine.interactions_for(Some(iron_key_id), Some(oak_door_id))
+engine.interactions_for(Some(toenail_id), Some(vent_grille_id))
 ```
 
-The query runs the *same* `matches()` (verb + item + target filter + condition)
-that the dispatcher uses, so it only reports interactions that are currently
-valid — no duplicate logic for the menu vs. the execution. Stock `BasicRules`
-reports nothing here; the query lists *authored* interactions, which a GUI
-combines with raw world state (e.g. `WorldState::exit_gated_by`) to compose its
-verb menu.
+The query runs the *same* `matches()` logic (verb + item + target filter +
+conditions) used by dispatch, so it only reports interactions that are
+currently valid. Data interactions are compiled once at construction into the
+closure `Interaction` shape, so the query answers data *and* closure
+interactions uniformly — no duplicate logic for the menu vs. the execution.
 
-### 6. Events: object-flavoured and open
+### 6. Events: typed, object-flavoured and open
 
-- All payloads carry object ids/names (`TookObjectNotFound`, `Dropped`, `Used`,
-  `Examined`, ...).
-- New: `UnlockedExit { direction }`, `CannotUse { item, target }` (the generic
-  refusal), `CantTake { object }` (scene objects are not portable), and
-  `Event::Custom { name }` — an opaque, game-authored beat (the engine's
-  "plugin channel", from the backlog).
+All payloads carry object ids/names. The movement/take/drop/use/examine
+families each have their not-found and ambiguous variants. Recent additions:
+
+- `Event::Custom { name }` — an opaque, game-authored beat (the prose is the
+  responsibility of the `View`).
+- `Event::UnlockedExit { direction }`, `CannotUse { item, target }`,
+  `CantTake { object }`.
+- `Event::Granted { object_id, object }` / `Event::Discarded { object_id, object }`
+  — inventory changes that do not come from a room.
 
 ### 7. Rendering: one pipeline, many front-ends
 
@@ -156,15 +163,13 @@ Text and GUI front-ends share a single render pipeline:
 
 - The default `render` dispatches each `Event` to a **typed, per-event hook**
   (`render_took`, `render_went_exit_locked`, ...) with the payload already
-  destructured (`object: &str`, `direction: &Direction`). A view overrides
-  only the events it phrases; every hook defaults to silence, so a new engine
-  event never breaks existing views (OCP). Unknown events fall back to
-  `render_generic`.
+  destructured. A view overrides only the events it phrases; every hook
+  defaults to silence, so a new engine event never breaks existing views.
+  Unknown events fall back to `render_generic`.
 - Output is a stream of `RenderCommand` (`Line`, `ClearScreen`, ...) — a
-  `#[non_exhaustive]` enum the engine can extend. A terminal front-end prints
-  lines; a GUI interprets commands in its widget tree.
-- `render` takes `&mut self` so stateful views can pace output, accumulate a
-  transcript, or animate — a pure view simply ignores the mutation.
+  `#[non_exhaustive]` enum the engine can extend.
+- `render` takes `&mut self` so stateful views can pace output or animate; the
+  view can read *only* `WorldState` — it can never mutate the game.
 
 ## The pipeline today
 
@@ -173,7 +178,8 @@ text input → tokenizer → lexer → Action
   → GameEngine.handle_input → execute_action
       → resolve_target / resolve_player_object / resolve_room_object
       → Rules hook
-          → authored Interaction? (conditions re-checked)
+          → data interaction? (conditions re-checked; first match wins)
+          → else closure Interaction? (Rules::interactions())
           → else stock fallback (kind check, gated unlock, refusals)
       → Vec<Event> + &mut WorldState
   → View.render → Vec<RenderCommand> (Line, ClearScreen, ...)
@@ -184,59 +190,62 @@ A point-and-click front-end is just a View plus the `interactions_for` query:
 it synthesizes an `Action` from clicks, sends it through the exact same
 `execute_action` path, and renders `Event`s.
 
+The terminal front-end currently renders, on `look`, the room's description
+(from the room `extra`), the visible objects, the carried inventory, and a
+survey of the compass directions that have exits (hidden doors stay hidden;
+locked doors are marked). All puzzle logic lives in `data/interactions.yaml`.
+
 ## Code map
 
-| File | Role |
+| File / module | Role |
 | --- | --- |
-| `crates/core/src/world/object.rs` | `ObjectId`, `ObjectKind`, `ObjectResolution` (plain ids), `Object` (kind + door state), `ObjectInfo` (with `DoorInfo`) |
-| `crates/core/src/world/room.rs` | `Room`: object/hidden-object lists, derived `Direction → ObjectId` index, door helpers (lock/hide/reveal/gate/extra) |
-| `crates/core/src/world/mod.rs` | `WorldState`: unified `resolve_target`, scope helpers, `object_kind`/`object_is_door`/`exit_direction_of`, transfers, `from_data` |
-| `crates/core/src/interaction.rs` | `Verb`, `ActionContext` (option ids), `TargetFilter` (Any/Targeted/Scene/Door), `Interaction` |
-| `crates/core/src/rules.rs` | `BasicRules`, `Rules` (defaults): `on_take` kind check, stock `on_use` with interaction dispatch + gated unlock |
-| `crates/core/src/engine.rs` | Action → hook dispatch, `interactions_for` query |
-| `crates/core/src/event.rs` | `Event` enum (object payloads, `UnlockedExit`, `CannotUse`, `CantTake`, `Custom`) |
-| `crates/core/src/data.rs` | `WorldData`/`ObjectData`/`RoomData`, `ObjectKind`, `DoorData` (`direction`, `to`, `locked`, `gated_by`) |
-| `crates/core/src/view.rs` | `View` trait: `render` dispatches to typed `render_*` hooks (defaults silent, `render_generic` fallback), `RenderCommand` (`Line`/`ClearScreen`, `#[non_exhaustive]`) |
-| `src/main.rs`, `src/view.rs` | `GameRules` (only the reveal-on-look beat), `TextView` (phrases via `render_*` hooks), `RenderCommand` interpreter loop |
+| `crates/core/src/world/object.rs` | `ObjectId` (symbolic string key), `ObjectResolution`, `Object` (kind + door state), `ObjectInfo`/`DoorInfo` |
+| `crates/core/src/world/room.rs` | `Room`: visible/hidden object lists, derived `Direction → ObjectId` index, door helpers |
+| `crates/core/src/world/mod.rs` | `WorldState`: unified `resolve_target`, scope helpers, `object_kind`/`object_is_door`/`exit_direction_of`, transfers, `player_grant_object`/`player_discard_object`, object-template registry, `from_data` |
+| `crates/core/src/interaction.rs` | `Verb`, `ActionContext`, `TargetFilter` (Any/Targeted/Scene), closure `Interaction` |
+| `crates/core/src/data/mod.rs` | `WorldData`, `ExtraValue`, `load`/`from_yaml` + reference validation |
+| `crates/core/src/data/object_data.rs` | `ObjectData` (`key`, `primary_name`, `aliases`, `kind`, `door`, `extra`) |
+| `crates/core/src/data/room_data.rs` / `door_data.rs` | `RoomData`, `DoorData` (direction/to/locked/gated_by as plain strings) |
+| `crates/core/src/data/interactions_data.rs` | `InteractionData`, `DataTarget`, `DataCondition`, `DataEffect`, `validate_references`, `compile` → `Interaction`, `dispatch_data` |
+| `crates/core/src/input/` | tokenizer, lexer, `Direction` (compass, `Display`), `Action` + result types (`TakeResult`, `DropResult`, `GrantResult`, `DiscardResult`, ...); private module, re-exported |
+| `crates/core/src/rules.rs` | `BasicRules`, `Rules` (defaults): stock take/drop/examine/use with data+closure interaction dispatch, gated unlock, refusals |
+| `crates/core/src/engine.rs` | Action → hook dispatch, `handle_input`, `interactions_for` query |
+| `crates/core/src/event.rs` | `Event` enum (typed variants incl. `Custom`, `UnlockedExit`, `CannotUse`, `CantTake`, `Granted`, `Discarded`) |
+| `crates/core/src/view.rs` | `View` trait: `render` dispatches to typed `render_*` hooks (defaults silent, `render_generic` fallback), `RenderCommand` (`#[non_exhaustive]`) |
+| `src/main.rs`, `src/view.rs` | terminal front-end: loads the three YAML files, stock `GameEngine::get`, REPL; `TextView` phrases events (description + objects + inventory + exits on `look`) |
+
+Public API surface is re-exported from `crates/core/src/lib.rs`.
 
 ## Data mapping
 
-- `items:` → `objects:`; every object may declare `kind: Item | Scene`
-  (default `Item`).
-- `visible_items:` → `visible_objects:`; `hidden_items:` → `hidden_objects:`.
-- Per-room `exits:` maps are gone — a door is an object with a `door:` block:
+Three YAML files, one per concept:
 
-```yaml
-- id: 14
-  primary_name: oak door
-  aliases: [door]
-  kind: Scene
-  door:
-    direction: east
-    to: 2
-    locked: true
-    gated_by: 2
-  extra:
-    material: oak
-```
+- **`data/items.yaml`** — `objects:` keyed by symbolic `key`; `kind: Item |
+  Scene` (default `Item`), optional `door:` block, opaque `extra` (any YAML
+  value → `ExtraValue`).
+- **`data/rooms.yaml`** — `rooms:` keyed by `key`; `visible_objects` /
+  `hidden_objects` lists of object keys, `extra` (the terminal front-end reads
+  `extra.description`).
+- **`data/interactions.yaml`** — `interactions:` list of `verb` + optional
+  `item`/`target`/`condition` + `effect` (see section 4).
 
-`WorldData::from_yaml` / `WorldData::load` signatures are unchanged; only the
-file format moved.
+`WorldData::load` / `from_yaml(items, rooms, interactions)` parse and validate;
+a reference to an unknown key anywhere fails loudly.
 
 ## One important design note
 
 Authored interactions and defaults must live on the **same concrete `Rules`
-type**. `BasicRules::on_use` consults `interactions()` so a consumer type that
-provides interactions gets the stock fallback *plus* its additions for free —
-but only when that type is what the engine dispatches on. A wrapper that
-delegates `on_use` to a plain `BasicRules` silently loses the wrapper's
-interactions (the default runs against `BasicRules`). Provide `interactions()`
-on your own `Rules` impl instead of nesting.
+type**. `BasicRules::on_use` consults both the data interactions and
+`interactions()` so a consumer type that provides interactions gets the stock
+fallback *plus* its additions for free — but only when that type is what the
+engine dispatches on. A wrapper that delegates `on_use` to a plain `BasicRules`
+silently loses the wrapper's interactions. Provide `interactions()` on your own
+`Rules` impl instead of nesting.
 
 ## Follow-ups
 
-- Both original backlog items are effectively closed: `Event::Custom` is the
-  "opaque game event passthrough", and the gated door is proven end-to-end from
-  the consumer side (the stock `on_use` unlock, exercised by the game).
-- Natural next steps: a GUI front-end (View + `interactions_for` menus), and
-  dialogue/"use on hidden door to reveal it" scenarios encoded as interactions.
+- Data-driven interactions (see AGENTS north-star #1) are done: the game's
+  entire escape sequence is authored in YAML with the stock engine.
+- Natural next steps — flags/global quest state, NPCs + dialogue trees,
+  room-event/trigger beats, and inventory/verb-coin UI primitives; see the
+  priority order in `AGENTS.md`.

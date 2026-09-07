@@ -1,6 +1,7 @@
 use getset::{Getters, MutGetters};
 
 use crate::data::WorldData;
+use crate::data::interactions_data::InteractionData;
 use crate::event::Event;
 use crate::input::{Action, parse_input};
 use crate::interaction::{ActionContext, Interaction};
@@ -31,6 +32,11 @@ pub struct GameEngine {
     #[getset(get = "pub", get_mut = "pub")]
     world: world::WorldState,
     rules: Box<dyn Rules>,
+    /// Data-driven interactions compiled into the closure [`Interaction`]
+    /// shape, in declaration order. Consulted by `interactions_for` ahead of
+    /// `Rules::interactions()`; dispatch itself goes through the default rules
+    /// hooks (which read the raw data from the world).
+    data_interactions: Vec<Interaction>,
 }
 
 impl GameEngine {
@@ -49,6 +55,11 @@ impl GameEngine {
         GameEngine {
             world,
             rules: Box::new(rules),
+            data_interactions: data
+                .interactions
+                .iter()
+                .map(InteractionData::compile)
+                .collect(),
         }
     }
 
@@ -120,10 +131,15 @@ impl GameEngine {
         target: Option<ObjectId>,
     ) -> Vec<&Interaction> {
         let context = ActionContext::new(None, item, target);
-        self.rules
-            .interactions()
+        self.data_interactions
             .iter()
             .filter(|interaction| interaction.matches(&self.world, &context))
+            .chain(
+                self.rules
+                    .interactions()
+                    .iter()
+                    .filter(|interaction| interaction.matches(&self.world, &context)),
+            )
             .collect()
     }
 }

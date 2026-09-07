@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use core::data::ExtraValue;
 use core::event::Event;
-use core::{Direction, GameEngine, ObjectId, Rules, WorldState};
+use core::{Direction, GameEngine, ObjectId, RoomId, Rules, WorldState};
 
 fn item_2_extra() -> HashMap<String, ExtraValue> {
     let mut extra = HashMap::new();
@@ -63,44 +63,58 @@ mod data_parsing {
     #[test]
     fn item_extra_parses_all_types() {
         let data = common::multi_room_world_data();
-        let key = data.find_object(2).expect("item 2 exists");
+        let key = data
+            .find_object(&ObjectId::new("iron-key"))
+            .expect("item 2 exists");
         assert_eq!(key.extra, item_2_extra());
     }
 
     #[test]
     fn room_extra_parses() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(1).expect("room 1 exists");
+        let room = data
+            .find_room(&RoomId::new("cellar"))
+            .expect("room 1 exists");
         assert_eq!(room.extra, room_1_extra());
     }
 
     #[test]
     fn door_extra_parses() {
         let data = common::multi_room_world_data();
-        let oak = data.find_object(14).expect("oak door exists");
+        let oak = data
+            .find_object(&ObjectId::new("oak-door"))
+            .expect("oak door exists");
         assert_eq!(oak.extra, exit_east_extra());
     }
 
     #[test]
     fn door_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
-        let north_stairs = data.find_object(8).expect("cellar stairs north exists");
+        let north_stairs = data
+            .find_object(&ObjectId::new("cellar-stairs"))
+            .expect("cellar stairs north exists");
         assert!(north_stairs.extra.is_empty());
-        let south_stairs = data.find_object(9).expect("cellar stairs south exists");
+        let south_stairs = data
+            .find_object(&ObjectId::new("corridor-stairs"))
+            .expect("cellar stairs south exists");
         assert!(south_stairs.extra.is_empty());
     }
 
     #[test]
     fn item_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
-        let sword = data.find_object(1).expect("item 1 exists");
+        let sword = data
+            .find_object(&ObjectId::new("glowing-sword"))
+            .expect("item 1 exists");
         assert!(sword.extra.is_empty());
     }
 
     #[test]
     fn room_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
-        let corridor = data.find_room(2).expect("room 2 exists");
+        let corridor = data
+            .find_room(&RoomId::new("corridor"))
+            .expect("room 2 exists");
         assert!(corridor.extra.is_empty());
     }
 }
@@ -115,7 +129,7 @@ mod world_exposure {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .object_info(ObjectId::new(2))
+            .object_info(&ObjectId::new("iron-key"))
             .expect("item 2 in room");
         assert_eq!(info.extra, item_2_extra());
     }
@@ -125,7 +139,7 @@ mod world_exposure {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .object_info(ObjectId::new(3))
+            .object_info(&ObjectId::new("locked-chest"))
             .expect("item 3 in room");
         assert!(info.extra.is_empty());
     }
@@ -176,7 +190,7 @@ mod world_exposure {
 /// the item in the room. Items without a weight are unaffected.
 struct VetoHeavyRules;
 
-fn weight_of(world: &WorldState, id: ObjectId) -> Option<i64> {
+fn weight_of(world: &WorldState, id: &ObjectId) -> Option<i64> {
     world
         .object_info(id)
         .and_then(|info| match info.extra.get("weight") {
@@ -194,10 +208,10 @@ impl Rules for VetoHeavyRules {
     ) -> Vec<Event> {
         match resolution {
             core::ObjectResolution::Found(id) => {
-                if weight_of(world, id).is_some_and(|kg| kg > 2) {
+                if weight_of(world, &id).is_some_and(|kg| kg > 2) {
                     Vec::new()
                 } else {
-                    match world.player_take_object(id) {
+                    match world.player_take_object(&id) {
                         core::TakeResult::Success => vec![Event::Took {
                             object_id: id,
                             object: name.to_string(),
@@ -254,7 +268,7 @@ mod rules_read_extra {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new(4),
+                object_id: ObjectId::new("brass-key"),
                 object: "brass key".to_string()
             }]
         );

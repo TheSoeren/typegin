@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::input::action::Action;
 use crate::world::WorldState;
 use crate::world::object::ObjectId;
@@ -5,7 +7,8 @@ use crate::world::object::ObjectId;
 /// The game's action vocabulary. An author writes interactions *for a verb*,
 /// and a point-and-click front-end can enumerate the verbs an object accepts
 /// instead of guessing from prose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Verb {
     Look,
     Go,
@@ -53,9 +56,10 @@ impl ActionContext {
     }
 }
 
-/// Coarse kind filter deciding which targets an interaction applies to. The
+/// Coarse structural filter deciding which targets an interaction applies to:
+/// arity (`Any` vs `Targeted`) and world-position (`Scene`). The task-specific
 /// selection on top of it lives in the interaction's `condition`, which can
-/// inspect the concrete target (a door's direction, an object's id, state,
+/// inspect the concrete target (a door's direction, its door-ness, lock state,
 /// ...).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetFilter {
@@ -65,17 +69,14 @@ pub enum TargetFilter {
     Targeted,
     /// Only use-with on a *scene* object (stays in the world).
     Scene,
-    /// Only use-with on a *door* (a scene object carrying door data).
-    Door,
 }
 
 impl TargetFilter {
-    pub(crate) fn matches(self, world: &WorldState, target: Option<ObjectId>) -> bool {
+    pub(crate) fn matches(self, world: &WorldState, target: Option<&ObjectId>) -> bool {
         match self {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
             TargetFilter::Scene => target.is_some_and(|id| world.object_is_scene(id)),
-            TargetFilter::Door => target.is_some_and(|id| world.object_is_door(id)),
         }
     }
 }
@@ -148,7 +149,7 @@ impl Interaction {
     /// The object this interaction requires (or `None` for "any").
     #[must_use]
     pub fn item(&self) -> Option<ObjectId> {
-        self.item
+        self.item.clone()
     }
 
     /// The coarse target filter this interaction accepts.
@@ -162,13 +163,13 @@ impl Interaction {
     /// API (list it).
     #[must_use]
     pub fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
-        let item_ok = match self.item {
-            Some(id) => context.item == Some(id),
+        let item_ok = match &self.item {
+            Some(id) => context.item.as_ref() == Some(id),
             None => true,
         };
         item_ok
             && context.verb.is_none_or(|v| self.verb() == v)
-            && self.target.matches(world, context.target)
+            && self.target.matches(world, context.target.as_ref())
             && self.condition_applies(world, context)
     }
 

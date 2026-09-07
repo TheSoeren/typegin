@@ -1,7 +1,9 @@
+use serde::Deserialize;
 use std::fmt;
 
 /// A compass direction the player can move in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Direction {
     /// Moves the player "up" the screen / north.
     North,

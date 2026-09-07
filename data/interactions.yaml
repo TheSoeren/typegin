@@ -1,0 +1,73 @@
+interactions:
+  ### PLAYER-CELL — Edna & Harvey: The Breakout, opening cell.
+  # 1) Examining the chair is the only way to discover the loose leg.
+  #    Gated so the reveal beat only fires while the leg is still out in the
+  #    room (a proper "object is hidden" condition is a future core feature;
+  #    re-examining the chair once the leg is carried just falls to stock prose).
+  - verb: examine
+    item: chair
+    condition:
+      - not:
+          player_holds: chair-leg
+    effect:
+      - reveal_object: chair-leg
+      - emit: The chair wobbles on three legs. The front-left one is barely screwed on — it pulls free with a good tug.
+
+  # 2) The loose chair leg (taken with the stock `take`) snaps over the table.
+  - verb: use
+    item: chair-leg
+    target:
+      object: table
+    effect:
+      - discard: chair-leg
+      - grant: broken-chair-leg
+      - emit: You lay the chair leg across the table, push down hard, and it snaps into a splintered, weaponlike stick.
+
+  # 3) The stick shreds the top-left pad, exposing the vent fan + grille.
+  #    Gated so it only fires while the vent is still hidden.
+  - verb: use
+    item: broken-chair-leg
+    target:
+      object: wall-polster
+    condition:
+      - exit_hidden: north
+    effect:
+      - emit: 'The padding shreds under the splintered wood. Behind the top-left pad: a vent grille held by four screws, and a silent air-conditioning fan.'
+      - reveal_object: fan
+      - reveal_object: vent-grille
+
+  # 4) A nail is needed for the screws (stand-in for the initial-inventory
+  #    memory item the real game starts with).
+  - verb: use
+    item: nail-clipper
+    effect:
+      - grant: toenail
+      - emit: Clip — an overlong toenail comes off in your hand.
+
+  # 5) The toenail draws the four screws; the chute opens. Gated so it only
+  #    fires while the grille is still locked.
+  - verb: use
+    item: toenail
+    target:
+      object: vent-grille
+    condition:
+      - exit_locked: north
+    effect:
+      - emit: Four turns, four screws on the floor. You lift out the grille and the quiet fan, and peer into the air chute.
+      - unlock_exit: north
+
+  ### Flavour beats
+  - verb: examine
+    item: door-grate
+    effect:
+      - emit: A guard stands on the other side, absorbed in a round of imaginary mini-golf. He could switch the air conditioning for you — if only he ever stopped talking about his father's putter.
+
+  - verb: examine
+    item: fan
+    effect:
+      - emit: A big air-conditioning fan. Silent for now — the ventilation is at the guard's mercy.
+
+  - verb: examine
+    item: cabinet
+    effect:
+      - emit: A tall cabinet, large enough to hide a full-grown warden in.
