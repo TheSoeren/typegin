@@ -24,11 +24,11 @@ fn main() -> ExitCode {
             }
         };
 
-    let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, GameRules);
+    let mut engine = typegin_core::GameEngine::get(&world_data);
 
     let mut view = view::TextView;
 
-    println!("You find yourself in a mysterious place.");
+    println!("You wake up in a padded cell of the sanatorium. Harvey is nowhere to be seen.");
     println!("Type 'look' to see where you are. 'quit' to leave.\n");
 
     let stdin = io::stdin();
@@ -59,22 +59,4 @@ fn main() -> ExitCode {
     }
 
     ExitCode::SUCCESS
-}
-
-/// This game's rules: room-specific discovery.
-///
-/// The core's default `BasicRules` supplies stock behaviour (taking items,
-/// refusing to take scene objects, unlocking `gated_by` doors). This game only
-/// adds an authored beat: looking around in the study reveals the hidden
-/// passage door.
-struct GameRules;
-
-impl typegin_core::Rules for GameRules {
-    fn on_look(&mut self, world: &mut typegin_core::WorldState) -> Vec<typegin_core::Event> {
-        if world.current_room_id() == typegin_core::RoomId::new("study") {
-            world.reveal_exit(typegin_core::Direction::North);
-        }
-
-        vec![typegin_core::Event::Looked]
-    }
 }

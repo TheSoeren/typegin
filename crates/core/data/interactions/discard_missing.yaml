@@ -1,0 +1,6 @@
+- verb: use
+  item: brass-key
+  target:
+    kind: scene
+  effect:
+    - discard: iron-key

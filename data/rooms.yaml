@@ -1,24 +1,30 @@
 rooms:
   - key: player-cell
-    name: Psych Ward Cell
-    visible_objects: [chair, table, exit-door, wall-polster, nail-clipper]
-    hidden_objects: [vent, chair-leg, chipped-chair-leg, fingernail]
+    name: The Padded Cell
+    visible_objects: [chair, table, wall-polster, door-grate, cell-door,
+      nail-clipper]
+    hidden_objects: [chair-leg, fan, vent-grille]
     extra:
-      description: An ordinary psych ward cell. Its walls are lined with polster.
+      description: A padded cell, every wall bundled in soft polster. Edna's head hurts.
 
-  - key: vent-corridor
-    name: Vent
-    visible_objects: []
-    hidden_objects: []
-
-  - key: headmaster-office
-    name: The Headmasters Office
-    visible_objects: []
+  - key: air-chute
+    name: The Air Chute
+    visible_objects: [air-chute-to-cell, air-chute-to-office]
     hidden_objects: []
     extra:
-      description: A big, robust table. Someone is compensating for something
+      description: A cramped, dusty ventilation chute.
+
+  - key: dr-marcel-office
+    name: Dr. Marcel's Office
+    visible_objects: [office-to-air-chute, encyclopedia, polo-mallet, ballpoint-pen,
+      cabinet]
+    hidden_objects: []
+    extra:
+      description: The office of Dr. Marcel. Books, a diploma, and somewhere to hide.
 
   - key: corridor
-    name: Unused Corridor
+    name: The Guard Corridor
     visible_objects: []
     hidden_objects: []
+    extra:
+      description: The corridor outside the cell. A guard polishes his putter.

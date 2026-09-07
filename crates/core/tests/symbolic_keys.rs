@@ -11,8 +11,8 @@
 //!
 //! ## Fixtures (in `crates/core/data/`)
 //!
-//! * `data_interactions_items.yaml` — the 10-object world (keys `iron-key` …
-//!   `oak-door`).
+//! * `data_interactions_items.yaml` — the 11-object world (keys `iron-key` …
+//!   `oak-door`, plus the un-placed `rusty-nail`).
 //! * `data_interactions_rooms.yaml` — the 3-room layout (Cellar → Corridor →
 //!   Study) with key-based rooms.
 //! * `interactions/` — authored interaction snippets (key-referencing).

@@ -71,3 +71,8 @@ objects:
       to: corridor
       locked: true
       gated_by: iron-key
+
+  - key: rusty-nail
+    primary_name: rusty nail
+    aliases: [nail]
+    kind: Item

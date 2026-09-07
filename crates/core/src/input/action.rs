@@ -37,6 +37,22 @@ pub enum TakeResult {
     Fail,
 }
 
+/// Outcome of materialising an object into the player's inventory from the
+/// world-data object templates (`grant`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrantResult {
+    Success,
+    Fail,
+}
+
+/// Outcome of removing a carried object from the player's inventory without
+/// placing it anywhere (`discard`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiscardResult {
+    Success,
+    Fail,
+}
+
 /// Outcome of moving an item from the player's inventory into the room.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DropResult {

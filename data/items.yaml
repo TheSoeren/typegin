@@ -1,21 +1,49 @@
 objects:
-  # Objects in the players cell
+  ### PLAYER-CELL — Edna & Harvey: The Breakout opening cell
   - key: chair
-    primary_name: Chair
+    primary_name: Hardwood chair
     aliases: [chair]
+    kind: Scene
+    extra:
+      description: A hardwood chair, worn smooth.
+
+  - key: chair-leg
+    primary_name: Chair leg
+    aliases: [chair leg, leg]
     kind: Item
     extra:
-      description: A plain old chair
+      description: A solid chair leg, about to become a tool.
+
+  - key: broken-chair-leg
+    primary_name: Splintered chair leg
+    aliases: [splintered chair leg, broken chair leg, sharp stick, stick]
+    kind: Item
+    extra:
+      description: A chair leg snapped into a splintered, weaponlike stick.
 
   - key: table
     primary_name: Table
     aliases: [table]
     kind: Scene
     extra:
-      description: A plain old table
+      description: A plain wooden table.
 
-  - key: exit-door
-    primary_name: Cell Door
+  - key: wall-polster
+    primary_name: Wall polster
+    aliases: [wall polster, polster, padding, pads]
+    kind: Scene
+    extra:
+      description: Endless layers of thick, soft wall padding. The top-left pad on the back wall bulges oddly.
+
+  - key: door-grate
+    primary_name: Door grate
+    aliases: [door grate, grate]
+    kind: Scene
+    extra:
+      description: A small grate high in the cell door, the only window to the guard corridor.
+
+  - key: cell-door
+    primary_name: Cell door
     aliases: [cell door, door]
     kind: Scene
     door:
@@ -23,42 +51,94 @@ objects:
       to: corridor
       locked: true
     extra:
-      description: A plain old table
+      description: The locked cell door. Solid, with a small grate up high.
 
-  - key: wall-polster
-    primary_name: Wall Polster
-    aliases: [wall polster, polster]
+  - key: fan
+    primary_name: Air-conditioning fan
+    aliases: [air conditioning fan, ac fan, fan, ventilator]
     kind: Scene
     extra:
-      description: All walls are lined with this thick, soft polster
+      description: A big air-conditioning fan hidden behind the wall padding. Silent for now.
 
-  - key: vent
-    primary_name: Vent
-    aliases: [vent]
+  - key: vent-grille
+    primary_name: Vent grille
+    aliases: [vent, grille, vent grille, air vent]
     kind: Scene
     door:
       direction: north
-      to: vent-corridor
+      to: air-chute
       locked: true
       hidden: true
-      gated_by: fingernail
+    extra:
+      description: 'A grille held by four screws. Behind it: the air chute.'
 
-  - key: fingernail
-    primary_name: Fingernail
-    aliases: [fingernail]
+  - key: toenail
+    primary_name: Toenail
+    aliases: [toenail, toe nail, nail]
     kind: Item
+    extra:
+      description: A long, sturdy toenail. The shape of a tiny crowbar.
 
-  - key: chair-leg
-    primary_name: Chair leg
-    aliases: [chair leg, leg]
-    kind: Item
-
-  - key: chipped-chair-leg
-    primary_name: Chipped Chair Leg
-    aliases: [chipped chair leg, chipped leg, chair leg, leg]
-    kind: Item
-
+  # NOTE: stand-in for the real opening's "Harvey 1: Toenails" memory item. A
+  # faithful intro would carry that memory in Edna's starting inventory (engine
+  # gap: initial inventory not yet supported), so the nail is clipped here.
   - key: nail-clipper
     primary_name: Nail clipper
     aliases: [nail clipper, clipper]
     kind: Item
+    extra:
+      description: A nail clipper. It has no business being in a padded cell.
+
+  ### AIR-CHUTE
+  - key: air-chute-to-cell
+    primary_name: Vent to the cell
+    aliases: [cell vent]
+    kind: Scene
+    door:
+      direction: south
+      to: player-cell
+
+  - key: air-chute-to-office
+    primary_name: Office vent grate
+    aliases: [office vent, chute grate]
+    kind: Scene
+    door:
+      direction: east
+      to: dr-marcel-office
+
+  ### DR. MARCEL'S OFFICE
+  - key: office-to-air-chute
+    primary_name: Vent back to the chute
+    aliases: [chute vent]
+    kind: Scene
+    door:
+      direction: west
+      to: air-chute
+
+  - key: encyclopedia
+    primary_name: Encyclopedia
+    aliases: [encyclopedia, book]
+    kind: Item
+    extra:
+      description: A heavy encyclopedia, first volume.
+
+  - key: polo-mallet
+    primary_name: Polo mallet
+    aliases: [polo mallet, mallet]
+    kind: Item
+    extra:
+      description: A wooden polo mallet. Odd in a doctor's office.
+
+  - key: ballpoint-pen
+    primary_name: Ballpoint pen
+    aliases: [ballpoint pen, pen]
+    kind: Item
+    extra:
+      description: A ballpoint pen. It has something to say.
+
+  - key: cabinet
+    primary_name: Cabinet
+    aliases: [cabinet]
+    kind: Scene
+    extra:
+      description: A tall cabinet, large enough to hide a full-grown warden in.

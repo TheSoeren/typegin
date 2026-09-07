@@ -15,21 +15,21 @@ theoretically build [Edna & Harvey: The Breakout](https://en.wikipedia.org/wiki/
 defect against this goal. When weighing a feature or design choice, ask:
 "does this move us toward being able to ship an Edna & Harvey title?"
 
-The mechanical adventure core (rooms, doors, items, examine/use/combine, and
-the point-and-click `interactions_for` query) already works. The **content
-layer** that such a game needs is the priority gap — in rough order of leverage:
+The mechanical adventure core (rooms, doors, items, take/drop/examine/use, and
+the point-and-click `interactions_for` query) works, and **puzzle logic is now
+written as data-driven interactions** in YAML world data (verbs, items,
+conditions, effects — see `data/interactions.yaml`) instead of Rust closures.
+The **content layer** gaps that remain, in rough order of leverage:
 
-1. **Data-driven game logic** — authored interactions/conditions/effects
-   should live in YAML world data, not Rust closures (content the designer can
-   author without writing Rust).
-2. **Flags / global quest / causal state** — a first-class `flags`-style model
+1. **Flags / global quest / causal state** — a first-class `flags`-style model
    on `WorldState` so "when X happens then Y" and conditional states are
-   declarative, not bolted on via closures.
-3. **NPCs and dialogue trees** — a character/dialogue-graph model over flags.
-4. **Room-event / trigger system** — non-item-triggered beats (entering a room,
-   time/causal chains), the analogue of a "World" hook distinct from
+   declarative, not bolted on via closures (`player_holds`/`exit_*` data
+   conditions are the current stand-ins).
+2. **NPCs and dialogue trees** — a character/dialogue-graph model over flags.
+3. **Room-event / trigger system** — non-item-triggered beats (entering a
+   room, time/causal chains), the analogue of a "World" hook distinct from
    `Interaction`'s verb-object shape.
-5. **Inventory / verb-coin UI primitives** and **combine-two-carried-items**
+4. **Inventory / verb-coin UI primitives** and **combine-two-carried-items**
    scope (a distinct Take-vs-combine overlap).
 
 Feature work should be judged against these; when a step maps to one of them,
@@ -79,7 +79,7 @@ adventure games** too. In particular:
 | Build               | `cargo build`                                                                                                                              |
 | Run                 | `cargo run`                                                                                                                                |
 | Test (all)          | `cargo test`                                                                                                                               |
-| Test (single suite) | `cargo test --test <name>` (names: `input`, `world`, `navigation`, `drop`, `default_rules`, `rules_override`, `hidden`, `extras`, `doors`) |
+| Test (single suite) | `cargo test --test <name>` (names: `input`, `world`, `navigation`, `drop`, `default_rules`, `rules_override`, `hidden`, `extras`, `doors`, `interactions`, `data_interactions`, `symbolic_keys`) |
 | Lint                | `cargo clippy --workspace --all-targets`                                                                                                   |
 | Format              | `cargo fmt`                                                                                                                                |
 | Format check        | `cargo fmt --check`                                                                                                                        |
@@ -89,16 +89,21 @@ Recommended verification order: `cargo fmt --check && cargo clippy --workspace -
 ## Key conventions
 
 - Rust edition 2024. No rustfmt.toml or clippy.toml; defaults apply.
-- World content is YAML: `data/items.yaml` and `data/rooms.yaml`. Test fixtures live in `crates/core/data/`.
+- World content is YAML, one file per concept: `data/items.yaml` (objects),
+  `data/rooms.yaml` (rooms), `data/interactions.yaml` (puzzle logic). Test
+  fixtures live in `crates/core/data/` (incl. per-case interaction fixtures in
+  `crates/core/data/interactions/`).
+- Object and room keys are symbolic strings (`ObjectId::new("chair-leg")`).
 - `GameEngine` is a pure in-memory `WorldState` built from world data (YAML); there is no database.
 - All tests are integration tests under `crates/core/tests/` with shared helpers in `tests/common/mod.rs`.
-- `GameEngine::get` uses `BasicRules` (stock defaults). `get_with_rules` injects custom `Rules`. The stock `BasicRules` already implements take/drop, refuses to take scene objects (`CantTake`) and unlocks doors whose `gated_by` object is used on them; the terminal front-end in `src/main.rs` only adds a `GameRules::on_look` that reveals the hidden passage door.
+- `GameEngine::get` uses `BasicRules` (stock defaults). `get_with_rules` injects custom `Rules`. The stock `BasicRules` dispatches data interactions (from `data/interactions.yaml`, stored on `WorldState`) first, then `Rules::interactions()` closures, then the stock fallback spine: take/drop, refuse to take scene objects (`CantTake`), unlock doors whose `gated_by` object is used on them. The terminal front-end in `src/main.rs` uses plain stock `GameEngine::get` — the whole puzzle is authored in YAML, with no custom rule type.
+- Non-room inventory changes are `grant` (materialise a template into inventory, `Event::Granted`) and `discard` (remove without dropping into the room, `Event::Discarded`); both are YAML interaction effects, no-op when the object is already held / not held.
 - `View` is a render trait producing a `RenderCommand` stream: the default `render(&mut self, events, world)` dispatches each event to a typed `render_*` hook (defaults silent). It observes `Event`s + `&WorldState` and can never mutate the game.
 - NEVER use `deref`
 - NEVER use `unwrap`
 
 ## Architecture
 
-`text input → tokenizer → lexer → Action → GameEngine.handle_input → Rules hook → Events + mutated WorldState → View.render (RenderCommand stream) → front-end interpreter`
+`text input → tokenizer → lexer → Action → GameEngine.handle_input → Rules hook (data interaction first-match → Rules::interactions() closures → stock fallback) → Events + mutated WorldState → View.render (RenderCommand stream) → front-end interpreter`
 
 Public API surface is re-exported from `crates/core/src/lib.rs`. The `input` module is private to the crate.

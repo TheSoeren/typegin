@@ -24,6 +24,9 @@ pub struct WorldState {
     /// Authored data-driven interactions shipped in world data. Queried by the
     /// default rules hooks *before* `Rules::interactions()` closures.
     data_interactions: Vec<InteractionData>,
+    /// Object templates from world data, used to materialise an object into
+    /// the player's inventory that is not placed in any room (`grant`).
+    object_templates: HashMap<ObjectId, object::Object>,
 }
 
 /// Navigation: location and movement within the world.
@@ -211,6 +214,20 @@ impl WorldState {
         }
     }
 
+    /// Materialise the object with `id` into the player's inventory from the
+    /// world-data object templates, regardless of where (if anywhere) the
+    /// object is placed. A no-op if the player already holds the object.
+    pub fn player_grant_object(&mut self, id: &ObjectId) -> action::GrantResult {
+        if self.player_holds(id) {
+            return action::GrantResult::Fail;
+        }
+        let Some(template) = self.object_templates.get(id) else {
+            return action::GrantResult::Fail;
+        };
+        self.player.add_object(template.clone());
+        action::GrantResult::Success
+    }
+
     pub fn player_drop_object(&mut self, id: &ObjectId) -> action::DropResult {
         let removed = self.remove_object_from_player(id);
         match removed {
@@ -219,6 +236,15 @@ impl WorldState {
                 action::DropResult::Success
             }
             None => action::DropResult::Fail,
+        }
+    }
+
+    /// Remove the carried object with `id` from the player's inventory without
+    /// placing it in the room (consumed). A no-op if the object is not carried.
+    pub fn player_discard_object(&mut self, id: &ObjectId) -> action::DiscardResult {
+        match self.remove_object_from_player(id) {
+            Some(_) => action::DiscardResult::Success,
+            None => action::DiscardResult::Fail,
         }
     }
 }
@@ -320,6 +346,13 @@ impl WorldState {
             .id
             .clone();
 
+        let object_templates: HashMap<ObjectId, object::Object> = data
+            .objects
+            .iter()
+            .map(object::Object::from_data)
+            .map(|object| (object.id.clone(), object))
+            .collect();
+
         let mut rooms = HashMap::new();
         for room_data in &data.rooms {
             let objects: Vec<object::Object> = room_data
@@ -352,6 +385,7 @@ impl WorldState {
             rooms,
             current_room_id: first_room_id,
             data_interactions: data.interactions.clone(),
+            object_templates,
         }
     }
 }

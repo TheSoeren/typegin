@@ -34,6 +34,13 @@
 //!       - emit: beat-name     #   kind taxonomy kept door out of the filters
 //!       - take: iron-key      # Event::Took (no-op if object absent)
 //!       - drop: iron-key      # Event::Dropped (no-op if absent)
+//!       - grant: rusty-nail   # Event::Granted (materialises into the player's
+//!                             #   inventory from the object-template registry,
+//!                             #   even if placed in no room; silent no-op if
+//!                             #   already held)
+//!       - discard: iron-key   # Event::Discarded (removed from the inventory
+//!                             #   and reappears nowhere; silent no-op if not
+//!                             #   carried)
 //!       - unlock_exit: east   # Event::UnlockedExit (no-op if absent)
 //!       - lock_exit: east     # silent
 //!       - reveal_exit: north  # silent
@@ -74,7 +81,7 @@ use core::ActionContext;
 use core::{
     DataCondition, DataEffect, DataTarget, DataTargetKind, Direction, Event, GameEngine,
     Interaction, InteractionData, ObjectId, ObjectResolution, RoomId, Rules, TargetFilter, Verb,
-    WorldData, WorldState,
+    WorldData, WorldDataError, WorldState,
 };
 
 /// The fixture world's item/scene objects (keys `iron-key` … `oak-door`), from
@@ -213,6 +220,40 @@ mod parse {
             ),
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn grant_and_discard_effects_load() {
+        let world = world_with(include_str!("../data/interactions/grant_and_discard.yaml"));
+        let interaction = &world.interactions[0];
+        assert_eq!(
+            interaction.effect,
+            vec![
+                DataEffect::Grant {
+                    grant: ObjectId::new("rusty-nail"),
+                },
+                DataEffect::Discard {
+                    discard: ObjectId::new("rusty-nail"),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn grant_or_discard_referencing_an_unknown_object_is_a_validation_error() {
+        for effect in ["grant", "discard"] {
+            let result = WorldData::from_yaml(
+                ITEMS_YAML,
+                ROOMS_YAML,
+                &format!(
+                    "interactions:\n- verb: use\n  item: iron-key\n  effect:\n    - {effect}: ghost-item\n"
+                ),
+            );
+            assert!(
+                matches!(result, Err(WorldDataError::Validation(_))),
+                "unknown `{effect}` target should be a validation error, got {result:?}"
+            );
+        }
     }
 }
 
@@ -526,6 +567,125 @@ mod effects {
         assert_eq!(
             engine.handle_input("go east"),
             vec![Event::WentExitHidden(Direction::East)]
+        );
+    }
+
+    #[test]
+    fn grant_materialises_an_item_placed_nowhere_in_the_world() {
+        let mut engine = engine_with(include_str!("../data/interactions/grant_unplaced.yaml"));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        // rusty-nail is declared in data but sits in no room: it is granted
+        // into the inventory out of nowhere.
+        assert_eq!(
+            engine.handle_input("use iron key on cellar stairs"),
+            vec![Event::Granted {
+                object_id: ObjectId::new("rusty-nail"),
+                object: "rusty nail".to_string(),
+            }]
+        );
+        assert!(engine.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(
+            !engine
+                .world()
+                .room_object_names()
+                .contains(&"rusty nail".to_string())
+        );
+    }
+
+    #[test]
+    fn grant_is_a_no_op_when_the_player_already_holds_the_item() {
+        let mut engine = engine_with(include_str!("../data/interactions/grant_when_held.yaml"));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        assert_eq!(
+            engine.handle_input("take brass key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("brass-key"),
+                object: "brass key".to_string(),
+            }]
+        );
+        // The grant of the already-held iron key is a silent no-op; only the
+        // explicit emit produces a beat.
+        assert_eq!(
+            engine.handle_input("use brass key on cellar stairs"),
+            vec![Event::Custom {
+                name: "done".to_string(),
+            }]
+        );
+        assert_eq!(
+            engine
+                .world()
+                .player_object_names()
+                .iter()
+                .filter(|name| name.as_str() == "iron key")
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn discard_removes_a_carried_item_without_dropping_it_in_the_room() {
+        let mut engine = engine_with(include_str!("../data/interactions/discard_carried.yaml"));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        assert_eq!(
+            engine.handle_input("use iron key on cellar stairs"),
+            vec![Event::Discarded {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        assert!(!engine.world().player_holds(&ObjectId::new("iron-key")));
+        assert!(
+            !engine
+                .world()
+                .room_object_names()
+                .contains(&"iron key".to_string())
+        );
+        // The item exists nowhere now: it can be neither be dropped nor used.
+        assert_eq!(
+            engine.handle_input("drop iron key"),
+            vec![Event::DroppedObjectNotFound {
+                object: "iron key".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn discard_is_a_no_op_when_the_player_does_not_hold_the_item() {
+        let mut engine = engine_with(include_str!("../data/interactions/discard_missing.yaml"));
+        assert_eq!(
+            engine.handle_input("take brass key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("brass-key"),
+                object: "brass key".to_string(),
+            }]
+        );
+        // discard of an item that is not carried: silent, nothing changes.
+        assert_eq!(
+            engine.handle_input("use brass key on cellar stairs"),
+            vec![]
+        );
+        // iron-key stayed in the cellar; it was not consumed from the room.
+        assert_eq!(
+            engine.world().resolve_target("iron key"),
+            ObjectResolution::Found(ObjectId::new("iron-key"))
         );
     }
 }

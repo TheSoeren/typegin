@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::data::{WorldData, WorldDataError};
 use crate::event::Event;
-use crate::input::action::{DropResult, TakeResult};
+use crate::input::action::{DiscardResult, DropResult, GrantResult, TakeResult};
 use crate::input::direction::{Direction, DirectionResolution};
 use crate::interaction::{ActionContext, Interaction, TargetFilter, Verb};
 use crate::world::WorldState;
@@ -236,9 +236,13 @@ pub enum DataEffect {
     /// Move an object from the current room into inventory: `Event::Took`
     /// (no-op if the object is not in the room).
     Take { take: ObjectId },
+    /// Add an object into inventory: `Event::Granted` (no-op if the object is already in inventory).
+    Grant { grant: ObjectId },
     /// Move a carried object into the current room: `Event::Dropped` (no-op
     /// if the object is not carried).
     Drop { drop: ObjectId },
+    /// Remove an object from inventory: `Event::Discarded` (no-op if the object is not carried).
+    Discard { discard: ObjectId },
     /// Unlock the exit in `direction` from the current room:
     /// `Event::UnlockedExit` (no-op if no such exit).
     UnlockExit { unlock_exit: Direction },
@@ -262,7 +266,9 @@ impl DataEffect {
         match self {
             DataEffect::Emit { emit } => Some(Event::Custom { name: emit.clone() }),
             DataEffect::Take { take } => take_into_inventory(world, take.clone()),
+            DataEffect::Grant { grant } => add_to_inventory(world, grant.clone()),
             DataEffect::Drop { drop } => drop_into_room(world, drop.clone()),
+            DataEffect::Discard { discard } => remove_from_inventory(world, discard.clone()),
             DataEffect::UnlockExit { unlock_exit } => match world.unlock_exit(*unlock_exit) {
                 DirectionResolution::Found(_) => Some(Event::UnlockedExit {
                     direction: *unlock_exit,
@@ -300,7 +306,9 @@ impl DataEffect {
     fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
         let id = match self {
             DataEffect::Take { take } => take,
+            DataEffect::Grant { grant } => grant,
             DataEffect::Drop { drop } => drop,
+            DataEffect::Discard { discard } => discard,
             DataEffect::RevealObject { reveal_object } => reveal_object,
             DataEffect::HideObject { hide_object } => hide_object,
             DataEffect::Emit { .. }
@@ -326,6 +334,20 @@ fn take_into_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     }
 }
 
+fn add_to_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
+    match world.player_grant_object(&id) {
+        GrantResult::Success => {
+            // The object is in the inventory now, so it is in scope for the name.
+            let name = world.object_info(&id)?.name;
+            Some(Event::Granted {
+                object_id: id,
+                object: name,
+            })
+        }
+        GrantResult::Fail => None,
+    }
+}
+
 fn drop_into_room(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     let name = world.object_info(&id)?.name;
     match world.player_drop_object(&id) {
@@ -334,6 +356,17 @@ fn drop_into_room(world: &mut WorldState, id: ObjectId) -> Option<Event> {
             object: name,
         }),
         DropResult::Fail => None,
+    }
+}
+
+fn remove_from_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
+    let name = world.object_info(&id)?.name;
+    match world.player_discard_object(&id) {
+        DiscardResult::Success => Some(Event::Discarded {
+            object_id: id,
+            object: name,
+        }),
+        DiscardResult::Fail => None,
     }
 }
 

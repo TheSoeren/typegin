@@ -56,10 +56,14 @@ pub enum Event {
         object_ids: Vec<ObjectId>,
         object: String,
     },
-
     /// The player tried to take a scene object (furniture, a door, ...). Scene
     /// objects stay in the world; only `Item`s are portable.
     CantTake {
+        object: String,
+    },
+    /// Granted does not depend on the item being in the current room
+    Granted {
+        object_id: ObjectId,
         object: String,
     },
 
@@ -73,6 +77,11 @@ pub enum Event {
     },
     DroppedObjectAmbiguous {
         object_ids: Vec<ObjectId>,
+        object: String,
+    },
+    /// Discarded does not add the item to the room after removing from inventory
+    Discarded {
+        object_id: ObjectId,
         object: String,
     },
 
