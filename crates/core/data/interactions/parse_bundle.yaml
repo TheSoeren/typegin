@@ -1,0 +1,21 @@
+- verb: use
+  item: 101
+  target:
+    kind: scene
+  condition:
+    - room: 3
+    - exit_locked: east
+    - is_door: true
+  effect:
+    - emit: door-unlocked
+    - unlock_exit: east
+- verb: take
+  item: 104
+  effect:
+    - take: 104
+    - drop: 104
+    - reveal_object: 104
+- verb: examine
+  item: 103
+  target:
+    object: 108

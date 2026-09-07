@@ -1,0 +1,4 @@
+- verb: use
+  item: 103
+  effect:
+    - emit: lamp-considered

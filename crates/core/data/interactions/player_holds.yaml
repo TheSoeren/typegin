@@ -1,0 +1,9 @@
+- verb: use
+  item: 101
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+    - player_holds: 102
+  effect:
+    - emit: brass-holder-key-worked

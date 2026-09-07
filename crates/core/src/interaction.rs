@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::input::action::Action;
 use crate::world::WorldState;
 use crate::world::object::ObjectId;
@@ -5,7 +7,8 @@ use crate::world::object::ObjectId;
 /// The game's action vocabulary. An author writes interactions *for a verb*,
 /// and a point-and-click front-end can enumerate the verbs an object accepts
 /// instead of guessing from prose.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Verb {
     Look,
     Go,
@@ -53,9 +56,10 @@ impl ActionContext {
     }
 }
 
-/// Coarse kind filter deciding which targets an interaction applies to. The
+/// Coarse structural filter deciding which targets an interaction applies to:
+/// arity (`Any` vs `Targeted`) and world-position (`Scene`). The task-specific
 /// selection on top of it lives in the interaction's `condition`, which can
-/// inspect the concrete target (a door's direction, an object's id, state,
+/// inspect the concrete target (a door's direction, its door-ness, lock state,
 /// ...).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TargetFilter {
@@ -65,8 +69,6 @@ pub enum TargetFilter {
     Targeted,
     /// Only use-with on a *scene* object (stays in the world).
     Scene,
-    /// Only use-with on a *door* (a scene object carrying door data).
-    Door,
 }
 
 impl TargetFilter {
@@ -75,7 +77,6 @@ impl TargetFilter {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
             TargetFilter::Scene => target.is_some_and(|id| world.object_is_scene(id)),
-            TargetFilter::Door => target.is_some_and(|id| world.object_is_door(id)),
         }
     }
 }

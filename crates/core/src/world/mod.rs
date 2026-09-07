@@ -8,7 +8,8 @@ use getset::{CopyGetters, Getters};
 use log::warn;
 
 use crate::data;
-use crate::data::ObjectKind;
+use crate::data::interactions_data::InteractionData;
+use crate::data::object_data;
 use crate::input::action;
 use crate::input::direction;
 use crate::world::object::{ObjectId, ObjectInfo, ObjectResolution};
@@ -21,6 +22,9 @@ pub struct WorldState {
     rooms: HashMap<room::RoomId, room::Room>,
     #[getset(get_copy = "pub")]
     current_room_id: room::RoomId,
+    /// Authored data-driven interactions shipped in world data. Queried by the
+    /// default rules hooks *before* `Rules::interactions()` closures.
+    data_interactions: Vec<InteractionData>,
 }
 
 /// Navigation: location and movement within the world.
@@ -232,7 +236,7 @@ impl WorldState {
 
     /// The kind of the object with `id`, if it is anywhere in scope.
     #[must_use]
-    pub fn object_kind(&self, id: ObjectId) -> Option<ObjectKind> {
+    pub fn object_kind(&self, id: ObjectId) -> Option<object_data::ObjectKind> {
         self.any_object(id).map(|object| object.kind)
     }
 
@@ -240,7 +244,7 @@ impl WorldState {
     #[must_use]
     pub fn object_is_scene(&self, id: ObjectId) -> bool {
         self.any_object(id)
-            .is_some_and(|object| object.kind == ObjectKind::Scene)
+            .is_some_and(|object| object.kind == object_data::ObjectKind::Scene)
     }
 
     /// Whether the object with `id` is a door (a scene object with door data).
@@ -296,6 +300,13 @@ impl WorldState {
 }
 
 impl WorldState {
+    /// The authored data-driven interactions, in declaration order.
+    pub(crate) fn data_interactions(&self) -> &[InteractionData] {
+        &self.data_interactions
+    }
+}
+
+impl WorldState {
     /// Build a `WorldState` directly from world data (YAML), with no database.
     pub(crate) fn from_data(data: &data::WorldData) -> Self {
         let first_room_id: room::RoomId = data
@@ -336,6 +347,7 @@ impl WorldState {
             player: player::Player::new(),
             rooms,
             current_room_id: first_room_id,
+            data_interactions: data.interactions.clone(),
         }
     }
 }

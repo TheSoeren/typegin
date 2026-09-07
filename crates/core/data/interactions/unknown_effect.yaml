@@ -1,0 +1,4 @@
+- verb: examine
+  item: 104
+  effect:
+    - explode: true

@@ -1,0 +1,70 @@
+objects:
+  - id: 101
+    primary_name: iron key
+    aliases: [key, rusty key]
+    kind: Item
+
+  - id: 102
+    primary_name: brass key
+    aliases: [key]
+    kind: Item
+
+  - id: 103
+    primary_name: rusty lamp
+    aliases: [lamp]
+    kind: Item
+
+  - id: 104
+    primary_name: stale bread
+    aliases: [bread]
+    kind: Item
+
+  - id: 105
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: north
+      to: 2
+
+  - id: 106
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: south
+      to: 1
+
+  - id: 107
+    primary_name: study door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 3
+
+  - id: 108
+    primary_name: wooden door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: west
+      to: 2
+
+  - id: 109
+    primary_name: secret passage
+    aliases: [passage]
+    kind: Scene
+    door:
+      direction: north
+      to: 1
+
+  - id: 110
+    primary_name: oak door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: 2
+      locked: true
+      gated_by: 101

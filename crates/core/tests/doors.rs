@@ -35,6 +35,8 @@ fn engine_at_room_3() -> core::GameEngine {
 // --- TOML data parsing ---
 
 mod data_parsing {
+    use core::object_data::ObjectKind;
+
     use super::*;
 
     #[test]
@@ -45,7 +47,7 @@ mod data_parsing {
         assert_eq!(door.to, 2);
         assert_eq!(door.direction, "north".to_string());
         assert!(!door.locked);
-        assert_eq!(stairs.kind, core::ObjectKind::Scene);
+        assert_eq!(stairs.kind, ObjectKind::Scene);
     }
 
     #[test]

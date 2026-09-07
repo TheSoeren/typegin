@@ -1,0 +1,6 @@
+- verb: look
+  effect:
+    - emit: never-run-look
+- verb: go
+  effect:
+    - emit: never-run-go

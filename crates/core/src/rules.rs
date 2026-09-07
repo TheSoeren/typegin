@@ -1,7 +1,8 @@
-use crate::data::ObjectKind;
+use crate::data::interactions_data;
 use crate::event;
 use crate::input::action;
 use crate::interaction::{ActionContext, Interaction, Verb};
+use crate::object_data;
 use crate::world;
 use crate::world::object::ObjectResolution;
 
@@ -93,13 +94,16 @@ pub trait Rules {
             };
         };
 
-        if let Some(ObjectKind::Scene) = world.object_kind(object_id) {
+        if let Some(object_data::ObjectKind::Scene) = world.object_kind(object_id) {
             return vec![event::Event::CantTake {
                 object: name.to_string(),
             }];
         }
 
         let context = ActionContext::new(Some(Verb::Take), Some(object_id), None);
+        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+            return events;
+        }
         if let Some(interaction) = self
             .interactions()
             .iter()
@@ -143,6 +147,9 @@ pub trait Rules {
         };
 
         let context = ActionContext::new(Some(Verb::Drop), Some(object_id), None);
+        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+            return events;
+        }
         if let Some(interaction) = self
             .interactions()
             .iter()
@@ -186,6 +193,9 @@ pub trait Rules {
         };
 
         let context = ActionContext::new(Some(Verb::Examine), Some(object_id), None);
+        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+            return events;
+        }
         if let Some(interaction) = self
             .interactions()
             .iter()
@@ -239,6 +249,9 @@ pub trait Rules {
             _ => None,
         };
         let context = ActionContext::new(Some(Verb::Use), Some(item_id), target_id);
+        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+            return events;
+        }
         if let Some(interaction) = self
             .interactions()
             .iter()

@@ -20,9 +20,10 @@
 mod common;
 
 use common::setup_engine;
+use core::object_data::ObjectKind;
 use core::{
-    ActionContext, Direction, Event, GameEngine, Interaction, ObjectId, ObjectKind,
-    ObjectResolution, Rules, TargetFilter, Verb, WorldState,
+    ActionContext, Direction, Event, GameEngine, Interaction, ObjectId, ObjectResolution, Rules,
+    TargetFilter, Verb, WorldState,
 };
 
 /// Takes the iron key (room 1), walks north (room 2) and east (room 3) so the
@@ -298,9 +299,10 @@ mod interactions_for {
         let interactions = vec![Interaction::build(
             Verb::Use,
             Some(ObjectId::new(2)),
-            TargetFilter::Door,
-            Some(Box::new(|world: &WorldState, _context: &ActionContext| {
+            TargetFilter::Scene,
+            Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 world.is_exit_locked(Direction::East)
+                    && context.target.is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|world: &mut WorldState, _context: &ActionContext| {
                 world.unlock_exit(Direction::East);
@@ -361,8 +363,10 @@ mod interactions_for {
         let interactions = vec![Interaction::build(
             Verb::Use,
             Some(ObjectId::new(2)),
-            TargetFilter::Door,
-            None,
+            TargetFilter::Scene,
+            Some(Box::new(|world: &WorldState, context: &ActionContext| {
+                context.target.is_some_and(|id| world.object_is_door(id))
+            })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
         )];
         let mut engine =
@@ -638,12 +642,14 @@ mod non_use_verbs {
             Interaction::build(
                 Verb::Use,
                 Some(ObjectId::new(2)),
-                TargetFilter::Door,
-                None,
+                TargetFilter::Scene,
+                Some(Box::new(|world: &WorldState, context: &ActionContext| {
+                    context.target.is_some_and(|id| world.object_is_door(id))
+                })),
                 Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
             ),
         ];
-        // Navigate to room 3 so the oak door is in scope for TargetFilter::Door.
+        // Navigate to room 3 so the oak door is in scope for TargetFilter::Scene.
         let mut engine = engine_with(interactions);
         engine.handle_input("go north");
         engine.handle_input("go east");

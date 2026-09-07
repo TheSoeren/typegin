@@ -1,0 +1,4 @@
+- verb: examine
+  item: 110
+  effect:
+    - reveal_exit: north

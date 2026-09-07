@@ -1,0 +1,6 @@
+- verb: examine
+  item: 101
+  condition:
+    - room: 3
+  effect:
+    - emit: key-in-study

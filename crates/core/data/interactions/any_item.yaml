@@ -1,0 +1,5 @@
+- verb: use
+  target:
+    object: 110
+  effect:
+    - emit: anything-used-on-the-oak

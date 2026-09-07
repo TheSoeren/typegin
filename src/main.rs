@@ -13,14 +13,16 @@ fn main() -> ExitCode {
         .map_or_else(|| PathBuf::from("data"), PathBuf::from);
     let items_path = data_dir.join("items.yaml");
     let rooms_path = data_dir.join("rooms.yaml");
+    let interactions_path = data_dir.join("interactions.yaml");
 
-    let world_data = match typegin_core::WorldData::load(&items_path, &rooms_path) {
-        Ok(data) => data,
-        Err(err) => {
-            eprintln!("Failed to load world data: {err}");
-            return ExitCode::FAILURE;
-        }
-    };
+    let world_data =
+        match typegin_core::WorldData::load(&items_path, &rooms_path, &interactions_path) {
+            Ok(data) => data,
+            Err(err) => {
+                eprintln!("Failed to load world data: {err}");
+                return ExitCode::FAILURE;
+            }
+        };
 
     let mut engine = typegin_core::GameEngine::get_with_rules(&world_data, GameRules);
 

@@ -1,0 +1,9 @@
+- verb: use
+  item: 101
+  target:
+    kind: scene
+  condition:
+    - room: 3
+    - is_door: true
+  effect:
+    - emit: used-on-a-door

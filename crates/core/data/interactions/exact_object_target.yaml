@@ -1,0 +1,6 @@
+- verb: use
+  item: 101
+  target:
+    object: 108
+  effect:
+    - emit: for-the-wooden-door

@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use crate::data;
-use crate::data::ObjectKind;
+use serde::Deserialize;
+
+use crate::data::{self, object_data};
 use crate::input::direction::Direction;
 use crate::world::room::RoomId;
 
 /// Identifier for a world object. All interactables share one id space.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Deserialize)]
 pub struct ObjectId(pub(crate) i32);
 
 impl ObjectId {
@@ -50,7 +51,7 @@ pub struct Object {
     pub(crate) id: ObjectId,
     pub(crate) primary_name: String,
     pub(crate) aliases: String,
-    pub(crate) kind: ObjectKind,
+    pub(crate) kind: object_data::ObjectKind,
     pub(crate) door: Option<DoorState>,
     pub(crate) extra: HashMap<String, data::ExtraValue>,
 }
@@ -90,7 +91,7 @@ impl Object {
         }
     }
 
-    pub(crate) fn from_data(object: &data::ObjectData) -> Self {
+    pub(crate) fn from_data(object: &object_data::ObjectData) -> Self {
         let door = object.door.as_ref().and_then(|door_data| {
             Direction::parse(&door_data.direction).map(|direction| DoorState {
                 direction,
@@ -118,7 +119,7 @@ pub struct ObjectInfo {
     pub id: ObjectId,
     pub name: String,
     pub aliases: Vec<String>,
-    pub kind: ObjectKind,
+    pub kind: object_data::ObjectKind,
     pub door: Option<DoorInfo>,
     pub extra: HashMap<String, data::ExtraValue>,
 }

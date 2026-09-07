@@ -1,0 +1,15 @@
+rooms:
+  - id: 1
+    name: The Cellar
+    visible_objects: [101, 102, 103, 105]
+    hidden_objects: [104]
+
+  - id: 2
+    name: The Corridor
+    visible_objects: [106, 107]
+    hidden_objects: []
+
+  - id: 3
+    name: The Study
+    visible_objects: [108, 110]
+    hidden_objects: [109]

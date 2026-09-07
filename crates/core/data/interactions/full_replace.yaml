@@ -1,0 +1,6 @@
+- verb: use
+  item: 101
+  target:
+    object: 110
+  effect:
+    - emit: key-does-not-work

@@ -1,0 +1,5 @@
+- verb: drop
+  item: 101
+  effect:
+    - emit: key-discarded
+    - drop: 101

@@ -1,0 +1,8 @@
+- verb: use
+  item: 101
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - emit: data-wins
