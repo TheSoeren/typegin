@@ -366,6 +366,39 @@ mod dispatch {
     }
 
     #[test]
+    fn no_target_interaction_rejects_surplus_target() {
+        let mut engine = engine_with(include_str!(
+            "../data/interactions/no_target_rejects_surplus_target.yaml"
+        ));
+        // Take the lamp so it's in inventory.
+        assert_eq!(
+            engine.handle_input("take rusty lamp"),
+            vec![Event::Took {
+                object_id: ObjectId::new("rusty-lamp"),
+                object: "rusty lamp".to_string(),
+            }]
+        );
+        // Use with no target: matches the interaction.
+        assert_eq!(
+            engine.handle_input("use rusty lamp"),
+            vec![Event::Custom {
+                name: "lamp-considered".to_string()
+            }]
+        );
+        // Use ON a target: must NOT match the no-target interaction.
+        // The engine should fall through to the stock "Used" event.
+        assert_eq!(
+            engine.handle_input("use rusty lamp on iron key"),
+            vec![Event::Used {
+                object_id: ObjectId::new("rusty-lamp"),
+                object: "rusty lamp".to_string(),
+                target_id: Some(ObjectId::new("iron-key")),
+                target: Some("iron key".to_string()),
+            }]
+        );
+    }
+
+    #[test]
     fn player_holds_condition_gates_query_and_dispatch() {
         let interactions = include_str!("../data/interactions/player_holds.yaml");
         // Holding only the iron key: gated off — the query lists nothing and

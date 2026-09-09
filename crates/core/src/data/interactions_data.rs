@@ -78,7 +78,7 @@ impl InteractionData {
 
     fn target_matches(&self, world: &WorldState, target: Option<&ObjectId>) -> bool {
         match &self.target {
-            None => true,
+            None => target.is_none(),
             Some(DataTarget::Object { object }) => target == Some(object),
             Some(DataTarget::Kind { kind }) => match kind {
                 DataTargetKind::Scene => target.is_some_and(|id| world.object_is_scene(id)),
