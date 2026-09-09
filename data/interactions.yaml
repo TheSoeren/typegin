@@ -9,8 +9,11 @@ interactions:
     condition:
       - not:
           player_holds: chair-leg
+      - not:
+          flag: chair-leg-revealed
     effect:
       - reveal_object: chair-leg
+      - set_flag: chair-leg-revealed
       - emit: The chair wobbles on three legs. The front-left one is barely screwed on — it pulls free with a good tug.
 
   # 2) The loose chair leg (taken with the stock `take`) snaps over the table.
@@ -35,6 +38,7 @@ interactions:
       - emit: 'The padding shreds under the splintered wood. Behind the top-left pad: a vent grille held by four screws, and a silent air-conditioning fan.'
       - reveal_object: fan
       - reveal_object: vent-grille
+      - set_flag: vent-exposed
 
   # 4) A nail is needed for the screws (stand-in for the initial-inventory
   #    memory item the real game starts with).
@@ -59,6 +63,9 @@ interactions:
   ### Flavour beats
   - verb: examine
     item: door-grate
+    condition:
+      - not:
+          flag: guard-distracted
     effect:
       - emit: A guard stands on the other side, absorbed in a round of imaginary mini-golf. He could switch the air conditioning for you — if only he ever stopped talking about his father's putter.
 
@@ -71,3 +78,49 @@ interactions:
     item: cabinet
     effect:
       - emit: A tall cabinet, large enough to hide a full-grown warden in.
+
+  - verb: examine
+    item: office-door
+    effect:
+      - emit: A heavy oak door. Locked from the outside — Dr. Marcel doesn't expect his patients to leave through here.
+
+  ### Guard distraction puzzle
+  # Show the polo mallet to the guard through the door-grate — he recognizes
+  # his father's putter and gets distracted chasing after it, leaving the
+  # cell door unlocked.
+  - verb: use
+    item: polo-mallet
+    target:
+      object: door-grate
+    condition:
+      - not:
+          flag: guard-distracted
+    effect:
+      - set_flag: guard-distracted
+      - emit: 'You hold the polo mallet up to the grate. The guard freezes mid-swing. "Is that — that''s my father''s putter!" He fumbles the door, stumbles after the mallet you toss down the corridor, and is gone.'
+      - unlock_exit: east
+
+  ### Flag-gated narrative flavour
+  # Chair description changes after the leg is revealed.
+  - verb: examine
+    item: chair
+    condition:
+      - flag: chair-leg-revealed
+    effect:
+      - emit: A three-legged chair, wobbling pathetically. You already took the loose leg.
+
+  # Wall-polster description changes after the vent is exposed.
+  - verb: examine
+    item: wall-polster
+    condition:
+      - flag: vent-exposed
+    effect:
+      - emit: The top-left pad is shredded. Behind it, the vent grille and fan are fully exposed.
+
+  # Door-grate description changes after the guard is distracted.
+  - verb: examine
+    item: door-grate
+    condition:
+      - flag: guard-distracted
+    effect:
+      - emit: The grate is empty. The guard corridor beyond is silent — he ran off after the mallet.

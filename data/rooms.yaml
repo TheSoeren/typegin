@@ -16,7 +16,7 @@ rooms:
 
   - key: dr-marcel-office
     name: Dr. Marcel's Office
-    visible_objects: [office-to-air-chute, encyclopedia, polo-mallet, ballpoint-pen,
+    visible_objects: [office-to-air-chute, office-door, encyclopedia, polo-mallet, ballpoint-pen,
       cabinet]
     hidden_objects: []
     extra:

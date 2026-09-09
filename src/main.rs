@@ -11,18 +11,23 @@ fn main() -> ExitCode {
     let data_dir = env::args_os()
         .nth(1)
         .map_or_else(|| PathBuf::from("data"), PathBuf::from);
+    let globals_path = data_dir.join("globals.yaml");
     let items_path = data_dir.join("items.yaml");
     let rooms_path = data_dir.join("rooms.yaml");
     let interactions_path = data_dir.join("interactions.yaml");
 
-    let world_data =
-        match typegin_core::WorldData::load(&items_path, &rooms_path, &interactions_path) {
-            Ok(data) => data,
-            Err(err) => {
-                eprintln!("Failed to load world data: {err}");
-                return ExitCode::FAILURE;
-            }
-        };
+    let world_data = match typegin_core::WorldData::load(
+        &globals_path,
+        &items_path,
+        &rooms_path,
+        &interactions_path,
+    ) {
+        Ok(data) => data,
+        Err(err) => {
+            eprintln!("Failed to load world data: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
 
     let mut engine = typegin_core::GameEngine::get(&world_data);
 
