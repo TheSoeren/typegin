@@ -127,4 +127,13 @@ pub enum Event {
         object_ids: Vec<ObjectId>,
         object: String,
     },
+
+    /// A global flag was set.
+    FlagSet {
+        flag: String,
+    },
+    /// A global flag was cleared.
+    FlagCleared {
+        flag: String,
+    },
 }

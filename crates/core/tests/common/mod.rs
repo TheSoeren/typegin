@@ -9,6 +9,7 @@ use core::{GameEngine, Rules, WorldData};
 /// Loads the test-only multi-room world from `crates/core/data/`.
 pub(crate) fn multi_room_world_data() -> WorldData {
     WorldData::from_yaml(
+        "{}",
         include_str!("../../data/items_multi_room.yaml"),
         include_str!("../../data/rooms_multi_room.yaml"),
         "{}",
@@ -19,6 +20,7 @@ pub(crate) fn multi_room_world_data() -> WorldData {
 /// Loads the original single-room world from `crates/core/data/`.
 pub(crate) fn test_world_data() -> WorldData {
     WorldData::from_yaml(
+        "{}",
         include_str!("../../data/items.yaml"),
         include_str!("../../data/rooms.yaml"),
         "{}",

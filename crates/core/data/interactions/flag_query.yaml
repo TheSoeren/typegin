@@ -1,0 +1,6 @@
+- verb: examine
+  item: iron-key
+  condition:
+    - flag: query-gate
+  effect:
+    - emit: query-matched

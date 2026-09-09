@@ -1,0 +1,6 @@
+- verb: examine
+  item: iron-key
+  effect:
+    - set_flag: phase-two
+    - clear_flag: phase-one
+    - emit: transitioned

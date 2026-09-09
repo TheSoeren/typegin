@@ -1,0 +1,9 @@
+- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - set_flag: door-unlocked-flag
+    - emit: door-handled

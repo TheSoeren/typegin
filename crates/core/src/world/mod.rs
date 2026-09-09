@@ -16,6 +16,7 @@ use crate::world::object::{ObjectId, ObjectInfo, ObjectResolution};
 
 #[derive(Debug, Getters)]
 pub struct WorldState {
+    flags: Vec<String>,
     #[getset(get = "pub")]
     player: player::Player,
     #[getset(get = "pub")]
@@ -329,6 +330,24 @@ impl WorldState {
     }
 }
 
+/// Global flags
+impl WorldState {
+    #[must_use]
+    pub fn has_flag(&self, flag: &str) -> bool {
+        self.flags.iter().any(|f| f == flag)
+    }
+
+    pub fn set_flag(&mut self, flag: &str) {
+        if !self.has_flag(flag) {
+            self.flags.push(flag.to_string());
+        }
+    }
+
+    pub fn clear_flag(&mut self, flag: &str) {
+        self.flags.retain(|f| f != flag);
+    }
+}
+
 impl WorldState {
     /// The authored data-driven interactions, in declaration order.
     pub(crate) fn data_interactions(&self) -> &[InteractionData] {
@@ -336,6 +355,7 @@ impl WorldState {
     }
 }
 
+/// Data import
 impl WorldState {
     /// Build a `WorldState` directly from world data (YAML), with no database.
     pub(crate) fn from_data(data: &data::WorldData) -> Self {
@@ -381,6 +401,7 @@ impl WorldState {
         );
 
         WorldState {
+            flags: data.flags.clone(),
             player: player::Player::new(),
             rooms,
             current_room_id: first_room_id,
