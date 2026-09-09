@@ -1,0 +1,7 @@
+- verb: examine
+  item: iron-key
+  condition:
+    - flag: step-one
+    - flag: step-two
+  effect:
+    - emit: both-steps-done

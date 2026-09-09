@@ -99,7 +99,7 @@ const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
 /// The base fixture world (no interactions). The interactions string has no
 /// `interactions` key, so it must parse as an empty list.
 fn base_world() -> WorldData {
-    WorldData::from_yaml(ITEMS_YAML, ROOMS_YAML, "{}").expect("base fixture parses")
+    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, "{}").expect("base fixture parses")
 }
 
 /// The fixture world with an authored interaction snippet. `interactions` is a
@@ -107,7 +107,7 @@ fn base_world() -> WorldData {
 /// under an `interactions:` key to mirror the separate interactions file.
 fn world_with(interactions: &str) -> WorldData {
     let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(ITEMS_YAML, ROOMS_YAML, &interactions_yaml)
+    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, &interactions_yaml)
         .expect("fixture with authored interactions parses")
 }
 
@@ -212,6 +212,7 @@ mod parse {
     #[test]
     fn unknown_effect_node_is_a_parse_error() {
         let result = WorldData::from_yaml(
+            "{}",
             ITEMS_YAML,
             ROOMS_YAML,
             &format!(
@@ -243,6 +244,7 @@ mod parse {
     fn grant_or_discard_referencing_an_unknown_object_is_a_validation_error() {
         for effect in ["grant", "discard"] {
             let result = WorldData::from_yaml(
+                "{}",
                 ITEMS_YAML,
                 ROOMS_YAML,
                 &format!(

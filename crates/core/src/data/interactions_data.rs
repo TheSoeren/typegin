@@ -180,6 +180,8 @@ pub enum DataCondition {
     ExitHidden { exit_hidden: Direction },
     /// The (present) target's door-ness equals the value.
     IsDoor { is_door: bool },
+    /// The global flag is enabled
+    Flag { flag: String },
     /// Negation of any condition.
     Not { not: Box<DataCondition> },
 }
@@ -195,6 +197,7 @@ impl DataCondition {
             DataCondition::IsDoor { is_door } => {
                 context.target.as_ref().map(|id| world.object_is_door(id)) == Some(*is_door)
             }
+            DataCondition::Flag { flag } => world.has_flag(flag),
             DataCondition::Not { not } => !not.matches(world, context),
         }
     }
@@ -221,7 +224,8 @@ impl DataCondition {
             DataCondition::Not { not } => not.validate_references(data),
             DataCondition::ExitLocked { .. }
             | DataCondition::ExitHidden { .. }
-            | DataCondition::IsDoor { .. } => Ok(()),
+            | DataCondition::IsDoor { .. }
+            | DataCondition::Flag { .. } => Ok(()),
         }
     }
 }
@@ -258,6 +262,16 @@ pub enum DataEffect {
     RevealObject { reveal_object: ObjectId },
     /// Move an object from the current room's visible set to hidden (silent).
     HideObject { hide_object: ObjectId },
+    /// Set a global flag to true
+    SetFlag {
+        #[serde(rename = "set_flag")]
+        flag: String,
+    },
+    /// Set a global flag to false
+    ClearFlag {
+        #[serde(rename = "clear_flag")]
+        flag: String,
+    },
 }
 
 impl DataEffect {
@@ -295,6 +309,14 @@ impl DataEffect {
                 world.hide_object(hide_object);
                 None
             }
+            DataEffect::SetFlag { flag } => {
+                world.set_flag(flag);
+                Some(Event::FlagSet { flag: flag.clone() })
+            }
+            DataEffect::ClearFlag { flag } => {
+                world.clear_flag(flag);
+                Some(Event::FlagCleared { flag: flag.clone() })
+            }
         }
     }
 
@@ -315,7 +337,9 @@ impl DataEffect {
             | DataEffect::UnlockExit { .. }
             | DataEffect::LockExit { .. }
             | DataEffect::RevealExit { .. }
-            | DataEffect::HideExit { .. } => return Ok(()),
+            | DataEffect::HideExit { .. }
+            | DataEffect::SetFlag { .. }
+            | DataEffect::ClearFlag { .. } => return Ok(()),
         };
         data.find_object(id).map(|_| ()).ok_or_else(|| {
             WorldDataError::Validation(format!("effect references unknown object key `{id}`"))

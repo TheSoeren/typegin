@@ -1,0 +1,7 @@
+- verb: examine
+  item: iron-key
+  condition:
+    - flag: cellar-visited
+    - room: study
+  effect:
+    - emit: studied-key-in-study

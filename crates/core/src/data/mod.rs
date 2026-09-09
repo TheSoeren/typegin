@@ -1,4 +1,5 @@
 pub mod door_data;
+pub mod global_data;
 pub mod interactions_data;
 pub mod object_data;
 pub mod room_data;
@@ -10,6 +11,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::data::global_data::GlobalFile;
 use crate::data::interactions_data::{InteractionData, InteractionsFile};
 use crate::data::object_data::{ObjectData, ObjectsFile};
 use crate::data::room_data::{RoomData, RoomsFile};
@@ -28,6 +30,8 @@ pub enum ExtraValue {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WorldData {
+    #[serde(default)]
+    pub flags: Vec<String>,
     pub objects: Vec<ObjectData>,
     pub rooms: Vec<RoomData>,
     pub interactions: Vec<InteractionData>,
@@ -169,15 +173,18 @@ impl WorldData {
     /// not match the expected item/room/interaction shape, or if the world
     /// data is structurally invalid (duplicate keys, unknown key references).
     pub fn from_yaml(
+        globals_yaml: &str,
         items_yaml: &str,
         rooms_yaml: &str,
         interactions_yaml: &str,
     ) -> Result<Self, WorldDataError> {
+        let globals: GlobalFile = serde_yaml_ng::from_str(globals_yaml)?;
         let objects: ObjectsFile = serde_yaml_ng::from_str(items_yaml)?;
         let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
         let interactions: InteractionsFile = serde_yaml_ng::from_str(interactions_yaml)?;
 
         let data = WorldData {
+            flags: globals.flags,
             objects: objects.objects,
             rooms: rooms.rooms,
             interactions: interactions.interactions,
@@ -195,14 +202,16 @@ impl WorldData {
     /// Returns a [`WorldDataError`] if any file cannot be read, or if any
     /// file's contents fail to parse as world data.
     pub fn load(
+        globals_path: impl AsRef<Path>,
         items_path: impl AsRef<Path>,
         rooms_path: impl AsRef<Path>,
         interactions_path: impl AsRef<Path>,
     ) -> Result<Self, WorldDataError> {
+        let globals_yaml = std::fs::read_to_string(globals_path)?;
         let items_yaml = std::fs::read_to_string(items_path)?;
         let rooms_yaml = std::fs::read_to_string(rooms_path)?;
         let interactions_yaml = std::fs::read_to_string(interactions_path)?;
 
-        Self::from_yaml(&items_yaml, &rooms_yaml, &interactions_yaml)
+        Self::from_yaml(&globals_yaml, &items_yaml, &rooms_yaml, &interactions_yaml)
     }
 }
