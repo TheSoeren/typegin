@@ -95,6 +95,8 @@ pub trait View {
                     self.render_examined_object_ambiguous(object)
                 }
                 Event::UnknownEvent { name } => self.render_unknown_event(name),
+                Event::FlagSet { flag } => self.render_flag_set(flag),
+                Event::FlagCleared { flag } => self.render_flag_cleared(flag),
                 other => self.render_generic(other),
             })
             .collect()
@@ -230,6 +232,16 @@ pub trait View {
 
     /// The player typed an unknown command.
     fn render_unknown_event(&mut self, _name: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// A global flag was set.
+    fn render_flag_set(&mut self, _flag: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// A global flag was cleared.
+    fn render_flag_cleared(&mut self, _flag: &str) -> Vec<RenderCommand> {
         Vec::new()
     }
 }
