@@ -1,5 +1,5 @@
-# Canonical authored fixtures for the data-driven interactions suite
-# (`crates/core/tests/interactions.rs` and `symbolic_keys.rs`). Identity is a
+# Canonical authored fixtures shared by the keyed-world test suites
+# (data_interactions, flags, npcs, symbolic_keys, triggers). Identity is a
 # stable `key` string; all cross-references are keys.
 objects:
   - key: iron-key
@@ -75,3 +75,19 @@ objects:
     primary_name: rusty nail
     aliases: [nail]
     kind: Item
+
+rooms:
+  - key: cellar
+    name: The Cellar
+    visible_objects: [iron-key, brass-key, rusty-lamp, cellar-stairs]
+    hidden_objects: [stale-bread]
+
+  - key: corridor
+    name: The Corridor
+    visible_objects: [corridor-stairs, study-door]
+    hidden_objects: []
+
+  - key: study
+    name: The Study
+    visible_objects: [wooden-door, oak-door]
+    hidden_objects: [secret-passage]

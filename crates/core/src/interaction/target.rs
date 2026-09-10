@@ -20,7 +20,7 @@ pub enum Target {
 
 /// Outcome of resolving a player-typed noun against a use-with target
 /// (object or NPC) in scope.
-pub type TargetResolution = crate::model::Resolution<Target>;
+pub type TargetResolution = crate::keys::Resolution<Target>;
 
 /// Coarse structural filter deciding which targets an interaction applies to:
 /// arity (`Any` vs `Targeted`) and world-position (`Scene`). The task-specific
@@ -55,8 +55,8 @@ mod tests {
     use crate::data::WorldData;
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
-    use crate::model::object_id::ObjectId;
-    use crate::model::room_id::RoomId;
+    use crate::keys::object_id::ObjectId;
+    use crate::keys::room_id::RoomId;
     use crate::world::npc::NpcId;
     use std::collections::HashMap;
 

@@ -5,7 +5,7 @@ use crate::data;
 use crate::input;
 use crate::world::object;
 
-pub use crate::model::room_id::RoomId;
+pub use crate::keys::room_id::RoomId;
 
 pub const DIRECTIONS: [input::Direction; 4] = [
     input::Direction::North,
@@ -218,9 +218,12 @@ impl Room {
     /// Lock the door in `direction` (no-op if there is none, or it is
     /// already locked).
     pub(crate) fn lock_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
-        match self.door_in_direction_mut(direction) {
-            Some(object) if object.door.as_ref().is_some_and(|door| !door.locked) => {
-                object.door.as_mut().expect("door ref").locked = true;
+        match self
+            .door_in_direction_mut(direction)
+            .and_then(|object| object.door.as_mut())
+        {
+            Some(door) if !door.locked => {
+                door.locked = true;
                 input::DirectionResolution::Found(direction)
             }
             _ => input::DirectionResolution::NotFound,
@@ -233,9 +236,12 @@ impl Room {
         &mut self,
         direction: input::Direction,
     ) -> input::DirectionResolution {
-        match self.door_in_direction_mut(direction) {
-            Some(object) if object.door.as_ref().is_some_and(|door| door.locked) => {
-                object.door.as_mut().expect("door ref").locked = false;
+        match self
+            .door_in_direction_mut(direction)
+            .and_then(|object| object.door.as_mut())
+        {
+            Some(door) if door.locked => {
+                door.locked = false;
                 input::DirectionResolution::Found(direction)
             }
             _ => input::DirectionResolution::NotFound,

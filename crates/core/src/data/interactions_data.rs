@@ -3,9 +3,9 @@ use serde::Deserialize;
 use crate::data::{WorldData, WorldDataError};
 use crate::input::direction::Direction;
 use crate::interaction::Verb;
-use crate::model::npc_id::NpcId;
-use crate::model::object_id::ObjectId;
-use crate::model::room_id::RoomId;
+use crate::keys::npc_id::NpcId;
+use crate::keys::object_id::ObjectId;
+use crate::keys::room_id::RoomId;
 
 impl InteractionData {
     /// Verify that every key this interaction references exists in `data`.
@@ -223,11 +223,4 @@ impl DataEffect {
             WorldDataError::Validation(format!("effect references unknown object key `{id}`"))
         })
     }
-}
-
-/// The top-level shape of an `interactions.yaml` file.
-#[derive(Debug, Deserialize)]
-pub(crate) struct InteractionsFile {
-    #[serde(default)]
-    pub(crate) interactions: Vec<InteractionData>,
 }

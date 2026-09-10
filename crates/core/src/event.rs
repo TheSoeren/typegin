@@ -1,9 +1,9 @@
 use crate::Npc;
 use crate::input::direction::Direction;
 use crate::interaction::Target;
-use crate::model::dialogue_node_id::DialogueNodeId;
-use crate::model::dialogue_option_id::DialogueOptionId;
-use crate::model::npc_id::NpcId;
+use crate::keys::dialogue_node_id::DialogueNodeId;
+use crate::keys::dialogue_option_id::DialogueOptionId;
+use crate::keys::npc_id::NpcId;
 use crate::world::npc::DialogueChoice as NpcDialogueChoice;
 use crate::world::object::ObjectId;
 
@@ -211,7 +211,7 @@ impl From<&NpcDialogueChoice> for DialogueChoice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::room_id::RoomId;
+    use crate::keys::room_id::RoomId;
     use crate::world::npc::DialogueGraph;
     use std::collections::HashMap;
 

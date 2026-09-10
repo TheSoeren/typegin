@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use crate::data::interactions_data::DataEffect;
 use crate::data::npc_data::NpcData;
-use crate::model::dialogue_node_id::DialogueNodeId;
-use crate::model::dialogue_option_id::DialogueOptionId;
-use crate::model::room_id::RoomId;
+use crate::keys::dialogue_node_id::DialogueNodeId;
+use crate::keys::dialogue_option_id::DialogueOptionId;
+use crate::keys::room_id::RoomId;
 use crate::{DialogueChoiceData, DialogueNodeData};
 
-pub use crate::model::npc_id::NpcId;
+pub use crate::keys::npc_id::NpcId;
 
 /// A live NPC in the world, built from [`NpcData`].
 #[derive(Debug, Clone)]
@@ -76,12 +76,7 @@ impl Npc {
             .dialogue
             .nodes
             .iter()
-            .map(|(key, node)| {
-                (
-                    DialogueNodeId::new(key.clone()),
-                    DialogueNode::from_data(node),
-                )
-            })
+            .map(|(id, node)| (id.clone(), DialogueNode::from_data(node)))
             .collect();
 
         Npc {
@@ -89,7 +84,7 @@ impl Npc {
             primary_name: data.primary_name.clone(),
             aliases: data.aliases.clone(),
             room: data.room.clone(),
-            root: DialogueNodeId::new(data.dialogue.root.clone()),
+            root: data.dialogue.root.clone(),
             dialogue: graph,
         }
     }
@@ -180,10 +175,10 @@ impl DialogueChoice {
     }
 
     pub(crate) fn from_data(data: &DialogueChoiceData) -> Self {
-        let next = if data.next == ".end" {
+        let next = if data.next == DialogueNodeId::new(".end") {
             None
         } else {
-            Some(DialogueNodeId::new(data.next.clone()))
+            Some(data.next.clone())
         };
 
         DialogueChoice {
@@ -198,7 +193,7 @@ impl DialogueChoice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::dialogue_option_id::DialogueOptionId;
+    use crate::keys::dialogue_option_id::DialogueOptionId;
 
     fn npc(aliases: Vec<&str>) -> Npc {
         Npc {
@@ -313,7 +308,7 @@ mod tests {
         let data = DialogueChoiceData {
             option_id: Some(DialogueOptionId::new("opt-1")),
             label: "Bye".to_string(),
-            next: ".end".to_string(),
+            next: DialogueNodeId::new(".end"),
             effect: Vec::new(),
         };
         let choice = DialogueChoice::from_data(&data);
@@ -327,7 +322,7 @@ mod tests {
         let data = DialogueChoiceData {
             option_id: None,
             label: "Continue".to_string(),
-            next: "node-2".to_string(),
+            next: DialogueNodeId::new("node-2"),
             effect: Vec::new(),
         };
         let choice = DialogueChoice::from_data(&data);
@@ -342,13 +337,13 @@ mod tests {
                 DialogueChoiceData {
                     option_id: None,
                     label: "Hi".to_string(),
-                    next: ".end".to_string(),
+                    next: DialogueNodeId::new(".end"),
                     effect: Vec::new(),
                 },
                 DialogueChoiceData {
                     option_id: None,
                     label: "Bye".to_string(),
-                    next: ".end".to_string(),
+                    next: DialogueNodeId::new(".end"),
                     effect: Vec::new(),
                 },
             ],

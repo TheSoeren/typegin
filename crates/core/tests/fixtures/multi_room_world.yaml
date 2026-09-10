@@ -101,3 +101,51 @@ objects:
       locked: true
     extra:
       material: oak
+
+rooms:
+  - key: cellar
+    name: The Damp Cellar
+    visible_objects: [glowing-sword, iron-key, locked-chest, brass-key, cellar-stairs]
+    hidden_objects: [stale-bread]
+    extra:
+      dark: true
+      gui:
+        background: bg/cellar.png
+
+  - key: corridor
+    name: The Torchlit Corridor
+    visible_objects: [rusty-lamp, old-map, corridor-stairs, study-door]
+    hidden_objects: []
+
+  - key: study
+    name: The Dusty Study
+    visible_objects: [wooden-door, oak-door]
+    hidden_objects: [secret-passage, hidden-vault]
+
+interactions:
+  - verb: use
+    item: iron-key
+    target:
+      object: oak-door
+    condition:
+      - exit_locked: east
+    effect:
+      - unlock_exit: east
+      - emit: unlock-authored
+
+  - verb: examine
+    target:
+      object: oak-door
+    effect:
+      - reveal_exit: north
+      - emit: passage-found
+
+  - verb: take
+    item: glowing-sword
+    effect:
+      - emit: intercepted
+
+  - verb: drop
+    item: old-map
+    effect:
+      - emit: map-returned

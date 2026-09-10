@@ -4,14 +4,15 @@ use serde::Deserialize;
 
 use crate::data::interactions_data::DataEffect;
 use crate::data::{WorldData, WorldDataError};
-use crate::model::dialogue_option_id::DialogueOptionId;
-use crate::model::npc_id::NpcId;
-use crate::model::room_id::RoomId;
+use crate::keys::dialogue_node_id::DialogueNodeId;
+use crate::keys::dialogue_option_id::DialogueOptionId;
+use crate::keys::npc_id::NpcId;
+use crate::keys::room_id::RoomId;
 
 /// A single NPC definition from world data (YAML).
 ///
 /// Each NPC lives in a specific room and carries an inline dialogue graph.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct NpcData {
     #[serde(rename = "key")]
     pub id: NpcId,
@@ -23,15 +24,15 @@ pub struct NpcData {
 }
 
 /// The dialogue graph for an NPC: a root node id and a map of named nodes.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct DialogueData {
-    pub root: String,
+    pub root: DialogueNodeId,
     #[serde(default)]
-    pub nodes: HashMap<String, DialogueNodeData>,
+    pub nodes: HashMap<DialogueNodeId, DialogueNodeData>,
 }
 
 /// A single node in a dialogue graph: the NPC's line and the player's choices.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct DialogueNodeData {
     pub text: String,
     #[serde(default)]
@@ -41,21 +42,14 @@ pub struct DialogueNodeData {
 /// A player choice within a dialogue node: a stable id, a label, the next node
 /// (or `.end` to terminate the conversation), and effects that run when the
 /// choice is selected.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct DialogueChoiceData {
     #[serde(default, rename = "key")]
     pub option_id: Option<DialogueOptionId>,
     pub label: String,
-    pub next: String,
+    pub next: DialogueNodeId,
     #[serde(default)]
     pub effect: Vec<DataEffect>,
-}
-
-/// The top-level shape of an `npcs.yaml` file.
-#[derive(Debug, Deserialize)]
-pub(crate) struct NpcsFile {
-    #[serde(default)]
-    pub(crate) npcs: Vec<NpcData>,
 }
 
 impl NpcData {
@@ -82,7 +76,9 @@ impl NpcData {
 
         for (node_id, node) in &self.dialogue.nodes {
             for choice in &node.choices {
-                if choice.next != ".end" && !self.dialogue.nodes.contains_key(&choice.next) {
+                if choice.next != DialogueNodeId::new(".end")
+                    && !self.dialogue.nodes.contains_key(&choice.next)
+                {
                     return Err(WorldDataError::Validation(format!(
                         "npc `{}` dialogue node `{}` choice references unknown node `{}`",
                         self.id, node_id, choice.next

@@ -4,6 +4,7 @@
 /// interprets them in whatever widget tree it owns. Because the enum is
 /// `#[non_exhaustive]` the engine can add commands later without breaking
 /// existing consumers — interpreters must carry a fallback arm.
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum RenderCommand {
     /// One line of prose for a terminal or transcript.

@@ -2,10 +2,120 @@ mod common;
 
 use core::{Direction, Event, GameEngine, ObjectResolution, RoomId, Verb, WorldData};
 
-use common::{
-    KEYED_ITEMS_YAML as ITEMS_YAML, KEYED_ROOMS_YAML as ROOMS_YAML, base_world,
-    engine_with_interactions as engine_with,
-};
+use common::{base_world, engine_with_interactions as engine_with, merge_yaml};
+
+/// The `objects:` and `rooms:` sections of the keyed world, split apart so
+/// `mod integrity` below can corrupt just one while keeping the other
+/// canonical. Kept in sync with `fixtures/keyed_world.yaml` by hand — this is
+/// the one file that needs the two sections independently addressable.
+const ITEMS_YAML: &str = r"objects:
+  - key: iron-key
+    primary_name: iron key
+    aliases: [key, rusty key]
+    kind: Item
+
+  - key: brass-key
+    primary_name: brass key
+    aliases: [key]
+    kind: Item
+
+  - key: rusty-lamp
+    primary_name: rusty lamp
+    aliases: [lamp]
+    kind: Item
+
+  - key: stale-bread
+    primary_name: stale bread
+    aliases: [bread]
+    kind: Item
+
+  - key: cellar-stairs
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: north
+      to: corridor
+
+  - key: corridor-stairs
+    primary_name: cellar stairs
+    aliases: [stairs]
+    kind: Scene
+    door:
+      direction: south
+      to: cellar
+
+  - key: study-door
+    primary_name: study door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: study
+
+  - key: wooden-door
+    primary_name: wooden door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: west
+      to: corridor
+
+  - key: secret-passage
+    primary_name: secret passage
+    aliases: [passage]
+    kind: Scene
+    door:
+      direction: north
+      to: cellar
+
+  - key: oak-door
+    primary_name: oak door
+    aliases: [door]
+    kind: Scene
+    door:
+      direction: east
+      to: corridor
+      locked: true
+
+  - key: rusty-nail
+    primary_name: rusty nail
+    aliases: [nail]
+    kind: Item";
+
+const ROOMS_YAML: &str = r"rooms:
+  - key: cellar
+    name: The Cellar
+    visible_objects: [iron-key, brass-key, rusty-lamp, cellar-stairs]
+    hidden_objects: [stale-bread]
+
+  - key: corridor
+    name: The Corridor
+    visible_objects: [corridor-stairs, study-door]
+    hidden_objects: []
+
+  - key: study
+    name: The Study
+    visible_objects: [wooden-door, oak-door]
+    hidden_objects: [secret-passage]";
+
+const UNLOCK_AND_EMIT_YAML: &str = r"- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - unlock_exit: east
+    - emit: door-unlocked";
+
+const ROOM_GATE_YAML: &str = r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - room: study
+  effect:
+    - emit: key-in-study";
 
 /// Walks into The Study and takes the iron key. Uses key-resolved world state
 /// for assertions (no hardcoded numeric ids).
@@ -108,7 +218,7 @@ mod dispatch {
 
     #[test]
     fn item_and_target_kind_keys_resolve() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/unlock_and_emit.yaml"));
+        let mut engine = engine_with(UNLOCK_AND_EMIT_YAML);
         iron_key_in_study(&mut engine);
         assert!(engine.world().is_exit_locked(Direction::East));
         assert_eq!(
@@ -127,7 +237,7 @@ mod dispatch {
 
     #[test]
     fn room_condition_key_resolves() {
-        let mut in_cellar = engine_with(include_str!("fixtures/interactions/room_gate.yaml"));
+        let mut in_cellar = engine_with(ROOM_GATE_YAML);
         in_cellar.handle_input("take iron key");
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
@@ -140,7 +250,7 @@ mod dispatch {
             }]
         );
 
-        let mut in_study = engine_with(include_str!("fixtures/interactions/room_gate.yaml"));
+        let mut in_study = engine_with(ROOM_GATE_YAML);
         in_study.handle_input("take iron key");
         iron_key_in_study(&mut in_study);
         assert_eq!(
@@ -153,7 +263,13 @@ mod dispatch {
 
     #[test]
     fn effect_object_keys_resolve() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/reveal_object.yaml"));
+        let mut engine = engine_with(
+            r"- verb: examine
+  target:
+    object: wooden-door
+  effect:
+    - reveal_object: secret-passage",
+        );
         iron_key_in_study(&mut engine);
         assert!(engine.world().is_exit_hidden(Direction::North));
         // The effect runs silently (no Examined, no Custom).
@@ -168,9 +284,13 @@ mod dispatch {
 
     #[test]
     fn drop_effect_with_key_resolves() {
-        let mut engine = engine_with(include_str!(
-            "fixtures/interactions/drop_emits_then_drops.yaml"
-        ));
+        let mut engine = engine_with(
+            r"- verb: drop
+  item: brass-key
+  effect:
+    - emit: key-discarded
+    - drop: brass-key",
+        );
         engine.handle_input("take iron key");
         engine.handle_input("take brass key");
         assert!(
@@ -224,7 +344,7 @@ mod query {
 
     #[test]
     fn interactions_for_reports_compiled_item_key() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/unlock_and_emit.yaml"));
+        let mut engine = engine_with(UNLOCK_AND_EMIT_YAML);
         // Carry the brass key too, so "wrong carried object" can be queried.
         engine.handle_input("take brass key");
         iron_key_in_study(&mut engine);
@@ -266,7 +386,7 @@ mod integrity {
         rooms: &str,
         interactions: &str,
     ) -> Result<WorldData, Box<dyn std::error::Error>> {
-        WorldData::from_yaml("{}", items, rooms, interactions, "{}").map_err(Into::into)
+        WorldData::from_yaml(&merge_yaml(&[items, rooms, interactions])).map_err(Into::into)
     }
 
     // ---- unknown keys in references ----
@@ -365,6 +485,14 @@ mod integrity {
     visible_objects: []
     hidden_objects: []";
         let result = from_yaml(ITEMS_YAML, rooms, "{}");
+        assert!(result.is_err());
+    }
+
+    // ---- structural minimums ----
+
+    #[test]
+    fn world_data_with_no_rooms_is_an_error() {
+        let result = from_yaml(ITEMS_YAML, "rooms: []", "{}");
         assert!(result.is_err());
     }
 }

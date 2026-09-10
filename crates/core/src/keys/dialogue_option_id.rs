@@ -1,4 +1,4 @@
-use crate::model::define_id;
+use crate::keys::define_id;
 
 define_id!(
     /// Stable authored identifier for a dialogue choice, used to identify a

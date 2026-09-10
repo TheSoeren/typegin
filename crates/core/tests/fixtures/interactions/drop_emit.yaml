@@ -1,5 +1,0 @@
-- verb: drop
-  item: iron-key
-  effect:
-    - emit: key-discarded
-    - drop: iron-key

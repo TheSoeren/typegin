@@ -1,7 +1,0 @@
-- verb: examine
-  target:
-    object: iron-key
-  condition:
-    - flag: quest-started
-  effect:
-    - emit: quest-item-recognized

@@ -10,10 +10,10 @@ use crate::data::interactions_data::{
     DataCondition, DataEffect, DataTarget, DataTargetKind, InteractionData,
 };
 use crate::event::Event;
-use crate::input::action::{DiscardResult, DropResult, GrantResult, TakeResult};
+use crate::input::action::Outcome;
 use crate::input::direction::DirectionResolution;
 use crate::interaction::{ActionContext, Interaction, Target, TargetFilter};
-use crate::model::object_id::ObjectId;
+use crate::keys::object_id::ObjectId;
 use crate::world::WorldState;
 
 impl InteractionData {
@@ -186,17 +186,17 @@ impl DataEffect {
 fn take_into_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     let name = world.object_info(&id)?.name;
     match world.player_take_object(&id) {
-        TakeResult::Success => Some(Event::Took {
+        Outcome::Success => Some(Event::Took {
             object_id: id,
             object: name,
         }),
-        TakeResult::Fail => None,
+        Outcome::Fail => None,
     }
 }
 
 fn add_to_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     match world.player_grant_object(&id) {
-        GrantResult::Success => {
+        Outcome::Success => {
             // The object is in the inventory now, so it is in scope for the name.
             let name = world.object_info(&id)?.name;
             Some(Event::Granted {
@@ -204,29 +204,29 @@ fn add_to_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
                 object: name,
             })
         }
-        GrantResult::Fail => None,
+        Outcome::Fail => None,
     }
 }
 
 fn drop_into_room(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     let name = world.object_info(&id)?.name;
     match world.player_drop_object(&id) {
-        DropResult::Success => Some(Event::Dropped {
+        Outcome::Success => Some(Event::Dropped {
             object_id: id,
             object: name,
         }),
-        DropResult::Fail => None,
+        Outcome::Fail => None,
     }
 }
 
 fn remove_from_inventory(world: &mut WorldState, id: ObjectId) -> Option<Event> {
     let name = world.object_info(&id)?.name;
     match world.player_discard_object(&id) {
-        DiscardResult::Success => Some(Event::Discarded {
+        Outcome::Success => Some(Event::Discarded {
             object_id: id,
             object: name,
         }),
-        DiscardResult::Fail => None,
+        Outcome::Fail => None,
     }
 }
 
@@ -252,7 +252,7 @@ mod tests {
     use crate::data::room_data::RoomData;
     use crate::input::direction::Direction;
     use crate::interaction::Verb;
-    use crate::model::room_id::RoomId;
+    use crate::keys::room_id::RoomId;
     use std::collections::HashMap;
 
     fn item(id: &str) -> ObjectData {
@@ -817,7 +817,7 @@ mod tests {
     fn interaction_data_npc_target_requires_exact_npc() {
         let interaction = InteractionData {
             target: Some(DataTarget::Npc {
-                npc: crate::model::npc_id::NpcId::new("guard"),
+                npc: crate::keys::npc_id::NpcId::new("guard"),
             }),
             ..base_interaction(Verb::Use)
         };
@@ -825,12 +825,12 @@ mod tests {
         let matching = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Npc(crate::model::npc_id::NpcId::new("guard"))),
+            Some(Target::Npc(crate::keys::npc_id::NpcId::new("guard"))),
         );
         let other = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Npc(crate::model::npc_id::NpcId::new("clerk"))),
+            Some(Target::Npc(crate::keys::npc_id::NpcId::new("clerk"))),
         );
         assert!(interaction.matches(&world, &matching));
         assert!(!interaction.matches(&world, &other));

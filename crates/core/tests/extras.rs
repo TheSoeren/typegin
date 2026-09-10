@@ -212,11 +212,11 @@ impl Rules for VetoHeavyRules {
                     Vec::new()
                 } else {
                     match world.player_take_object(&id) {
-                        core::TakeResult::Success => vec![Event::Took {
+                        core::Outcome::Success => vec![Event::Took {
                             object_id: id,
                             object: name.to_string(),
                         }],
-                        core::TakeResult::Fail => {
+                        core::Outcome::Fail => {
                             vec![Event::TookObjectNotFound {
                                 object: name.to_string(),
                             }]

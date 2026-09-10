@@ -1,7 +1,0 @@
-- verb: examine
-  target:
-    object: iron-key
-  condition:
-    - flag: guard-told-about-key
-  effect:
-    - emit: key-glint
