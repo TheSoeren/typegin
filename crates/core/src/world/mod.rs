@@ -19,12 +19,15 @@ use crate::model::object_id::ObjectId;
 use crate::world::object::TargetResolution;
 use crate::world::object::{ObjectInfo, ObjectResolution};
 
+/// The mutable authority for a running game: rooms, the player's inventory,
+/// global flags, and NPC dialogue state. All gameplay mutation goes through
+/// its methods; [`Rules`](crate::rules::Rules) and
+/// [`Interaction`](crate::interaction::Interaction) effects are the only
+/// callers that hold a `&mut WorldState`.
 #[derive(Debug, Getters)]
 pub struct WorldState {
     flags: Vec<String>,
-    #[getset(get = "pub")]
     player: player::Player,
-    #[getset(get = "pub")]
     rooms: HashMap<room::RoomId, room::Room>,
     current_room_id: room::RoomId,
     /// Authored data-driven interactions shipped in world data. Queried by the
@@ -38,7 +41,6 @@ pub struct WorldState {
     npcs: Vec<npc::Npc>,
     /// Current dialogue node per NPC. The most recently talked-to NPC is the
     /// "active" one for `Choose` dispatch.
-    #[getset(get = "pub")]
     dialogue_state: HashMap<npc::NpcId, DialogueNodeId>,
     /// The NPC the player is currently talking to; `Choose` dispatch reads
     /// this NPC's current node from `dialogue_state`.
@@ -128,6 +130,8 @@ impl WorldState {
         self.current_room().exit_extra(direction)
     }
 
+    /// Unlock the exit in `direction` (no-op if there is none, or it is
+    /// already unlocked).
     pub fn unlock_exit(
         &mut self,
         direction: direction::Direction,
@@ -135,10 +139,14 @@ impl WorldState {
         self.current_room_mut().unlock_exit(direction)
     }
 
+    /// Lock the exit in `direction` (no-op if there is none, or it is already
+    /// locked).
     pub fn lock_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
         self.current_room_mut().lock_exit(direction)
     }
 
+    /// Reveal the hidden exit in `direction` (no-op if there is none, or it
+    /// is not hidden).
     pub fn reveal_exit(
         &mut self,
         direction: direction::Direction,
@@ -146,6 +154,8 @@ impl WorldState {
         self.current_room_mut().reveal_exit(direction)
     }
 
+    /// Hide the exit in `direction` (no-op if there is none, or it is already
+    /// hidden).
     pub fn hide_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
         self.current_room_mut().hide_exit(direction)
     }
@@ -348,7 +358,7 @@ impl WorldState {
     fn get_available_objects(&self) -> Vec<object::Object> {
         [
             self.current_room().objects().as_slice(),
-            self.player().objects().as_slice(),
+            self.player.objects().as_slice(),
         ]
         .concat()
     }
@@ -424,6 +434,7 @@ impl WorldState {
     }
 }
 
+/// Data-driven interaction access.
 impl WorldState {
     /// The authored data-driven interactions, in declaration order.
     pub(crate) fn data_interactions(&self) -> &[InteractionData] {

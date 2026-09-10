@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/core"]
+members = ["crates/core", "crates/cli"]
 resolver = "2"
 
 [workspace.lints.clippy]
@@ -8,15 +8,3 @@ pedantic = { level = "deny", priority = 1 }
 redundant_clone = { level = "deny", priority = 2 }
 clone_on_copy = { level = "deny", priority = 2 }
 needless_collect = { level = "deny", priority = 2 }
-
-[package]
-name = "typegin"
-version = "0.1.0"
-edition = "2024"
-
-[lints]
-workspace = true
-
-[dependencies]
-env_logger = "0.11.11"
-typegin-core = { package = "core", path = "crates/core" }

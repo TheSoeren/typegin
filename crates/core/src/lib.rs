@@ -1,3 +1,7 @@
+//! Front-end-agnostic text-adventure engine: parsing, world state, and a
+//! data-driven interaction system, behind a [`View`] trait so a game can be
+//! played as text, GUI, or point-and-click without changing engine code.
+
 pub mod data;
 pub mod engine;
 pub mod event;
@@ -13,13 +17,12 @@ pub use data::interactions_data::{
 };
 pub use data::npc_data::{DialogueChoiceData, DialogueData, DialogueNodeData, NpcData};
 pub use data::object_data;
-pub use data::room_data;
-pub use data::{WorldData, WorldDataError};
+pub use data::{ExtraValue, WorldData, WorldDataError};
 pub use engine::GameEngine;
 pub use event::{DialogueChoice, Event};
 pub use input::parse_input;
 pub use input::{Action, Direction, DirectionResolution, DropResult, MoveResult, TakeResult};
-pub use interaction::{ActionContext, Interaction, Target, TargetFilter, Verb};
+pub use interaction::{ActionContext, Interaction, Target, TargetFilter, TargetResolution, Verb};
 pub use model::dialogue_node_id::DialogueNodeId;
 pub use model::dialogue_option_id::DialogueOptionId;
 pub use model::npc_id::NpcId;

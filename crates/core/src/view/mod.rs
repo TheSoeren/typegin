@@ -2,49 +2,30 @@ use crate::event::Event;
 use crate::input::direction::Direction;
 use crate::world::WorldState;
 
-/// A screen-level instruction produced by a [`View`].
-///
-/// A text front-end turns these into lines on the terminal; a GUI front-end
-/// interprets them in whatever widget tree it owns. Because the enum is
-/// `#[non_exhaustive]` the engine can add commands later without breaking
-/// existing consumers — interpreters must carry a fallback arm.
-#[non_exhaustive]
-pub enum RenderCommand {
-    /// One line of prose for a terminal or transcript.
-    Line(String),
-    /// Wipe the current view (e.g. before showing new [`RenderCommand::Line`]s).
-    ClearScreen,
-}
+mod render_command;
+
+pub use render_command::RenderCommand;
 
 /// Turns gameplay events into screen output.
 ///
-/// The engine only ever produces typed [`Event`]s and mutates
-/// [`WorldState`]; turning those into visible output is entirely this
-/// trait's job. Implement it once per output style (terminal, web, log,
-/// translations, ...) and swap it on a UI. A GUI that reads the [`Event`]s
-/// and [`WorldState`] directly and draws itself also gets the same shared,
-/// read-only access — [`RenderCommand`] merely lets text and GUI front-ends
-/// share one pipeline.
+/// This is the *outbound* half of the engine: it observes [`Event`]s and
+/// [`WorldState`] read-only, after [`Rules`](crate::rules::Rules) has already
+/// decided what happened. Implement it once per output style (terminal, GUI,
+/// log, translations, ...) and swap it on a UI; [`RenderCommand`] lets text
+/// and GUI front-ends share one pipeline, though a GUI may also read
+/// [`Event`]s and [`WorldState`] directly and draw itself.
 ///
-/// This is the *outbound* hook: it observes events read-only, after the
-/// game logic has already run. Inbound decision-making lives in [`Rules`].
-///
-/// Idiomatic use: override one [`View::render_*`] hook per event you want to
-/// phrase. The default [`View::render`] dispatches every event to its hook
-/// with the payload already destructured (names, directions, ...), so a view
-/// only implements what it phrases. A not-yet-dispatched event falls back to
-/// [`View::render_generic`], so a new engine [`Event`] never breaks an
-/// existing view.
-///
-/// Hooks take `&mut self` so stateful views can pace output, accumulate a
-/// transcript, or animate; a pure view simply ignores the mutation.
-///
-/// [`Rules`]: crate::engine::Rules
+/// Override one `render_*` hook per event you want to phrase; the default
+/// [`View::render`] dispatches each event to its hook with the payload
+/// already destructured, and falls back to [`View::render_generic`] for a
+/// not-yet-dispatched event, so a new engine [`Event`] never breaks an
+/// existing view. Hooks take `&mut self` so a stateful view can pace output
+/// or accumulate a transcript.
 pub trait View {
     /// Render a batch of events into screen commands, in order.
     ///
-    /// The default matches each event against its typed [`View::render_*`]
-    /// hook. Override only if you need to combine events (e.g. collapse
+    /// The default matches each event against its typed `render_*` hook.
+    /// Override only if you need to combine events (e.g. collapse
     /// consecutive notifications).
     fn render(&mut self, events: &[Event], world: &WorldState) -> Vec<RenderCommand> {
         #[allow(unreachable_patterns)]
@@ -146,7 +127,7 @@ pub trait View {
         Vec::new()
     }
 
-    /// A locked exit was unlocked
+    /// A locked exit was unlocked.
     fn render_unlocked_exit(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
         Vec::new()
     }

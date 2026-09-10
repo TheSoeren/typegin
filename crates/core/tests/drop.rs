@@ -6,10 +6,7 @@
 mod common;
 
 use common::{setup_engine, setup_engine_with_rules};
-use core::{
-    Action, BasicRules, Direction, DropResult, Event, ObjectId, ObjectResolution, RoomId,
-    parse_input,
-};
+use core::{BasicRules, Direction, DropResult, Event, ObjectId, ObjectResolution, RoomId};
 
 fn player_has_item(world: &core::world::WorldState, id: &ObjectId) -> bool {
     world.get_object_from_player(id) != ObjectResolution::NotFound
@@ -19,33 +16,12 @@ fn room_has_item(world: &core::world::WorldState, id: &ObjectId) -> bool {
     world.get_object_from_room(id) != ObjectResolution::NotFound
 }
 
-mod drop_lexer {
-    use super::*;
-
-    #[test]
-    fn parse_drop_item() {
-        let action = parse_input("drop sword");
-        assert_eq!(action, Action::Drop("sword".to_string()));
-    }
-
-    #[test]
-    fn parse_drop_with_descriptor() {
-        let action = parse_input("drop the iron key");
-        assert_eq!(action, Action::Drop("iron key".to_string()));
-    }
-
-    #[test]
-    fn parse_drop_shortcut() {
-        let action = parse_input("d sword");
-        assert_eq!(action, Action::Drop("sword".to_string()));
-    }
-
-    #[test]
-    fn parse_drop_empty_is_unknown() {
-        let action = parse_input("drop");
-        assert_eq!(action, Action::Unknown("drop".to_string()));
-    }
-}
+// Drop-verb parsing (`parse_drop_item`, `parse_drop_shortcut`,
+// `parse_drop_empty_is_unknown`, ...) is now covered directly and more
+// precisely by the `lex`/`tokenize` unit tests in
+// `crates/core/src/input/lexer.rs` and `crates/core/src/input/tokenizer.rs`
+// (and was already duplicated by `crates/core/tests/input.rs`'s `drop`,
+// `drop_shortcut` and `drop_empty_is_unknown` cases even before that).
 
 mod rules_drop_trait {
     use super::*;

@@ -7,41 +7,10 @@ use core::{
     Verb, WorldData, WorldDataError, WorldState,
 };
 
-const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
-const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
-
-/// The base fixture world (no interactions). The interactions string has no
-/// `interactions` key, so it must parse as an empty list.
-fn base_world() -> WorldData {
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, "{}", "{}").expect("base fixture parses")
-}
-
-/// The fixture world with an authored interaction snippet. `interactions` is a
-/// standalone YAML sequence (as stored under `data/interactions/`), appended
-/// under an `interactions:` key to mirror the separate interactions file.
-fn world_with(interactions: &str) -> WorldData {
-    let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, &interactions_yaml, "{}")
-        .expect("fixture with authored interactions parses")
-}
-
-/// Opens the fixture world with authored interactions under the stock rules.
-fn engine_with(interactions: &str) -> GameEngine {
-    GameEngine::get(&world_with(interactions))
-}
-
-/// Walks from The Cellar into The Study via the corridor.
-fn enter_study(engine: &mut GameEngine) {
-    assert_eq!(
-        engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
-    );
-    assert_eq!(
-        engine.handle_input("go east"),
-        vec![Event::Went(Direction::East)]
-    );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
-}
+use common::{
+    KEYED_ITEMS_YAML as ITEMS_YAML, KEYED_ROOMS_YAML as ROOMS_YAML, base_world,
+    engine_with_interactions as engine_with, enter_study, world_with_interactions as world_with,
+};
 
 /// Takes the iron key in The Cellar, then walks to The Study.
 fn iron_key_in_study(engine: &mut GameEngine) {
@@ -60,7 +29,7 @@ mod parse {
 
     #[test]
     fn loads_interactions_from_the_interactions_file() {
-        let world = world_with(include_str!("../data/interactions/parse_bundle.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/parse_bundle.yaml"));
         assert_eq!(
             world.interactions,
             vec![
@@ -131,7 +100,7 @@ mod parse {
             ROOMS_YAML,
             &format!(
                 "interactions:\n{}",
-                include_str!("../data/interactions/unknown_effect.yaml")
+                include_str!("fixtures/interactions/unknown_effect.yaml")
             ),
             "{}",
         );
@@ -140,7 +109,7 @@ mod parse {
 
     #[test]
     fn grant_and_discard_effects_load() {
-        let world = world_with(include_str!("../data/interactions/grant_and_discard.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/grant_and_discard.yaml"));
         let interaction = &world.interactions[0];
         assert_eq!(
             interaction.effect,
@@ -180,7 +149,7 @@ mod dispatch {
 
     #[test]
     fn data_interaction_replaces_the_stock_unlock() {
-        let mut engine = engine_with(include_str!("../data/interactions/unlock_and_emit.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/unlock_and_emit.yaml"));
         iron_key_in_study(&mut engine);
         assert!(engine.world().is_exit_locked(Direction::East));
         assert_eq!(
@@ -199,7 +168,7 @@ mod dispatch {
 
     #[test]
     fn authored_beat_fully_replaces_the_stock_beat() {
-        let mut engine = engine_with(include_str!("../data/interactions/full_replace.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/full_replace.yaml"));
         iron_key_in_study(&mut engine);
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
@@ -213,7 +182,7 @@ mod dispatch {
 
     #[test]
     fn is_door_condition_matches_any_door() {
-        let mut engine = engine_with(include_str!("../data/interactions/is_door.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/is_door.yaml"));
         iron_key_in_study(&mut engine);
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
@@ -231,7 +200,7 @@ mod dispatch {
 
     #[test]
     fn omitted_item_matches_any_carried_object() {
-        let mut engine = engine_with(include_str!("../data/interactions/any_item.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/any_item.yaml"));
         iron_key_in_study(&mut engine);
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
@@ -243,7 +212,7 @@ mod dispatch {
 
     #[test]
     fn omitted_target_matches_self_use() {
-        let mut engine = engine_with(include_str!("../data/interactions/self_use.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/self_use.yaml"));
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
@@ -262,7 +231,7 @@ mod dispatch {
     #[test]
     fn no_target_interaction_rejects_surplus_target() {
         let mut engine = engine_with(include_str!(
-            "../data/interactions/no_target_rejects_surplus_target.yaml"
+            "fixtures/interactions/no_target_rejects_surplus_target.yaml"
         ));
         // Take the lamp so it's in inventory.
         assert_eq!(
@@ -294,7 +263,7 @@ mod dispatch {
 
     #[test]
     fn room_condition_gates_dispatch() {
-        let interactions = include_str!("../data/interactions/room_gate.yaml");
+        let interactions = include_str!("fixtures/interactions/room_gate.yaml");
         let mut in_cellar = engine_with(interactions);
         in_cellar.handle_input("take iron key");
         assert_eq!(
@@ -318,7 +287,7 @@ mod dispatch {
 
     #[test]
     fn not_condition_negates() {
-        let interactions = include_str!("../data/interactions/not_negation.yaml");
+        let interactions = include_str!("fixtures/interactions/not_negation.yaml");
         let mut engine = engine_with(interactions);
         engine.handle_input("take iron key");
         enter_study(&mut engine);
@@ -349,7 +318,7 @@ mod dispatch {
 
     #[test]
     fn first_declared_interaction_wins() {
-        let mut engine = engine_with(include_str!("../data/interactions/first_wins.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/first_wins.yaml"));
         iron_key_in_study(&mut engine);
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
@@ -361,7 +330,7 @@ mod dispatch {
 
     #[test]
     fn look_and_go_are_query_only() {
-        let mut engine = engine_with(include_str!("../data/interactions/query_only_verbs.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/query_only_verbs.yaml"));
         assert_eq!(engine.handle_input("look"), vec![Event::Looked]);
         assert_eq!(
             engine.handle_input("go north"),
@@ -382,7 +351,7 @@ mod effects {
 
     #[test]
     fn examine_effect_reveals_a_hidden_exit() {
-        let mut engine = engine_with(include_str!("../data/interactions/reveal_exit.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/reveal_exit.yaml"));
         enter_study(&mut engine);
         assert!(engine.world().is_exit_hidden(Direction::North));
 
@@ -397,7 +366,7 @@ mod effects {
 
     #[test]
     fn drop_effect_emits_then_drops() {
-        let mut engine = engine_with(include_str!("../data/interactions/drop_emit.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/drop_emit.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -428,7 +397,7 @@ mod effects {
 
     #[test]
     fn lock_and_hide_effects_are_silent() {
-        let mut engine = engine_with(include_str!("../data/interactions/lock_hide.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/lock_hide.yaml"));
         iron_key_in_study(&mut engine);
         engine.world_mut().unlock_exit(Direction::East);
         assert!(!engine.world().is_exit_locked(Direction::East));
@@ -444,7 +413,7 @@ mod effects {
 
     #[test]
     fn grant_materialises_an_item_placed_nowhere_in_the_world() {
-        let mut engine = engine_with(include_str!("../data/interactions/grant_unplaced.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/grant_unplaced.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -472,7 +441,7 @@ mod effects {
 
     #[test]
     fn grant_is_a_no_op_when_the_player_already_holds_the_item() {
-        let mut engine = engine_with(include_str!("../data/interactions/grant_when_held.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/grant_when_held.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -508,7 +477,7 @@ mod effects {
 
     #[test]
     fn discard_removes_a_carried_item_without_dropping_it_in_the_room() {
-        let mut engine = engine_with(include_str!("../data/interactions/discard_carried.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/discard_carried.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -541,7 +510,7 @@ mod effects {
 
     #[test]
     fn discard_is_a_no_op_when_the_player_does_not_hold_the_item() {
-        let mut engine = engine_with(include_str!("../data/interactions/discard_missing.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/discard_missing.yaml"));
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
@@ -577,7 +546,7 @@ mod precedence_and_rules {
 
     #[test]
     fn data_interactions_run_before_rules_interactions() {
-        let world = world_with(include_str!("../data/interactions/data_wins.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/data_wins.yaml"));
         let closure = vec![Interaction::build(
             Verb::Use,
             Some(ObjectId::new("iron-key")),
@@ -623,7 +592,7 @@ mod precedence_and_rules {
         }
 
         let mut engine = GameEngine::get_with_rules(
-            &world_with(include_str!("../data/interactions/data_wins.yaml")),
+            &world_with(include_str!("fixtures/interactions/data_wins.yaml")),
             OverrideRules,
         );
         iron_key_in_study(&mut engine);
@@ -649,7 +618,7 @@ mod interactions_for {
 
     #[test]
     fn query_reports_matching_data_interactions() {
-        let mut engine = engine_with(include_str!("../data/interactions/query_use.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/query_use.yaml"));
         iron_key_in_study(&mut engine);
         let listed = engine.interactions_for(
             Some(ObjectId::new("iron-key")),
@@ -670,7 +639,7 @@ mod interactions_for {
 
     #[test]
     fn query_lists_data_first_then_rules() {
-        let world = world_with(include_str!("../data/interactions/query_use.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/query_use.yaml"));
         let closure = vec![Interaction::build(
             Verb::Use,
             None,

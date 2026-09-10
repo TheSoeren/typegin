@@ -22,6 +22,7 @@ pub enum ObjectKind {
     Scene,
 }
 
+/// A single object definition from world data (YAML).
 #[derive(Debug, Clone, Deserialize)]
 pub struct ObjectData {
     #[serde(rename = "key")]
@@ -37,6 +38,7 @@ pub struct ObjectData {
     pub extra: HashMap<String, ExtraValue>,
 }
 
+/// The top-level shape of an `items.yaml` file.
 #[derive(Debug, Deserialize)]
 pub(crate) struct ObjectsFile {
     pub(crate) objects: Vec<ObjectData>,

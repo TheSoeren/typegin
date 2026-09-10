@@ -168,7 +168,7 @@ impl typegin_core::View for TextView {
         &mut self,
         npc: &str,
         text: &str,
-        choices: &[typegin_core::event::DialogueChoice],
+        choices: &[typegin_core::DialogueChoice],
     ) -> Vec<typegin_core::RenderCommand> {
         let mut out = vec![line(format!("{npc}: {text}"))];
         for (i, choice) in choices.iter().enumerate() {
@@ -259,9 +259,9 @@ fn room_description(world: &typegin_core::WorldState) -> String {
     match world
         .current_room_extra()
         .get("description")
-        .map(typegin_core::data::ExtraValue::to_owned)
+        .map(typegin_core::ExtraValue::to_owned)
     {
-        Some(typegin_core::data::ExtraValue::Str(desc)) => desc,
+        Some(typegin_core::ExtraValue::Str(desc)) => desc,
         _ => "You are in a room.".to_string(),
     }
 }

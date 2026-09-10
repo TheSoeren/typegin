@@ -49,52 +49,13 @@
 
 mod common;
 
-use core::{
-    DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, RoomId, Target, WorldData,
+use core::{DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, Target, WorldData};
+
+use common::{
+    KEYED_GLOBALS_YAML as GLOBALS_YAML, KEYED_ITEMS_YAML as ITEMS_YAML,
+    KEYED_ROOMS_YAML as ROOMS_YAML, base_world, engine_with_interactions as engine_with,
+    enter_study, world_data_with_initial_flags, world_with_interactions as world_with,
 };
-
-const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
-const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
-const GLOBALS_YAML: &str = "{}";
-
-fn base_world() -> WorldData {
-    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, "{}", "{}")
-        .expect("base fixture parses")
-}
-
-fn world_with(interactions: &str) -> WorldData {
-    let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(
-        GLOBALS_YAML,
-        ITEMS_YAML,
-        ROOMS_YAML,
-        &interactions_yaml,
-        "{}",
-    )
-    .expect("fixture with authored interactions parses")
-}
-
-fn engine_with(interactions: &str) -> GameEngine {
-    GameEngine::get(&world_with(interactions))
-}
-
-fn world_data_with_initial_flags(flags: Vec<&str>) -> WorldData {
-    let mut data = base_world();
-    data.flags = flags.into_iter().map(String::from).collect();
-    data
-}
-
-fn enter_study(engine: &mut GameEngine) {
-    assert_eq!(
-        engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
-    );
-    assert_eq!(
-        engine.handle_input("go east"),
-        vec![Event::Went(Direction::East)]
-    );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
-}
 
 // ---------------------------------------------------------------------------
 // WorldState API
@@ -143,7 +104,7 @@ mod parse {
 
     #[test]
     fn flag_condition_parses() {
-        let world = world_with(include_str!("../data/interactions/flag_condition.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/flag_condition.yaml"));
         let interaction = &world.interactions[0];
         assert_eq!(
             interaction.condition,
@@ -155,7 +116,7 @@ mod parse {
 
     #[test]
     fn set_flag_effect_parses() {
-        let world = world_with(include_str!("../data/interactions/set_flag_effect.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
         let interaction = &world.interactions[0];
         assert!(interaction.effect.contains(&DataEffect::SetFlag {
             flag: "door-unlocked-flag".to_string()
@@ -164,7 +125,7 @@ mod parse {
 
     #[test]
     fn clear_flag_effect_parses() {
-        let world = world_with(include_str!("../data/interactions/clear_flag_effect.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/clear_flag_effect.yaml"));
         let interaction = &world.interactions[0];
         assert!(interaction.effect.contains(&DataEffect::ClearFlag {
             flag: "temp-flag".to_string()
@@ -173,7 +134,7 @@ mod parse {
 
     #[test]
     fn flag_in_not_condition_parses() {
-        let world = world_with(include_str!("../data/interactions/flag_with_not.yaml"));
+        let world = world_with(include_str!("fixtures/interactions/flag_with_not.yaml"));
         let interaction = &world.interactions[0];
         assert_eq!(
             interaction.condition,
@@ -202,7 +163,7 @@ mod dispatch {
 
     #[test]
     fn flag_condition_blocks_when_flag_not_set() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_condition.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_condition.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -222,7 +183,7 @@ mod dispatch {
 
     #[test]
     fn flag_condition_allows_when_flag_is_set() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_condition.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_condition.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -241,7 +202,7 @@ mod dispatch {
 
     #[test]
     fn set_flag_effect_sets_the_flag() {
-        let mut engine = engine_with(include_str!("../data/interactions/set_flag_effect.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
         assert!(!engine.world().has_flag("door-unlocked-flag"));
         // Use iron key on oak door (a scene/door object) to trigger the effect.
         // Walk to study first where the oak door lives.
@@ -269,7 +230,7 @@ mod dispatch {
 
     #[test]
     fn clear_flag_effect_clears_the_flag() {
-        let mut engine = engine_with(include_str!("../data/interactions/clear_flag_effect.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/clear_flag_effect.yaml"));
         engine.world_mut().set_flag("temp-flag");
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -295,7 +256,7 @@ mod dispatch {
 
     #[test]
     fn not_flag_negates() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_with_not.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_with_not.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -323,7 +284,7 @@ mod dispatch {
 
     #[test]
     fn multiple_flags_must_all_be_set() {
-        let mut engine = engine_with(include_str!("../data/interactions/multiple_flags.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/multiple_flags.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -360,7 +321,7 @@ mod dispatch {
 
     #[test]
     fn flag_combined_with_room_condition() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_and_room.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_and_room.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -389,7 +350,9 @@ mod dispatch {
 
     #[test]
     fn set_and_clear_in_same_interaction_run_in_order() {
-        let mut engine = engine_with(include_str!("../data/interactions/set_and_clear_same.yaml"));
+        let mut engine = engine_with(include_str!(
+            "fixtures/interactions/set_and_clear_same.yaml"
+        ));
         engine.world_mut().set_flag("phase-one");
         assert!(!engine.world().has_flag("phase-two"));
         assert_eq!(
@@ -419,7 +382,7 @@ mod dispatch {
 
     #[test]
     fn flag_effects_emit_events() {
-        let mut engine = engine_with(include_str!("../data/interactions/set_flag_effect.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -446,7 +409,7 @@ mod dispatch {
     #[test]
     fn flag_gated_interaction_overrides_stock_use() {
         let mut engine = engine_with(include_str!(
-            "../data/interactions/flag_overrides_stock.yaml"
+            "fixtures/interactions/flag_overrides_stock.yaml"
         ));
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -486,7 +449,7 @@ mod interactions_for {
 
     #[test]
     fn query_reports_interaction_when_flag_is_set() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_query.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_query.yaml"));
         // Flag not set → query returns nothing
         assert!(
             engine
@@ -505,7 +468,7 @@ mod interactions_for {
 
     #[test]
     fn query_excludes_interaction_when_flag_is_cleared() {
-        let mut engine = engine_with(include_str!("../data/interactions/flag_query.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/flag_query.yaml"));
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
@@ -549,7 +512,7 @@ mod initial_flags {
 
     #[test]
     fn initial_flags_are_queryable_by_interactions() {
-        let interactions = include_str!("../data/interactions/flag_condition.yaml");
+        let interactions = include_str!("fixtures/interactions/flag_condition.yaml");
         let interactions_yaml = format!("interactions:\n{interactions}");
         let mut data = WorldData::from_yaml(
             GLOBALS_YAML,

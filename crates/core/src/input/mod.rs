@@ -8,6 +8,8 @@ pub use direction::{Direction, DirectionResolution};
 use lexer::lex;
 use tokenizer::tokenize;
 
+/// Parse a raw text line into a structured [`Action`] by tokenizing then
+/// lexing it.
 pub fn parse_input(input: &str) -> Action {
     let tokens = tokenize(input);
     let token_refs: Vec<&str> = tokens.iter().map(String::as_str).collect();

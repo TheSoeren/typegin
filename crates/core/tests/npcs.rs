@@ -86,47 +86,16 @@
 mod common;
 
 use core::{
-    Action, DataEffect, DialogueChoice, DialogueNodeId, Direction, Event, GameEngine, NpcId,
-    ObjectId, RoomId, WorldData, WorldDataError,
+    DataEffect, DialogueChoice, DialogueNodeId, Direction, Event, GameEngine, NpcId, ObjectId,
+    RoomId, WorldData, WorldDataError,
 };
 
-const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
-const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
-const GLOBALS_YAML: &str = "{}";
-
-fn base_world() -> WorldData {
-    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, "{}", "{}")
-        .expect("base fixture parses")
-}
-
-fn world_with(npcs: &str) -> WorldData {
-    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, "{}", npcs)
-        .expect("fixture with npcs parses")
-}
-
-fn world_with_npc_and_interactions(npcs: &str, interactions: &str) -> WorldData {
-    let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(
-        GLOBALS_YAML,
-        ITEMS_YAML,
-        ROOMS_YAML,
-        &interactions_yaml,
-        npcs,
-    )
-    .expect("fixture with npcs and interactions parses")
-}
-
-fn engine_with(npcs: &str) -> GameEngine {
-    GameEngine::get(&world_with(npcs))
-}
-
-fn enter_corridor(engine: &mut GameEngine) {
-    assert_eq!(
-        engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
-    );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
-}
+use common::{
+    KEYED_GLOBALS_YAML as GLOBALS_YAML, KEYED_ITEMS_YAML as ITEMS_YAML,
+    KEYED_ROOMS_YAML as ROOMS_YAML, base_world, engine_with_npcs as engine_with, enter_corridor,
+    world_with_npcs as world_with,
+    world_with_npcs_and_interactions as world_with_npc_and_interactions,
+};
 
 // ---------------------------------------------------------------------------
 // WorldState API
@@ -143,33 +112,33 @@ mod world_state_api {
 
     #[test]
     fn npcs_are_loaded_from_data() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(engine.world().npcs().len(), 1);
         assert_eq!(engine.world().npcs()[0].id(), &NpcId::new("guard"));
     }
 
     #[test]
     fn npc_names_are_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(engine.world().npcs()[0].primary_name(), "guard");
     }
 
     #[test]
     fn npc_aliases_are_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let aliases = engine.world().npcs()[0].aliases();
         assert!(aliases.contains(&"sentry".to_string()));
     }
 
     #[test]
     fn npc_room_is_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(engine.world().npcs()[0].room_id(), &RoomId::new("corridor"));
     }
 
     #[test]
     fn npc_root_node_is_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(
             engine.world().npcs()[0].root(),
             &DialogueNodeId::new("greeting")
@@ -178,7 +147,7 @@ mod world_state_api {
 
     #[test]
     fn dialogue_graph_is_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let npc = &engine.world().npcs()[0];
         assert!(
             npc.dialogue()
@@ -188,7 +157,7 @@ mod world_state_api {
 
     #[test]
     fn dialogue_node_text_is_loaded() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let npc = &engine.world().npcs()[0];
         let node = npc
             .dialogue()
@@ -199,7 +168,7 @@ mod world_state_api {
 
     #[test]
     fn dialogue_choice_next_is_typed() {
-        let engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let npc = &engine.world().npcs()[0];
         let node = npc
             .dialogue()
@@ -213,9 +182,9 @@ mod world_state_api {
     }
 
     #[test]
-    fn dialogue_state_starts_empty() {
+    fn no_active_dialogue_at_start() {
         let engine = GameEngine::get(&base_world());
-        assert!(engine.world().dialogue_state().is_empty());
+        assert!(engine.world().active_npc().is_none());
     }
 
     #[test]
@@ -226,7 +195,7 @@ mod world_state_api {
 
     #[test]
     fn find_npc_by_name_in_room() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
         assert_eq!(corridor_npcs.len(), 1);
         assert_eq!(corridor_npcs[0].id(), &NpcId::new("guard"));
@@ -234,7 +203,7 @@ mod world_state_api {
 
     #[test]
     fn find_npc_by_alias_in_room() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
         let found = corridor_npcs.iter().find(|npc| npc.has_name("sentry"));
         assert!(found.is_some());
@@ -242,7 +211,7 @@ mod world_state_api {
 
     #[test]
     fn resolve_npc_by_alias() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         enter_corridor(&mut engine);
         let found = engine.world().resolve_npc("sentry");
         assert!(found.is_some());
@@ -251,20 +220,20 @@ mod world_state_api {
 
     #[test]
     fn resolve_npc_unknown_name_is_none() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert!(engine.world().resolve_npc("ghost").is_none());
     }
 
     #[test]
     fn npc_not_in_other_room() {
-        let engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         let cellar_npcs = engine.world().npcs_in_room(&RoomId::new("cellar"));
         assert!(cellar_npcs.is_empty());
     }
 
     #[test]
     fn two_npcs_in_same_room() {
-        let engine = engine_with(include_str!("../data/npcs_two_npcs.yaml"));
+        let engine = engine_with(include_str!("fixtures/npcs_two_npcs.yaml"));
         let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
         assert_eq!(corridor_npcs.len(), 2);
     }
@@ -279,43 +248,43 @@ mod parse {
 
     #[test]
     fn single_npc_parses() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs.len(), 1);
     }
 
     #[test]
     fn npc_key_is_parsed_as_npc_id() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs[0].id, NpcId::new("guard"));
     }
 
     #[test]
     fn npc_primary_name_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs[0].primary_name, "guard");
     }
 
     #[test]
     fn npc_aliases_are_parsed() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs[0].aliases, vec!["sentry"]);
     }
 
     #[test]
     fn npc_room_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs[0].room, RoomId::new("corridor"));
     }
 
     #[test]
     fn dialogue_root_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(world.npcs[0].dialogue.root, "greeting");
     }
 
     #[test]
     fn dialogue_node_text_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -326,7 +295,7 @@ mod parse {
 
     #[test]
     fn dialogue_node_without_choices_parses() {
-        let world = world_with(include_str!("../data/npcs_guard.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_guard.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -337,7 +306,7 @@ mod parse {
 
     #[test]
     fn dialogue_node_with_choices_parses() {
-        let world = world_with(include_str!("../data/npcs_two_branches.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -348,7 +317,7 @@ mod parse {
 
     #[test]
     fn dialogue_choice_label_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_two_branches.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -359,7 +328,7 @@ mod parse {
 
     #[test]
     fn dialogue_choice_next_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_two_branches.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -370,7 +339,7 @@ mod parse {
 
     #[test]
     fn dialogue_choice_end_marker_is_parsed() {
-        let world = world_with(include_str!("../data/npcs_two_branches.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -381,7 +350,7 @@ mod parse {
 
     #[test]
     fn dialogue_choice_key_defaults_to_none() {
-        let world = world_with(include_str!("../data/npcs_two_branches.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_branches.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -392,7 +361,7 @@ mod parse {
 
     #[test]
     fn dialogue_choice_effects_are_parsed() {
-        let world = world_with(include_str!("../data/npcs_effects.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_effects.yaml"));
         let node = world.npcs[0]
             .dialogue
             .nodes
@@ -406,7 +375,7 @@ mod parse {
 
     #[test]
     fn two_npcs_parse() {
-        let world = world_with(include_str!("../data/npcs_two_npcs.yaml"));
+        let world = world_with(include_str!("fixtures/npcs_two_npcs.yaml"));
         assert_eq!(world.npcs.len(), 2);
         assert_eq!(world.npcs[0].id, NpcId::new("guard"));
         assert_eq!(world.npcs[1].id, NpcId::new("warden"));
@@ -458,57 +427,15 @@ mod parse {
 
 // ---------------------------------------------------------------------------
 // Input parsing: Action::Talk and Action::Choose
+//
+// Now covered directly by the `lex` unit tests in
+// `crates/core/src/input/lexer.rs` (`talk_joins_remaining_tokens`,
+// `talk_with_no_target_is_unknown`, `choose_joins_remaining_tokens`,
+// `choose_with_no_payload_is_unknown`) plus the stop-word stripping proven by
+// `crates/core/src/input/tokenizer.rs`'s
+// `stop_word_inside_a_longer_phrase_is_dropped` — together the same coverage
+// this module gave through the public `parse_input` entry point.
 // ---------------------------------------------------------------------------
-
-mod input_parse {
-    use super::*;
-    use core::parse_input;
-
-    #[test]
-    fn talk_to_npc_parses() {
-        assert_eq!(
-            parse_input("talk to guard"),
-            Action::Talk("guard".to_string())
-        );
-    }
-
-    #[test]
-    fn talk_without_to_parses() {
-        assert_eq!(parse_input("talk guard"), Action::Talk("guard".to_string()));
-    }
-
-    #[test]
-    fn talk_with_multi_word_npc_parses() {
-        assert_eq!(
-            parse_input("talk to old man"),
-            Action::Talk("old man".to_string())
-        );
-    }
-
-    #[test]
-    fn choose_index_parses() {
-        assert_eq!(parse_input("choose 1"), Action::Choose("1".to_string()));
-    }
-
-    #[test]
-    fn choose_label_parses() {
-        // Stop words are stripped by the tokenizer.
-        assert_eq!(
-            parse_input("choose ask about the exit"),
-            Action::Choose("ask exit".to_string())
-        );
-    }
-
-    #[test]
-    fn talk_without_target_is_unknown() {
-        assert!(matches!(parse_input("talk"), Action::Unknown(_)));
-    }
-
-    #[test]
-    fn choose_without_payload_is_unknown() {
-        assert!(matches!(parse_input("choose"), Action::Unknown(_)));
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Talk dispatch
@@ -519,7 +446,7 @@ mod talk_dispatch {
 
     #[test]
     fn talk_to_npc_returns_dialogue_node() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         enter_corridor(&mut engine);
         // No choices → the line is spoken, then the conversation ends.
         assert_eq!(
@@ -542,7 +469,7 @@ mod talk_dispatch {
 
     #[test]
     fn talk_to_npc_not_in_room_returns_not_found() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         // Still in the cellar, guard is in corridor
         assert_eq!(
             engine.handle_input("talk to guard"),
@@ -554,7 +481,7 @@ mod talk_dispatch {
 
     #[test]
     fn talk_to_unknown_name_returns_not_found() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         enter_corridor(&mut engine);
         assert_eq!(
             engine.handle_input("talk to ghost"),
@@ -566,11 +493,11 @@ mod talk_dispatch {
 
     #[test]
     fn talk_sets_dialogue_state_and_active_npc() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
-            engine.world().dialogue_state().get(&NpcId::new("guard")),
+            engine.world().npc_dialogue_node(&NpcId::new("guard")),
             Some(&DialogueNodeId::new("greeting"))
         );
         assert_eq!(engine.world().active_npc(), &Some(NpcId::new("guard")));
@@ -578,7 +505,7 @@ mod talk_dispatch {
 
     #[test]
     fn talk_node_with_choices_returns_them() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         let events = engine.handle_input("talk to guard");
         match &events[0] {
@@ -603,7 +530,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_by_index_advances_to_next_node() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         // `about-exit` is a leaf node → line spoken, then the conversation ends.
@@ -627,7 +554,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_end_marker_ends_dialogue() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
@@ -641,22 +568,22 @@ mod choose_dispatch {
 
     #[test]
     fn choose_clears_dialogue_state() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         engine.handle_input("choose 2");
         assert!(
-            !engine
+            engine
                 .world()
-                .dialogue_state()
-                .contains_key(&NpcId::new("guard"))
+                .npc_dialogue_node(&NpcId::new("guard"))
+                .is_none()
         );
         assert!(engine.world().active_npc().is_none());
     }
 
     #[test]
     fn choose_by_label_ends_dialogue() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
@@ -670,7 +597,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_invalid_index_returns_error() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
@@ -684,7 +611,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_invalid_label_returns_error() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
@@ -698,7 +625,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_without_active_dialogue_is_unknown() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         let events = engine.handle_input("choose 1");
         assert_eq!(events.len(), 1);
@@ -707,7 +634,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_effects_are_applied() {
-        let mut engine = engine_with(include_str!("../data/npcs_effects.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_effects.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert!(!engine.world().has_flag("guard-told-about-key"));
@@ -717,7 +644,7 @@ mod choose_dispatch {
 
     #[test]
     fn choose_effects_emit_events() {
-        let mut engine = engine_with(include_str!("../data/npcs_effects.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_effects.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         let events = engine.handle_input("choose 1");
@@ -742,7 +669,7 @@ mod choose_dispatch {
 
     #[test]
     fn deep_chain_walks_three_nodes() {
-        let mut engine = engine_with(include_str!("../data/npcs_deep_chain.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_deep_chain.yaml"));
         enter_corridor(&mut engine);
 
         // Node 1: greeting
@@ -771,7 +698,7 @@ mod choose_dispatch {
             other => panic!("expected Talked, got {other:?}"),
         }
         assert_eq!(
-            engine.world().dialogue_state().get(&NpcId::new("guard")),
+            engine.world().npc_dialogue_node(&NpcId::new("guard")),
             Some(&DialogueNodeId::new("ask-key"))
         );
 
@@ -808,7 +735,7 @@ mod state_management {
 
     #[test]
     fn moving_rooms_clears_active_dialogue() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert!(engine.world().active_npc().is_some());
@@ -818,30 +745,35 @@ mod state_management {
             vec![Event::Went(Direction::South)]
         );
         assert!(engine.world().active_npc().is_none());
-        assert!(engine.world().dialogue_state().is_empty());
+        assert!(
+            engine
+                .world()
+                .npc_dialogue_node(&NpcId::new("guard"))
+                .is_none()
+        );
     }
 
     #[test]
     fn talk_to_different_npc_replaces_active() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_npcs.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_npcs.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(engine.world().active_npc(), &Some(NpcId::new("guard")));
         assert_eq!(
-            engine.world().dialogue_state().get(&NpcId::new("guard")),
+            engine.world().npc_dialogue_node(&NpcId::new("guard")),
             Some(&DialogueNodeId::new("greeting"))
         );
         engine.handle_input("talk to warden");
         assert_eq!(engine.world().active_npc(), &Some(NpcId::new("warden")));
         assert_eq!(
-            engine.world().dialogue_state().get(&NpcId::new("warden")),
+            engine.world().npc_dialogue_node(&NpcId::new("warden")),
             Some(&DialogueNodeId::new("greeting"))
         );
     }
 
     #[test]
     fn ending_dialogue_allows_new_conversation() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_branches.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_branches.yaml"));
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         engine.handle_input("choose 2"); // ends dialogue
@@ -1032,8 +964,8 @@ mod integration {
     #[test]
     fn dialogue_set_flag_gates_data_interaction() {
         let mut engine = GameEngine::get(&world_with_npc_and_interactions(
-            include_str!("../data/npcs_effects.yaml"),
-            include_str!("../data/interactions/dialogue_flag_dispatch.yaml"),
+            include_str!("fixtures/npcs_effects.yaml"),
+            include_str!("fixtures/interactions/dialogue_flag_dispatch.yaml"),
         ));
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -1067,8 +999,8 @@ mod integration {
     #[test]
     fn dialogue_flag_visible_in_query() {
         let mut engine = GameEngine::get(&world_with_npc_and_interactions(
-            include_str!("../data/npcs_effects.yaml"),
-            include_str!("../data/interactions/dialogue_flag_query.yaml"),
+            include_str!("fixtures/npcs_effects.yaml"),
+            include_str!("fixtures/interactions/dialogue_flag_query.yaml"),
         ));
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -1110,7 +1042,7 @@ mod interactions_for_talk {
 
     #[test]
     fn npc_in_current_room_is_a_talk_target() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         // Starts in the cellar; the guard lives in the corridor.
         assert!(engine.interactions_for(None, None).is_empty());
 
@@ -1126,7 +1058,7 @@ mod interactions_for_talk {
 
     #[test]
     fn leaving_the_room_removes_talk_targets() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         enter_corridor(&mut engine);
         assert_eq!(engine.interactions_for(None, None).len(), 1);
 
@@ -1136,7 +1068,7 @@ mod interactions_for_talk {
 
     #[test]
     fn every_npc_in_the_room_is_listed() {
-        let mut engine = engine_with(include_str!("../data/npcs_two_npcs.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_two_npcs.yaml"));
         enter_corridor(&mut engine);
         let listed = engine.interactions_for(None, None);
         assert_eq!(listed.len(), 2);
@@ -1154,7 +1086,7 @@ mod interactions_for_talk {
 
     #[test]
     fn targeted_queries_never_list_npc_hotspots() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         enter_corridor(&mut engine);
         let with_item = engine.interactions_for(Some(ObjectId::new("iron-key")), None);
         assert!(
@@ -1175,7 +1107,7 @@ mod interactions_for_talk {
 
     #[test]
     fn talk_target_still_dispatches_via_talk_action() {
-        let mut engine = engine_with(include_str!("../data/npcs_effects.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_effects.yaml"));
         enter_corridor(&mut engine);
         // The open query surfaces the NPC as a talk hotspot...
         assert_eq!(engine.interactions_for(None, None).len(), 1);
@@ -1203,7 +1135,7 @@ mod use_on_npc {
 
     #[test]
     fn use_item_on_npc_without_interaction_emits_used() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -1228,8 +1160,8 @@ mod use_on_npc {
     #[test]
     fn use_item_on_npc_runs_authored_interaction() {
         let mut engine = GameEngine::get(&world_with_npc_and_interactions(
-            include_str!("../data/npcs_guard.yaml"),
-            include_str!("../data/interactions/use_npc.yaml"),
+            include_str!("fixtures/npcs_guard.yaml"),
+            include_str!("fixtures/interactions/use_npc.yaml"),
         ));
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -1257,8 +1189,8 @@ mod use_on_npc {
     #[test]
     fn query_reports_npc_targeted_use_interaction() {
         let mut engine = GameEngine::get(&world_with_npc_and_interactions(
-            include_str!("../data/npcs_guard.yaml"),
-            include_str!("../data/interactions/use_npc.yaml"),
+            include_str!("fixtures/npcs_guard.yaml"),
+            include_str!("fixtures/interactions/use_npc.yaml"),
         ));
         enter_corridor(&mut engine);
         let listed = engine.interactions_for(
@@ -1272,7 +1204,7 @@ mod use_on_npc {
 
     #[test]
     fn use_item_on_unknown_npc_reports_target_not_found() {
-        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/npcs_guard.yaml"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {

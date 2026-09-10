@@ -1,33 +1,27 @@
-use crate::data::interactions_data;
+use crate::data::interactions_data::DataEffect;
 use crate::input::action;
-use crate::interaction::{ActionContext, Interaction, Verb};
+use crate::interaction::{ActionContext, Interaction, Verb, dispatch_data};
 use crate::world;
 use crate::world::object::{ObjectResolution, TargetResolution};
 use crate::{Event, event, object_data};
 
-/// Minimal rules that reuse every default hook.
-///
-/// Used when no custom rules are supplied to [`GameEngine::get`](crate::GameEngine::get).
-pub struct BasicRules;
+mod basic;
 
-impl Rules for BasicRules {}
+pub use basic::BasicRules;
 
 /// Hooks the game logic uses to decide behaviour.
 ///
-/// This is how a game customizes rules: implement `Rules` and pass it to
-/// [`GameEngine::get_with_rules`](crate::GameEngine::get_with_rules). The world
-/// is passed in, so there is no wrapper boilerplate and no delegation. Every
-/// method has a default implementation, so a custom type only implements the
-/// hooks it wants to change.
+/// Implement `Rules` and pass it to
+/// [`GameEngine::get_with_rules`](crate::GameEngine::get_with_rules); every
+/// method has a default, so a custom type only overrides what it changes. Two
+/// complementary customization surfaces exist:
 ///
-/// Two complementary customization surfaces exist:
-///
-/// * **Per-verb defaults** — override one of the `on_*` hooks to change a
-///   whole action category (`on_take`, `on_use`, ...).
-/// * **Per-interaction rules** — provide [`Interaction`]s via [`Rules::interactions`].
-///   These run *before* the default `on_use` fallback, so bespoke puzzle logic
-///   ("cut the rope with the knife") authors as a single interaction instead of
-///   a hook re-implementation. Front-ends can also enumerate them (see
+/// * **Per-verb defaults** — override an `on_*` hook to change a whole action
+///   category (`on_take`, `on_use`, ...).
+/// * **Per-interaction rules** — provide [`Interaction`]s via
+///   [`Rules::interactions`], run before the default `on_use` fallback, so
+///   bespoke puzzle logic authors as one interaction instead of a hook
+///   rewrite. Front-ends can also enumerate them (see
 ///   `GameEngine::interactions_for`) to build point-and-click menus.
 pub trait Rules {
     /// Authored interactions, consulted before the default `on_use` fallback.
@@ -69,7 +63,7 @@ pub trait Rules {
 
     /// Decide what happens when the player tries to take an object.
     ///
-    /// Only [`Item`](ObjectKind::Item) objects are portable — the default
+    /// Only [`Item`](crate::object_data::ObjectKind::Item) objects are portable — the default
     /// takes them into inventory. Scene objects (furniture, doors, ...) are a
     /// fixed part of the world and are refused with `CantTake`; authored
     /// interactions never get a say here (use flows through `on_use`).
@@ -100,7 +94,7 @@ pub trait Rules {
         }
 
         let context = ActionContext::new(Some(Verb::Take), Some(object_id.clone()), None);
-        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+        if let Some(events) = dispatch_data(world, &context) {
             return events;
         }
         if let Some(interaction) = self
@@ -146,7 +140,7 @@ pub trait Rules {
         };
 
         let context = ActionContext::new(Some(Verb::Drop), Some(object_id.clone()), None);
-        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+        if let Some(events) = dispatch_data(world, &context) {
             return events;
         }
         if let Some(interaction) = self
@@ -192,7 +186,7 @@ pub trait Rules {
         };
 
         let context = ActionContext::new(Some(Verb::Examine), None, Some(target.clone()));
-        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+        if let Some(events) = dispatch_data(world, &context) {
             return events;
         }
         if let Some(interaction) = self
@@ -237,7 +231,7 @@ pub trait Rules {
             _ => None,
         };
         let context = ActionContext::new(Some(Verb::Use), Some(item_id.clone()), target_id);
-        if let Some(events) = interactions_data::dispatch_data(world, &context) {
+        if let Some(events) = dispatch_data(world, &context) {
             return events;
         }
         if let Some(interaction) = self
@@ -364,7 +358,7 @@ pub trait Rules {
                 .is_some_and(|node| node.choices().is_empty()),
         };
 
-        let mut events = interactions_data::DataEffect::apply_all(&effects, world);
+        let mut events = DataEffect::apply_all(&effects, world);
 
         if let Some(next) = next_node_id {
             if let Some(next_event) = next_event {
