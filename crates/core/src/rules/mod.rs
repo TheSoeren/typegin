@@ -53,8 +53,8 @@ pub trait Rules {
         } else {
             match world.get_room_id_by_exit_direction(direction) {
                 Some(room_id) => match world.move_to_room(room_id) {
-                    action::MoveResult::Success => vec![event::Event::Went(direction)],
-                    action::MoveResult::Fail => vec![event::Event::WentInvalidDirection(direction)],
+                    action::Outcome::Success => vec![event::Event::Went(direction)],
+                    action::Outcome::Fail => vec![event::Event::WentInvalidDirection(direction)],
                 },
                 None => vec![event::Event::WentInvalidDirection(direction)],
             }
@@ -106,11 +106,11 @@ pub trait Rules {
         }
 
         match world.player_take_object(&object_id) {
-            action::TakeResult::Success => vec![event::Event::Took {
+            action::Outcome::Success => vec![event::Event::Took {
                 object_id,
                 object: name.to_string(),
             }],
-            action::TakeResult::Fail => {
+            action::Outcome::Fail => {
                 vec![event::Event::TookObjectNotFound {
                     object: name.to_string(),
                 }]
@@ -152,11 +152,11 @@ pub trait Rules {
         }
 
         match world.player_drop_object(&object_id) {
-            action::DropResult::Success => vec![event::Event::Dropped {
+            action::Outcome::Success => vec![event::Event::Dropped {
                 object_id,
                 object: name.to_string(),
             }],
-            action::DropResult::Fail => vec![event::Event::DroppedObjectNotFound {
+            action::Outcome::Fail => vec![event::Event::DroppedObjectNotFound {
                 object: name.to_string(),
             }],
         }

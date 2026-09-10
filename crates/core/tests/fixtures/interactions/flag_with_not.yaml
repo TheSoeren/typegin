@@ -1,8 +1,0 @@
-- verb: examine
-  target:
-    object: iron-key
-  condition:
-    - not:
-        flag: door-seen
-  effect:
-    - emit: first-look

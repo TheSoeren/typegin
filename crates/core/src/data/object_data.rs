@@ -4,7 +4,9 @@ use serde::Deserialize;
 
 use crate::data::ExtraValue;
 use crate::data::door_data::DoorData;
-use crate::model::object_id::ObjectId;
+use crate::data::{WorldData, WorldDataError};
+use crate::keys::object_id::ObjectId;
+use crate::keys::room_id::RoomId;
 
 /// The two object kinds of the Visionaire model:
 ///
@@ -23,7 +25,7 @@ pub enum ObjectKind {
 }
 
 /// A single object definition from world data (YAML).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct ObjectData {
     #[serde(rename = "key")]
     pub id: ObjectId,
@@ -38,8 +40,21 @@ pub struct ObjectData {
     pub extra: HashMap<String, ExtraValue>,
 }
 
-/// The top-level shape of an `items.yaml` file.
-#[derive(Debug, Deserialize)]
-pub(crate) struct ObjectsFile {
-    pub(crate) objects: Vec<ObjectData>,
+impl ObjectData {
+    /// Verify that this object's door (if any) leads to a declared room key.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
+    pub(crate) fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+        if let Some(door) = &self.door {
+            data.find_room(&RoomId::new(&door.to)).ok_or_else(|| {
+                WorldDataError::Validation(format!(
+                    "door `{}` references unknown room key `{}`",
+                    self.id, door.to
+                ))
+            })?;
+        }
+        Ok(())
+    }
 }

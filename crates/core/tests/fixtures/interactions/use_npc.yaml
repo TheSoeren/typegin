@@ -1,7 +1,0 @@
-# "Use an object on an NPC": an interaction keyed to an NPC target.
-- verb: use
-  item: iron-key
-  target:
-    npc: guard
-  effect:
-    - emit: key-shown-to-guard

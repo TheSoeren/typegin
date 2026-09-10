@@ -1,9 +1,0 @@
-- verb: use
-  item: iron-key
-  target:
-    kind: scene
-  condition:
-    - flag: enabled
-    - is_door: true
-  effect:
-    - emit: flag-gated-use

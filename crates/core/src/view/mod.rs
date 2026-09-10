@@ -49,6 +49,7 @@ pub trait View {
                     self.render_took_object_ambiguous(object)
                 }
                 Event::CantTake { object } => self.render_cant_take(object),
+                Event::Granted { object, .. } => self.render_granted(object),
                 Event::Dropped { object, .. } => self.render_dropped(object),
                 Event::DroppedObjectNotFound { object } => {
                     self.render_dropped_object_not_found(object)
@@ -56,6 +57,7 @@ pub trait View {
                 Event::DroppedObjectAmbiguous { object, .. } => {
                     self.render_dropped_object_ambiguous(object)
                 }
+                Event::Discarded { object, .. } => self.render_discarded(object),
                 Event::Used { object, target, .. } => self.render_used(object, target.as_deref()),
                 Event::UsedObjectNotFound { object } => self.render_used_object_not_found(object),
                 Event::UsedObjectAmbiguous { object, .. } => {
@@ -162,6 +164,12 @@ pub trait View {
         Vec::new()
     }
 
+    /// An object was granted into inventory, regardless of where (if
+    /// anywhere) it was placed in the world.
+    fn render_granted(&mut self, _object: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
     /// The player dropped an item from inventory.
     fn render_dropped(&mut self, _object: &str) -> Vec<RenderCommand> {
         Vec::new()
@@ -174,6 +182,11 @@ pub trait View {
 
     /// The player referenced an item matching several carried items.
     fn render_dropped_object_ambiguous(&mut self, _object: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// An object was removed from inventory without being placed anywhere.
+    fn render_discarded(&mut self, _object: &str) -> Vec<RenderCommand> {
         Vec::new()
     }
 

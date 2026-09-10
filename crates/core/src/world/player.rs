@@ -3,7 +3,7 @@ use getset::Getters;
 use crate::world::object;
 
 /// The player's inventory.
-#[derive(Debug, Getters)]
+#[derive(Debug, Default, Getters)]
 #[getset(get = "pub(crate)")]
 pub(crate) struct Player {
     objects: Vec<object::Object>,
@@ -11,9 +11,7 @@ pub(crate) struct Player {
 
 impl Player {
     pub(crate) fn new() -> Self {
-        Player {
-            objects: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Find a carried object by id.
@@ -48,12 +46,6 @@ impl Player {
             Some(pos) => Some(self.objects.remove(pos)),
             None => None,
         }
-    }
-}
-
-impl Default for Player {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

@@ -1,9 +1,29 @@
 use std::env;
 use std::io::{self, BufRead, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 mod view;
+
+/// The engine only ever parses one YAML document, so the shipped
+/// `data/*.yaml` files (kept separate purely for authoring convenience) are
+/// concatenated here before handing the result to
+/// [`typegin_core::WorldData::from_yaml`] — each file contributes disjoint
+/// top-level keys, so concatenation is a lossless merge.
+fn read_world_yaml(data_dir: &Path) -> Result<String, typegin_core::WorldDataError> {
+    let mut yaml = String::new();
+    for file_name in [
+        "globals.yaml",
+        "items.yaml",
+        "rooms.yaml",
+        "interactions.yaml",
+        "npcs.yaml",
+    ] {
+        yaml.push_str(&std::fs::read_to_string(data_dir.join(file_name))?);
+        yaml.push('\n');
+    }
+    Ok(yaml)
+}
 
 fn main() -> ExitCode {
     env_logger::init();
@@ -11,19 +31,10 @@ fn main() -> ExitCode {
     let data_dir = env::args_os()
         .nth(1)
         .map_or_else(|| PathBuf::from("data"), PathBuf::from);
-    let globals_path = data_dir.join("globals.yaml");
-    let items_path = data_dir.join("items.yaml");
-    let rooms_path = data_dir.join("rooms.yaml");
-    let interactions_path = data_dir.join("interactions.yaml");
-    let npcs_path = data_dir.join("npcs.yaml");
 
-    let world_data = match typegin_core::WorldData::load(
-        &globals_path,
-        &items_path,
-        &rooms_path,
-        &interactions_path,
-        &npcs_path,
-    ) {
+    let world_data = match read_world_yaml(&data_dir)
+        .and_then(|yaml| typegin_core::WorldData::from_yaml(&yaml))
+    {
         Ok(data) => data,
         Err(err) => {
             eprintln!("Failed to load world data: {err}");

@@ -34,39 +34,13 @@ pub enum Action {
     Unknown(String),
 }
 
-/// Outcome of moving an item from the room into the player's inventory.
+/// Outcome of a world mutation attempt: taking, granting, discarding, or
+/// dropping an object, or moving the player to another room. Every such
+/// attempt is a plain success-or-no-op — none carries payload data beyond
+/// that — so one shared type stands in for what were five identically-shaped
+/// per-operation enums.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TakeResult {
-    Success,
-    Fail,
-}
-
-/// Outcome of materialising an object into the player's inventory from the
-/// world-data object templates (`grant`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GrantResult {
-    Success,
-    Fail,
-}
-
-/// Outcome of removing a carried object from the player's inventory without
-/// placing it anywhere (`discard`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DiscardResult {
-    Success,
-    Fail,
-}
-
-/// Outcome of moving an item from the player's inventory into the room.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DropResult {
-    Success,
-    Fail,
-}
-
-/// Outcome of changing the player's current room.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MoveResult {
+pub enum Outcome {
     Success,
     Fail,
 }

@@ -1,5 +1,0 @@
-- verb: use
-  item: iron-key
-  effect:
-    - grant: rusty-nail
-    - discard: rusty-nail

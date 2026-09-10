@@ -17,7 +17,7 @@ mod common;
 
 use core::{Direction, Event, RoomId, TriggerData, TriggerId, WorldData, WorldDataError};
 
-use common::{engine_with_triggers as engine_with, world_with_triggers as world_with};
+use common::{engine_with_triggers as engine_with, merge_yaml, world_with_triggers as world_with};
 
 mod parse {
     use core::{DataCondition, DataEffect};
@@ -25,8 +25,20 @@ mod parse {
     use super::*;
 
     #[test]
-    fn loads_triggers_from_the_globals_file() {
-        let world = world_with(include_str!("fixtures/triggers/parse_bundle.yaml"));
+    fn loads_triggers_from_the_world_data() {
+        let world = world_with(
+            r"- id: guard-alert
+  condition:
+    - room: study
+    - flag: alarm-armed
+  effect:
+    - emit: guard-alert
+    - set_flag: guard-alerted
+- id: door-sensor
+  condition: []
+  effect:
+    - emit: sensor-tick",
+        );
         assert_eq!(
             world.triggers,
             vec![
@@ -67,25 +79,34 @@ mod parse {
 
     #[test]
     fn trigger_condition_referencing_an_unknown_room_is_a_validation_error() {
-        let result = world_with_result(include_str!("fixtures/triggers/unknown_room.yaml"));
+        let result = world_with_result(
+            r"- id: bad-trigger
+  condition:
+    - room: nonexistent-room
+  effect:
+    - emit: never",
+        );
         assert!(matches!(result, Err(WorldDataError::Validation(_))));
     }
 
     #[test]
     fn duplicate_trigger_ids_are_a_validation_error() {
-        let result = world_with_result(include_str!("fixtures/triggers/duplicate_ids.yaml"));
+        let result = world_with_result(
+            r"- id: dup
+  condition: []
+  effect:
+    - emit: first
+- id: dup
+  condition: []
+  effect:
+    - emit: second",
+        );
         assert!(matches!(result, Err(WorldDataError::Validation(_))));
     }
 
     fn world_with_result(triggers: &str) -> Result<WorldData, WorldDataError> {
-        let globals_yaml = format!("triggers:\n{triggers}");
-        WorldData::from_yaml(
-            &globals_yaml,
-            common::KEYED_ITEMS_YAML,
-            common::KEYED_ROOMS_YAML,
-            "{}",
-            "{}",
-        )
+        let triggers_yaml = format!("triggers:\n{triggers}");
+        WorldData::from_yaml(&merge_yaml(&[common::KEYED_WORLD_YAML, &triggers_yaml]))
     }
 }
 
@@ -94,7 +115,13 @@ mod dispatch {
 
     #[test]
     fn room_entry_trigger_fires_once_on_entering_the_room() {
-        let mut engine = engine_with(include_str!("fixtures/triggers/room_entry_once.yaml"));
+        let mut engine = engine_with(
+            r"- id: enter-study-once
+  condition:
+    - room: study
+  effect:
+    - emit: study-entered",
+        );
 
         // Walking into the corridor does not satisfy `room: study`.
         assert_eq!(
@@ -135,7 +162,13 @@ mod dispatch {
 
     #[test]
     fn trigger_fires_off_any_action_not_just_a_specific_verb() {
-        let mut engine = engine_with(include_str!("fixtures/triggers/flag_transition.yaml"));
+        let mut engine = engine_with(
+            r"- id: ac-off-alert
+  condition:
+    - flag: ac-off
+  effect:
+    - emit: fan-still",
+        );
 
         // The flag is unset: a `Look` action (never routed through
         // `Interaction` dispatch) still checks triggers, and none fire.
@@ -162,7 +195,18 @@ mod dispatch {
 
     #[test]
     fn all_triggers_ready_in_the_same_pass_fire_in_declaration_order() {
-        let mut engine = engine_with(include_str!("fixtures/triggers/two_ready_same_turn.yaml"));
+        let mut engine = engine_with(
+            r"- id: first-in-study
+  condition:
+    - room: study
+  effect:
+    - emit: first-beat
+- id: second-in-study
+  condition:
+    - room: study
+  effect:
+    - emit: second-beat",
+        );
         engine.handle_input("go north");
         assert_eq!(
             engine.handle_input("go east"),
@@ -180,7 +224,18 @@ mod dispatch {
 
     #[test]
     fn a_trigger_firing_does_not_cascade_into_a_newly_ready_trigger_the_same_turn() {
-        let mut engine = engine_with(include_str!("fixtures/triggers/cascade_single_pass.yaml"));
+        let mut engine = engine_with(
+            r"- id: enter-sets-flag
+  condition:
+    - room: study
+  effect:
+    - set_flag: chain-flag
+- id: depends-on-chain-flag
+  condition:
+    - flag: chain-flag
+  effect:
+    - emit: chain-fired",
+        );
         engine.handle_input("go north");
 
         // Entering the study fires `enter-sets-flag`, which sets

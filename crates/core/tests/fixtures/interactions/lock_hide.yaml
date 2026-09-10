@@ -1,9 +1,0 @@
-- verb: use
-  item: iron-key
-  target:
-    kind: scene
-  condition:
-    - is_door: true
-  effect:
-    - lock_exit: east
-    - hide_exit: east

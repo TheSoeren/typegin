@@ -5,10 +5,7 @@
 mod common;
 
 use common::single_room_engine;
-use core::{
-    DropResult, GameEngine, MoveResult, ObjectId, ObjectResolution, RoomId, TakeResult,
-    world::WorldState,
-};
+use core::{GameEngine, ObjectId, ObjectResolution, Outcome, RoomId, world::WorldState};
 
 /// A fresh engine over the single-room world, whose room `cellar` holds the
 /// sword, iron key, locked chest and brass key visibly, and the stale bread
@@ -104,7 +101,7 @@ mod worlds_inventory {
         let result = engine
             .world_mut()
             .player_take_object(&ObjectId::new("iron-key"));
-        assert_eq!(result, TakeResult::Success);
+        assert_eq!(result, Outcome::Success);
         assert!(!room_has_item(engine.world(), &ObjectId::new("iron-key")));
         assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
@@ -117,7 +114,7 @@ mod worlds_inventory {
         let result = engine
             .world_mut()
             .player_take_object(&ObjectId::new("stale-bread"));
-        assert_eq!(result, TakeResult::Fail);
+        assert_eq!(result, Outcome::Fail);
         assert!(!room_has_item(
             engine.world(),
             &ObjectId::new("stale-bread")
@@ -137,7 +134,7 @@ mod worlds_inventory {
         let result = engine
             .world_mut()
             .player_drop_object(&ObjectId::new("iron-key"));
-        assert_eq!(result, DropResult::Success);
+        assert_eq!(result, Outcome::Success);
         assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
         assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
@@ -148,7 +145,7 @@ mod worlds_inventory {
         let result = engine
             .world_mut()
             .player_drop_object(&ObjectId::new("iron-key"));
-        assert_eq!(result, DropResult::Fail);
+        assert_eq!(result, Outcome::Fail);
         assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 
@@ -158,7 +155,7 @@ mod worlds_inventory {
         // The single-room world has no other room.
         assert_eq!(
             engine.world_mut().move_to_room(RoomId::new("nonexistent")),
-            MoveResult::Fail
+            Outcome::Fail
         );
         assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
     }

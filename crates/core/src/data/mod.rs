@@ -1,5 +1,4 @@
 pub mod door_data;
-pub mod global_data;
 pub mod interactions_data;
 pub mod npc_data;
 pub mod object_data;
@@ -12,13 +11,12 @@ use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::data::global_data::GlobalFile;
-use crate::data::interactions_data::{InteractionData, InteractionsFile};
-use crate::data::npc_data::{NpcData, NpcsFile};
-use crate::data::object_data::{ObjectData, ObjectsFile};
-use crate::data::room_data::{RoomData, RoomsFile};
-use crate::model::object_id::ObjectId;
-use crate::model::room_id::RoomId;
+use crate::data::interactions_data::InteractionData;
+use crate::data::npc_data::NpcData;
+use crate::data::object_data::ObjectData;
+use crate::data::room_data::RoomData;
+use crate::keys::object_id::ObjectId;
+use crate::keys::room_id::RoomId;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(untagged)]
@@ -71,26 +69,18 @@ impl WorldData {
             "room key `{key}` declared more than once",
         )?;
 
+        if self.rooms.is_empty() {
+            return Err(WorldDataError::Validation(
+                "world data must declare at least one room".to_string(),
+            ));
+        }
+
         for room in &self.rooms {
-            for id in room.visible_objects.iter().chain(&room.hidden_objects) {
-                self.find_object(id).ok_or_else(|| {
-                    WorldDataError::Validation(format!(
-                        "room `{}` references unknown object key `{}`",
-                        room.id, id
-                    ))
-                })?;
-            }
+            room.validate_references(self)?;
         }
 
         for object in &self.objects {
-            if let Some(door) = &object.door {
-                self.find_room(&RoomId::new(&door.to)).ok_or_else(|| {
-                    WorldDataError::Validation(format!(
-                        "door `{}` references unknown room key `{}`",
-                        object.id, door.to
-                    ))
-                })?;
-            }
+            object.validate_references(self)?;
         }
 
         for interaction in &self.interactions {
@@ -163,66 +153,60 @@ impl From<serde_yaml_ng::Error> for WorldDataError {
     }
 }
 
+/// The top-level shape of a world-data YAML document: every section as a
+/// top-level key in one document. `objects` and `rooms` are required; the
+/// rest default to empty when their key is omitted.
+///
+/// A consumer authoring content across multiple files (as the shipped
+/// `data/*.yaml` files do) concatenates them into one string before calling
+/// [`WorldData::from_yaml`] — each file already contributes disjoint
+/// top-level keys, so concatenation is a lossless merge with no deep-merge
+/// logic required. The core crate only ever sees one document; it has no
+/// opinion on how many files a consumer's content is split across.
+#[derive(Debug, Deserialize)]
+struct WorldDataFile {
+    #[serde(default)]
+    flags: Vec<String>,
+    objects: Vec<ObjectData>,
+    rooms: Vec<RoomData>,
+    #[serde(default)]
+    interactions: Vec<InteractionData>,
+    #[serde(default)]
+    npcs: Vec<NpcData>,
+}
+
 impl WorldData {
-    /// Build the world data from raw YAML strings: the items file (`objects`),
-    /// the rooms file (`rooms`) and the interactions file (`interactions`).
+    /// Build the world data from a single YAML document (see
+    /// [`WorldDataFile`] for its shape).
     ///
     /// # Errors
     ///
-    /// Returns a [`WorldDataError`] if any YAML string is malformed or does
-    /// not match the expected item/room/interaction shape, or if the world
-    /// data is structurally invalid (duplicate keys, unknown key references).
-    pub fn from_yaml(
-        globals_yaml: &str,
-        items_yaml: &str,
-        rooms_yaml: &str,
-        interactions_yaml: &str,
-        npcs_yaml: &str,
-    ) -> Result<Self, WorldDataError> {
-        let globals: GlobalFile = serde_yaml_ng::from_str(globals_yaml)?;
-        let objects: ObjectsFile = serde_yaml_ng::from_str(items_yaml)?;
-        let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
-        let interactions: InteractionsFile = serde_yaml_ng::from_str(interactions_yaml)?;
-        let npcs: NpcsFile = serde_yaml_ng::from_str(npcs_yaml)?;
+    /// Returns a [`WorldDataError`] if the YAML is malformed or does not
+    /// match the expected shape, or if the world data is structurally
+    /// invalid (duplicate keys, unknown key references).
+    pub fn from_yaml(yaml: &str) -> Result<Self, WorldDataError> {
+        let file: WorldDataFile = serde_yaml_ng::from_str(yaml)?;
 
         let data = WorldData {
-            flags: globals.flags,
-            objects: objects.objects,
-            rooms: rooms.rooms,
-            interactions: interactions.interactions,
-            npcs: npcs.npcs,
+            flags: file.flags,
+            objects: file.objects,
+            rooms: file.rooms,
+            interactions: file.interactions,
+            npcs: file.npcs,
         };
         data.validate()?;
 
         Ok(data)
     }
 
-    /// Load world data from the given items, rooms and interactions YAML
-    /// files on disk.
+    /// Load world data from a single YAML file on disk.
     ///
     /// # Errors
     ///
-    /// Returns a [`WorldDataError`] if any file cannot be read, or if any
-    /// file's contents fail to parse as world data.
-    pub fn load(
-        globals_path: impl AsRef<Path>,
-        items_path: impl AsRef<Path>,
-        rooms_path: impl AsRef<Path>,
-        interactions_path: impl AsRef<Path>,
-        npcs_path: impl AsRef<Path>,
-    ) -> Result<Self, WorldDataError> {
-        let globals_yaml = std::fs::read_to_string(globals_path)?;
-        let items_yaml = std::fs::read_to_string(items_path)?;
-        let rooms_yaml = std::fs::read_to_string(rooms_path)?;
-        let interactions_yaml = std::fs::read_to_string(interactions_path)?;
-        let npcs_yaml = std::fs::read_to_string(npcs_path)?;
-
-        Self::from_yaml(
-            &globals_yaml,
-            &items_yaml,
-            &rooms_yaml,
-            &interactions_yaml,
-            &npcs_yaml,
-        )
+    /// Returns a [`WorldDataError`] if the file cannot be read, or if its
+    /// contents fail to parse as world data.
+    pub fn load(path: impl AsRef<Path>) -> Result<Self, WorldDataError> {
+        let yaml = std::fs::read_to_string(path)?;
+        Self::from_yaml(&yaml)
     }
 }

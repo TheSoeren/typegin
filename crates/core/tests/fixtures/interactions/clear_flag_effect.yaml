@@ -1,8 +1,0 @@
-- verb: examine
-  target:
-    object: iron-key
-  condition:
-    - flag: temp-flag
-  effect:
-    - clear_flag: temp-flag
-    - emit: flag-cleared

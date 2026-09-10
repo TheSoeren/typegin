@@ -6,28 +6,24 @@
 
 use core::{Direction, Event, GameEngine, RoomId, Rules, WorldData};
 
+/// Concatenates YAML sections into the single document
+/// [`WorldData::from_yaml`] parses. Each section already contributes its own
+/// disjoint top-level key (`objects:`, `rooms:`, `interactions:`, ...), so
+/// concatenation is a lossless merge.
+pub(crate) fn merge_yaml(sections: &[&str]) -> String {
+    sections.join("\n")
+}
+
 /// Loads the test-only multi-room world from `crates/core/tests/fixtures/`.
 pub(crate) fn multi_room_world_data() -> WorldData {
-    WorldData::from_yaml(
-        "{}",
-        include_str!("../fixtures/items_multi_room.yaml"),
-        include_str!("../fixtures/rooms_multi_room.yaml"),
-        include_str!("../fixtures/interactions.yaml"),
-        "{}",
-    )
-    .expect("parse multi-room test world data")
+    WorldData::from_yaml(include_str!("../fixtures/multi_room_world.yaml"))
+        .expect("parse multi-room test world data")
 }
 
 /// Loads the original single-room world from `crates/core/tests/fixtures/`.
 pub(crate) fn test_world_data() -> WorldData {
-    WorldData::from_yaml(
-        "{}",
-        include_str!("../fixtures/items.yaml"),
-        include_str!("../fixtures/rooms.yaml"),
-        "{}",
-        "{}",
-    )
-    .expect("parse single-room test world data")
+    WorldData::from_yaml(include_str!("../fixtures/single_room_world.yaml"))
+        .expect("parse single-room test world data")
 }
 
 /// Opens a multi-room engine with the given custom rules.
@@ -47,18 +43,16 @@ pub(crate) fn single_room_engine() -> GameEngine {
 
 // ---------------------------------------------------------------------------
 // "Keyed" fixture: two rooms (`cellar` / `study`) connected by a `corridor`,
-// used by the authored-interactions, flags and NPC suites. Shared here so
-// each suite doesn't redeclare its own copy of the same loader functions.
+// used by the authored-interactions, flags, NPC and trigger suites. Shared
+// here so each suite doesn't redeclare its own copy of the same loader
+// functions.
 // ---------------------------------------------------------------------------
 
-pub(crate) const KEYED_ITEMS_YAML: &str = include_str!("../fixtures/data_interactions_items.yaml");
-pub(crate) const KEYED_ROOMS_YAML: &str = include_str!("../fixtures/data_interactions_rooms.yaml");
-pub(crate) const KEYED_GLOBALS_YAML: &str = "{}";
+pub(crate) const KEYED_WORLD_YAML: &str = include_str!("../fixtures/keyed_world.yaml");
 
-/// The base keyed world: no interactions, no npcs, no flags.
+/// The base keyed world: no interactions, no npcs, no flags, no triggers.
 pub(crate) fn base_world() -> WorldData {
-    WorldData::from_yaml("{}", KEYED_ITEMS_YAML, KEYED_ROOMS_YAML, "{}", "{}")
-        .expect("keyed fixture parses")
+    WorldData::from_yaml(KEYED_WORLD_YAML).expect("keyed fixture parses")
 }
 
 /// The base keyed world with an initial flag set.
@@ -70,18 +64,11 @@ pub(crate) fn world_data_with_initial_flags(flags: Vec<&str>) -> WorldData {
 
 /// The keyed world with an authored interaction snippet. `interactions` is a
 /// standalone YAML sequence (as stored under `tests/fixtures/interactions/`),
-/// appended under an `interactions:` key to mirror the separate interactions
-/// file.
+/// wrapped under an `interactions:` key to become its own section.
 pub(crate) fn world_with_interactions(interactions: &str) -> WorldData {
     let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(
-        "{}",
-        KEYED_ITEMS_YAML,
-        KEYED_ROOMS_YAML,
-        &interactions_yaml,
-        "{}",
-    )
-    .expect("keyed fixture with authored interactions parses")
+    WorldData::from_yaml(&merge_yaml(&[KEYED_WORLD_YAML, &interactions_yaml]))
+        .expect("keyed fixture with authored interactions parses")
 }
 
 /// Opens the keyed world with an authored interaction snippet under the stock
@@ -90,9 +77,10 @@ pub(crate) fn engine_with_interactions(interactions: &str) -> GameEngine {
     GameEngine::get(&world_with_interactions(interactions))
 }
 
-/// The keyed world with an authored npcs snippet.
+/// The keyed world with an authored npcs snippet (already a full `npcs:`
+/// section, as stored under `tests/fixtures/npcs_*.yaml`).
 pub(crate) fn world_with_npcs(npcs: &str) -> WorldData {
-    WorldData::from_yaml("{}", KEYED_ITEMS_YAML, KEYED_ROOMS_YAML, "{}", npcs)
+    WorldData::from_yaml(&merge_yaml(&[KEYED_WORLD_YAML, npcs]))
         .expect("keyed fixture with npcs parses")
 }
 
@@ -100,14 +88,8 @@ pub(crate) fn world_with_npcs(npcs: &str) -> WorldData {
 /// interactions snippet.
 pub(crate) fn world_with_npcs_and_interactions(npcs: &str, interactions: &str) -> WorldData {
     let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(
-        "{}",
-        KEYED_ITEMS_YAML,
-        KEYED_ROOMS_YAML,
-        &interactions_yaml,
-        npcs,
-    )
-    .expect("keyed fixture with npcs and interactions parses")
+    WorldData::from_yaml(&merge_yaml(&[KEYED_WORLD_YAML, npcs, &interactions_yaml]))
+        .expect("keyed fixture with npcs and interactions parses")
 }
 
 /// Opens the keyed world with an authored npcs snippet under the stock rules.
@@ -117,18 +99,12 @@ pub(crate) fn engine_with_npcs(npcs: &str) -> GameEngine {
 
 /// The keyed world with an authored triggers snippet. `triggers` is a
 /// standalone YAML sequence (as stored under `tests/fixtures/triggers/`),
-/// appended under a `triggers:` key inside the globals file, mirroring how
-/// `world_with_interactions` appends under an `interactions:` key.
+/// wrapped under a `triggers:` key to become its own section, mirroring how
+/// `world_with_interactions` wraps under an `interactions:` key.
 pub(crate) fn world_with_triggers(triggers: &str) -> WorldData {
-    let globals_yaml = format!("triggers:\n{triggers}");
-    WorldData::from_yaml(
-        &globals_yaml,
-        KEYED_ITEMS_YAML,
-        KEYED_ROOMS_YAML,
-        "{}",
-        "{}",
-    )
-    .expect("keyed fixture with triggers parses")
+    let triggers_yaml = format!("triggers:\n{triggers}");
+    WorldData::from_yaml(&merge_yaml(&[KEYED_WORLD_YAML, &triggers_yaml]))
+        .expect("keyed fixture with triggers parses")
 }
 
 /// Opens the keyed world with an authored triggers snippet under the stock

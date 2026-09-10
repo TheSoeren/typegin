@@ -4,10 +4,10 @@ use crate::data::{self, object_data};
 use crate::input::direction::Direction;
 use crate::world::room::RoomId;
 
-pub use crate::model::object_id::ObjectId;
+pub use crate::keys::object_id::ObjectId;
 
 /// Outcome of resolving a player-typed noun against the objects in scope.
-pub type ObjectResolution = crate::model::Resolution<ObjectId>;
+pub type ObjectResolution = crate::keys::Resolution<ObjectId>;
 
 /// Outcome of resolving a player-typed noun against a use-with target
 /// (object or NPC). Defined next to [`Target`](crate::interaction::Target)

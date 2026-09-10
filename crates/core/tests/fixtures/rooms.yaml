@@ -1,5 +1,0 @@
-rooms:
-  - key: cellar
-    name: The Damp Cellar
-    visible_objects: [glowing-sword, iron-key, locked-chest, brass-key]
-    hidden_objects: [stale-bread]

@@ -211,8 +211,9 @@ mod interactions_for {
         engine.handle_input("go north");
         engine.handle_input("go east");
 
-        // While locked: the interaction is listed, and the dispatcher runs it
-        // (custom unlock event) instead of the stock UnlockedExit.
+        // While locked: both the item-specific `use` interaction and the
+        // item-agnostic `examine` interaction (no `item` field, so it matches
+        // any carried item) are listed for this target.
         assert_eq!(
             engine
                 .interactions_for(
@@ -220,7 +221,7 @@ mod interactions_for {
                     Some(Target::Object(ObjectId::new("oak-door")))
                 )
                 .len(),
-            1
+            2
         );
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
@@ -235,16 +236,15 @@ mod interactions_for {
         );
         assert!(!engine.world().is_exit_locked(Direction::East));
 
-        // Now unlocked: the condition no longer holds, so the query drops it
-        // and the dispatcher falls through to the CannotUse spine.
-        assert!(
-            engine
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
-                )
-                .is_empty()
+        // Now unlocked: the `use` interaction's condition no longer holds, so
+        // the query drops it — but the unconditional `examine` interaction
+        // still matches.
+        let after_unlock = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
         );
+        assert_eq!(after_unlock.len(), 1);
+        assert_eq!(after_unlock[0].verb(), Verb::Examine);
     }
 
     #[test]
@@ -254,24 +254,22 @@ mod interactions_for {
         engine.handle_input("go north");
         engine.handle_input("go east");
 
-        assert_eq!(
-            engine
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
-                )
-                .len(),
-            1
+        let with_iron_key = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
         );
-        // Iron key in hand but querying with a different carried object.
-        assert!(
-            engine
-                .interactions_for(
-                    Some(ObjectId::new("brass-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
-                )
-                .is_empty()
+        assert_eq!(with_iron_key.len(), 2);
+        assert!(with_iron_key.iter().any(|i| i.verb() == Verb::Use));
+
+        // Iron key in hand but querying with a different carried object: the
+        // item-specific `use` interaction no longer matches, but the
+        // item-agnostic `examine` interaction (no `item` field) still does.
+        let with_brass_key = engine.interactions_for(
+            Some(ObjectId::new("brass-key")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
         );
+        assert_eq!(with_brass_key.len(), 1);
+        assert_eq!(with_brass_key[0].verb(), Verb::Examine);
     }
 }
 
@@ -429,11 +427,14 @@ mod non_use_verbs {
         assert_eq!(drop.len(), 1);
         assert_eq!(drop[0].verb(), Verb::Drop);
 
+        // This target also carries the item-agnostic `examine` interaction
+        // from the fixture, so both are reported for any carried item.
         let use_it = engine.interactions_for(
             Some(ObjectId::new("iron-key")),
             Some(Target::Object(ObjectId::new("oak-door"))),
         );
-        assert_eq!(use_it.len(), 1);
+        assert_eq!(use_it.len(), 2);
         assert_eq!(use_it[0].verb(), Verb::Use);
+        assert_eq!(use_it[1].verb(), Verb::Examine);
     }
 }

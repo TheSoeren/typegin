@@ -6,7 +6,7 @@
 mod common;
 
 use common::{setup_engine, setup_engine_with_rules};
-use core::{BasicRules, Direction, DropResult, Event, ObjectId, ObjectResolution, RoomId};
+use core::{BasicRules, Direction, Event, ObjectId, ObjectResolution, Outcome, RoomId};
 
 fn player_has_item(world: &core::world::WorldState, id: &ObjectId) -> bool {
     world.get_object_from_player(id) != ObjectResolution::NotFound
@@ -55,7 +55,7 @@ mod world_state_drop {
         let moved = engine
             .world_mut()
             .player_drop_object(&ObjectId::new("iron-key"));
-        assert_eq!(moved, DropResult::Success);
+        assert_eq!(moved, Outcome::Success);
         assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
         assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
@@ -66,7 +66,7 @@ mod world_state_drop {
         let moved = engine
             .world_mut()
             .player_drop_object(&ObjectId::new("nonexistent"));
-        assert_eq!(moved, DropResult::Fail);
+        assert_eq!(moved, Outcome::Fail);
     }
 
     #[test]
@@ -75,7 +75,7 @@ mod world_state_drop {
         let moved = engine
             .world_mut()
             .player_drop_object(&ObjectId::new("iron-key")); // not holding it
-        assert_eq!(moved, DropResult::Fail);
+        assert_eq!(moved, Outcome::Fail);
         assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
     }
 }

@@ -1,5 +1,0 @@
-- id: enter-study-once
-  condition:
-    - room: study
-  effect:
-    - emit: study-entered

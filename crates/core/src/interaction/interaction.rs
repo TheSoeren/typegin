@@ -127,7 +127,7 @@ impl Interaction {
     pub fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
         let item_ok = match &self.item {
             Some(id) => context.item.as_ref() == Some(id),
-            None => context.item.is_none(),
+            None => true,
         };
         item_ok
             && context.verb.is_none_or(|v| self.verb() == v)
@@ -156,7 +156,7 @@ mod tests {
     use crate::data::npc_data::{DialogueData, NpcData};
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
-    use crate::model::room_id::RoomId;
+    use crate::keys::room_id::RoomId;
     use std::collections::HashMap;
 
     /// A one-room world containing a single `Item` object `sword`, and
@@ -169,7 +169,7 @@ mod tests {
                 aliases: Vec::new(),
                 room: RoomId::new("room"),
                 dialogue: DialogueData {
-                    root: "start".to_string(),
+                    root: crate::keys::dialogue_node_id::DialogueNodeId::new("start"),
                     nodes: HashMap::new(),
                 },
             }]
@@ -241,12 +241,14 @@ mod tests {
     }
 
     #[test]
-    fn matches_none_item_requires_context_to_carry_no_item() {
+    fn matches_none_item_matches_any_carried_item() {
         let interaction =
             Interaction::build(Verb::Take, None, TargetFilter::Any, None, no_op_effect());
         let world = world_with(false);
         let with_item = ActionContext::new(Some(Verb::Take), Some(ObjectId::new("sword")), None);
-        assert!(!interaction.matches(&world, &with_item));
+        let no_item = ActionContext::new(Some(Verb::Take), None, None);
+        assert!(interaction.matches(&world, &with_item));
+        assert!(interaction.matches(&world, &no_item));
     }
 
     #[test]

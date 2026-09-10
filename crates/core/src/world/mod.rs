@@ -14,8 +14,8 @@ use crate::data::interactions_data::InteractionData;
 use crate::data::object_data;
 use crate::input::action;
 use crate::input::direction;
-use crate::model::dialogue_node_id::DialogueNodeId;
-use crate::model::object_id::ObjectId;
+use crate::keys::dialogue_node_id::DialogueNodeId;
+use crate::keys::object_id::ObjectId;
 use crate::world::object::TargetResolution;
 use crate::world::object::{ObjectInfo, ObjectResolution};
 
@@ -84,14 +84,14 @@ impl WorldState {
     /// Change the current room to `room_id`, if it is known to the world.
     ///
     /// Moving rooms ends any active conversation.
-    pub fn move_to_room(&mut self, room_id: room::RoomId) -> action::MoveResult {
+    pub fn move_to_room(&mut self, room_id: room::RoomId) -> action::Outcome {
         if self.rooms.contains_key(&room_id) {
             self.current_room_id = room_id;
             self.clear_all_dialogue();
-            action::MoveResult::Success
+            action::Outcome::Success
         } else {
             warn!("Tried to move to unknown room (id: {room_id})!");
-            action::MoveResult::Fail
+            action::Outcome::Fail
         }
     }
 
@@ -226,48 +226,48 @@ impl WorldState {
 
 /// Object transfer management
 impl WorldState {
-    pub fn player_take_object(&mut self, id: &ObjectId) -> action::TakeResult {
+    pub fn player_take_object(&mut self, id: &ObjectId) -> action::Outcome {
         let removed = self.remove_object_from_room(id);
         match removed {
             Some(object) => {
                 self.player.add_object(object);
-                action::TakeResult::Success
+                action::Outcome::Success
             }
-            None => action::TakeResult::Fail,
+            None => action::Outcome::Fail,
         }
     }
 
     /// Materialise the object with `id` into the player's inventory from the
     /// world-data object templates, regardless of where (if anywhere) the
     /// object is placed. A no-op if the player already holds the object.
-    pub fn player_grant_object(&mut self, id: &ObjectId) -> action::GrantResult {
+    pub fn player_grant_object(&mut self, id: &ObjectId) -> action::Outcome {
         if self.player_holds(id) {
-            return action::GrantResult::Fail;
+            return action::Outcome::Fail;
         }
         let Some(template) = self.object_templates.get(id) else {
-            return action::GrantResult::Fail;
+            return action::Outcome::Fail;
         };
         self.player.add_object(template.clone());
-        action::GrantResult::Success
+        action::Outcome::Success
     }
 
-    pub fn player_drop_object(&mut self, id: &ObjectId) -> action::DropResult {
+    pub fn player_drop_object(&mut self, id: &ObjectId) -> action::Outcome {
         let removed = self.remove_object_from_player(id);
         match removed {
             Some(object) => {
                 self.current_room_mut().add_object(object);
-                action::DropResult::Success
+                action::Outcome::Success
             }
-            None => action::DropResult::Fail,
+            None => action::Outcome::Fail,
         }
     }
 
     /// Remove the carried object with `id` from the player's inventory without
     /// placing it in the room (consumed). A no-op if the object is not carried.
-    pub fn player_discard_object(&mut self, id: &ObjectId) -> action::DiscardResult {
+    pub fn player_discard_object(&mut self, id: &ObjectId) -> action::Outcome {
         match self.remove_object_from_player(id) {
-            Some(_) => action::DiscardResult::Success,
-            None => action::DiscardResult::Fail,
+            Some(_) => action::Outcome::Success,
+            None => action::Outcome::Fail,
         }
     }
 }

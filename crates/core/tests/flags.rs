@@ -52,10 +52,53 @@ mod common;
 use core::{DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, Target, WorldData};
 
 use common::{
-    KEYED_GLOBALS_YAML as GLOBALS_YAML, KEYED_ITEMS_YAML as ITEMS_YAML,
-    KEYED_ROOMS_YAML as ROOMS_YAML, base_world, engine_with_interactions as engine_with,
-    enter_study, world_data_with_initial_flags, world_with_interactions as world_with,
+    KEYED_WORLD_YAML, base_world, engine_with_interactions as engine_with, enter_study, merge_yaml,
+    world_data_with_initial_flags, world_with_interactions as world_with,
 };
+
+const FLAG_CONDITION_YAML: &str = r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - flag: quest-started
+  effect:
+    - emit: quest-item-recognized";
+
+const SET_FLAG_EFFECT_YAML: &str = r"- verb: use
+  item: iron-key
+  target:
+    kind: scene
+  condition:
+    - is_door: true
+  effect:
+    - set_flag: door-unlocked-flag
+    - emit: door-handled";
+
+const CLEAR_FLAG_EFFECT_YAML: &str = r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - flag: temp-flag
+  effect:
+    - clear_flag: temp-flag
+    - emit: flag-cleared";
+
+const FLAG_WITH_NOT_YAML: &str = r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - not:
+        flag: door-seen
+  effect:
+    - emit: first-look";
+
+const FLAG_QUERY_YAML: &str = r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - flag: query-gate
+  effect:
+    - emit: query-matched";
 
 // ---------------------------------------------------------------------------
 // WorldState API
@@ -104,7 +147,7 @@ mod parse {
 
     #[test]
     fn flag_condition_parses() {
-        let world = world_with(include_str!("fixtures/interactions/flag_condition.yaml"));
+        let world = world_with(FLAG_CONDITION_YAML);
         let interaction = &world.interactions[0];
         assert_eq!(
             interaction.condition,
@@ -116,7 +159,7 @@ mod parse {
 
     #[test]
     fn set_flag_effect_parses() {
-        let world = world_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
+        let world = world_with(SET_FLAG_EFFECT_YAML);
         let interaction = &world.interactions[0];
         assert!(interaction.effect.contains(&DataEffect::SetFlag {
             flag: "door-unlocked-flag".to_string()
@@ -125,7 +168,7 @@ mod parse {
 
     #[test]
     fn clear_flag_effect_parses() {
-        let world = world_with(include_str!("fixtures/interactions/clear_flag_effect.yaml"));
+        let world = world_with(CLEAR_FLAG_EFFECT_YAML);
         let interaction = &world.interactions[0];
         assert!(interaction.effect.contains(&DataEffect::ClearFlag {
             flag: "temp-flag".to_string()
@@ -134,7 +177,7 @@ mod parse {
 
     #[test]
     fn flag_in_not_condition_parses() {
-        let world = world_with(include_str!("fixtures/interactions/flag_with_not.yaml"));
+        let world = world_with(FLAG_WITH_NOT_YAML);
         let interaction = &world.interactions[0];
         assert_eq!(
             interaction.condition,
@@ -163,7 +206,7 @@ mod dispatch {
 
     #[test]
     fn flag_condition_blocks_when_flag_not_set() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_condition.yaml"));
+        let mut engine = engine_with(FLAG_CONDITION_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -183,7 +226,7 @@ mod dispatch {
 
     #[test]
     fn flag_condition_allows_when_flag_is_set() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_condition.yaml"));
+        let mut engine = engine_with(FLAG_CONDITION_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -202,7 +245,7 @@ mod dispatch {
 
     #[test]
     fn set_flag_effect_sets_the_flag() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
+        let mut engine = engine_with(SET_FLAG_EFFECT_YAML);
         assert!(!engine.world().has_flag("door-unlocked-flag"));
         // Use iron key on oak door (a scene/door object) to trigger the effect.
         // Walk to study first where the oak door lives.
@@ -230,7 +273,7 @@ mod dispatch {
 
     #[test]
     fn clear_flag_effect_clears_the_flag() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/clear_flag_effect.yaml"));
+        let mut engine = engine_with(CLEAR_FLAG_EFFECT_YAML);
         engine.world_mut().set_flag("temp-flag");
         assert_eq!(
             engine.handle_input("take iron key"),
@@ -256,7 +299,7 @@ mod dispatch {
 
     #[test]
     fn not_flag_negates() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_with_not.yaml"));
+        let mut engine = engine_with(FLAG_WITH_NOT_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -284,7 +327,16 @@ mod dispatch {
 
     #[test]
     fn multiple_flags_must_all_be_set() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/multiple_flags.yaml"));
+        let mut engine = engine_with(
+            r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - flag: step-one
+    - flag: step-two
+  effect:
+    - emit: both-steps-done",
+        );
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -321,7 +373,16 @@ mod dispatch {
 
     #[test]
     fn flag_combined_with_room_condition() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_and_room.yaml"));
+        let mut engine = engine_with(
+            r"- verb: examine
+  target:
+    object: iron-key
+  condition:
+    - flag: cellar-visited
+    - room: study
+  effect:
+    - emit: studied-key-in-study",
+        );
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -350,9 +411,15 @@ mod dispatch {
 
     #[test]
     fn set_and_clear_in_same_interaction_run_in_order() {
-        let mut engine = engine_with(include_str!(
-            "fixtures/interactions/set_and_clear_same.yaml"
-        ));
+        let mut engine = engine_with(
+            r"- verb: examine
+  target:
+    object: iron-key
+  effect:
+    - set_flag: phase-two
+    - clear_flag: phase-one
+    - emit: transitioned",
+        );
         engine.world_mut().set_flag("phase-one");
         assert!(!engine.world().has_flag("phase-two"));
         assert_eq!(
@@ -382,7 +449,7 @@ mod dispatch {
 
     #[test]
     fn flag_effects_emit_events() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/set_flag_effect.yaml"));
+        let mut engine = engine_with(SET_FLAG_EFFECT_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -408,9 +475,25 @@ mod dispatch {
 
     #[test]
     fn flag_gated_interaction_overrides_stock_use() {
-        let mut engine = engine_with(include_str!(
-            "fixtures/interactions/flag_overrides_stock.yaml"
-        ));
+        let mut engine = engine_with(
+            r"- verb: use
+  item: iron-key
+  target:
+    object: oak-door
+  condition:
+    - not:
+        flag: override-stock
+  effect:
+    - emit: no-flag-set
+- verb: use
+  item: iron-key
+  target:
+    object: oak-door
+  condition:
+    - flag: override-stock
+  effect:
+    - unlock_exit: east",
+        );
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -449,7 +532,7 @@ mod interactions_for {
 
     #[test]
     fn query_reports_interaction_when_flag_is_set() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_query.yaml"));
+        let mut engine = engine_with(FLAG_QUERY_YAML);
         // Flag not set → query returns nothing
         assert!(
             engine
@@ -468,7 +551,7 @@ mod interactions_for {
 
     #[test]
     fn query_excludes_interaction_when_flag_is_cleared() {
-        let mut engine = engine_with(include_str!("fixtures/interactions/flag_query.yaml"));
+        let mut engine = engine_with(FLAG_QUERY_YAML);
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
@@ -512,16 +595,9 @@ mod initial_flags {
 
     #[test]
     fn initial_flags_are_queryable_by_interactions() {
-        let interactions = include_str!("fixtures/interactions/flag_condition.yaml");
-        let interactions_yaml = format!("interactions:\n{interactions}");
-        let mut data = WorldData::from_yaml(
-            GLOBALS_YAML,
-            ITEMS_YAML,
-            ROOMS_YAML,
-            &interactions_yaml,
-            "{}",
-        )
-        .expect("parses");
+        let interactions_yaml = format!("interactions:\n{FLAG_CONDITION_YAML}");
+        let mut data = WorldData::from_yaml(&merge_yaml(&[KEYED_WORLD_YAML, &interactions_yaml]))
+            .expect("parses");
         data.flags = vec!["quest-started".to_string()];
         let mut engine = GameEngine::get(&data);
         assert_eq!(
