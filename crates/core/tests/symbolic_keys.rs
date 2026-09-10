@@ -2,25 +2,10 @@ mod common;
 
 use core::{Direction, Event, GameEngine, ObjectResolution, RoomId, Verb, WorldData};
 
-const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
-const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
-
-/// The base keyed world (no interactions).
-fn base_world() -> WorldData {
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, "{}", "{}").expect("keyed fixture parses")
-}
-
-/// The keyed world with an authored interaction snippet (same pattern as the
-/// `data_interactions` suite).
-fn world_with(interactions: &str) -> WorldData {
-    let yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, &yaml, "{}")
-        .expect("keyed fixture with interactions parses")
-}
-
-fn engine_with(interactions: &str) -> GameEngine {
-    GameEngine::get(&world_with(interactions))
-}
+use common::{
+    KEYED_ITEMS_YAML as ITEMS_YAML, KEYED_ROOMS_YAML as ROOMS_YAML, base_world,
+    engine_with_interactions as engine_with,
+};
 
 /// Walks into The Study and takes the iron key. Uses key-resolved world state
 /// for assertions (no hardcoded numeric ids).
@@ -123,7 +108,7 @@ mod dispatch {
 
     #[test]
     fn item_and_target_kind_keys_resolve() {
-        let mut engine = engine_with(include_str!("../data/interactions/unlock_and_emit.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/unlock_and_emit.yaml"));
         iron_key_in_study(&mut engine);
         assert!(engine.world().is_exit_locked(Direction::East));
         assert_eq!(
@@ -142,7 +127,7 @@ mod dispatch {
 
     #[test]
     fn room_condition_key_resolves() {
-        let mut in_cellar = engine_with(include_str!("../data/interactions/room_gate.yaml"));
+        let mut in_cellar = engine_with(include_str!("fixtures/interactions/room_gate.yaml"));
         in_cellar.handle_input("take iron key");
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
@@ -155,7 +140,7 @@ mod dispatch {
             }]
         );
 
-        let mut in_study = engine_with(include_str!("../data/interactions/room_gate.yaml"));
+        let mut in_study = engine_with(include_str!("fixtures/interactions/room_gate.yaml"));
         in_study.handle_input("take iron key");
         iron_key_in_study(&mut in_study);
         assert_eq!(
@@ -168,7 +153,7 @@ mod dispatch {
 
     #[test]
     fn effect_object_keys_resolve() {
-        let mut engine = engine_with(include_str!("../data/interactions/reveal_object.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/reveal_object.yaml"));
         iron_key_in_study(&mut engine);
         assert!(engine.world().is_exit_hidden(Direction::North));
         // The effect runs silently (no Examined, no Custom).
@@ -184,7 +169,7 @@ mod dispatch {
     #[test]
     fn drop_effect_with_key_resolves() {
         let mut engine = engine_with(include_str!(
-            "../data/interactions/drop_emits_then_drops.yaml"
+            "fixtures/interactions/drop_emits_then_drops.yaml"
         ));
         engine.handle_input("take iron key");
         engine.handle_input("take brass key");
@@ -239,7 +224,7 @@ mod query {
 
     #[test]
     fn interactions_for_reports_compiled_item_key() {
-        let mut engine = engine_with(include_str!("../data/interactions/unlock_and_emit.yaml"));
+        let mut engine = engine_with(include_str!("fixtures/interactions/unlock_and_emit.yaml"));
         // Carry the brass key too, so "wrong carried object" can be queried.
         engine.handle_input("take brass key");
         iron_key_in_study(&mut engine);

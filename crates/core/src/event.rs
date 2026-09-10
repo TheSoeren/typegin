@@ -15,7 +15,6 @@ use crate::world::object::ObjectId;
 /// the same game logic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// The player typed an unknown command
     UnknownEvent {
         name: String,
     },
@@ -36,7 +35,6 @@ pub enum Event {
     WentExitLocked(Direction),
     WentInvalidDirection(Direction),
 
-    /// A locked exit was unlocked
     UnlockedExit {
         direction: Direction,
     },
@@ -58,7 +56,8 @@ pub enum Event {
     CantTake {
         object: String,
     },
-    /// Granted does not depend on the item being in the current room
+    /// The object was granted into inventory, regardless of where (if
+    /// anywhere) it was placed in the world.
     Granted {
         object_id: ObjectId,
         object: String,
@@ -76,7 +75,7 @@ pub enum Event {
         object_ids: Vec<ObjectId>,
         object: String,
     },
-    /// Discarded does not add the item to the room after removing from inventory
+    /// The object was removed from inventory without being placed anywhere.
     Discarded {
         object_id: ObjectId,
         object: String,
@@ -119,7 +118,6 @@ pub enum Event {
         target: String,
     },
 
-    /// The player examined an object
     Examined {
         target: Target,
         target_name: String,
@@ -132,11 +130,9 @@ pub enum Event {
         target: String,
     },
 
-    /// A global flag was set.
     FlagSet {
         flag: String,
     },
-    /// A global flag was cleared.
     FlagCleared {
         flag: String,
     },
@@ -209,5 +205,66 @@ impl From<&NpcDialogueChoice> for DialogueChoice {
             label: choice.label().to_string(),
             next: choice.next().cloned(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::room_id::RoomId;
+    use crate::world::npc::DialogueGraph;
+    use std::collections::HashMap;
+
+    fn npc_with_node(node_id: &str, text: &str, choices: Vec<NpcDialogueChoice>) -> Npc {
+        let mut dialogue: DialogueGraph = HashMap::new();
+        dialogue.insert(
+            DialogueNodeId::new(node_id),
+            crate::world::npc::DialogueNode {
+                text: text.to_string(),
+                choices,
+            },
+        );
+        Npc {
+            id: NpcId::new("guard"),
+            primary_name: "Guard".to_string(),
+            aliases: Vec::new(),
+            room: RoomId::new("corridor"),
+            root: DialogueNodeId::new(node_id),
+            dialogue,
+        }
+    }
+
+    #[test]
+    fn talked_builds_an_event_for_a_known_node() {
+        let npc = npc_with_node("start", "Halt!", Vec::new());
+        let event = Event::talked(&npc, &DialogueNodeId::new("start")).expect("node exists");
+        assert_eq!(
+            event,
+            Event::Talked {
+                npc_id: NpcId::new("guard"),
+                npc: "Guard".to_string(),
+                node_id: DialogueNodeId::new("start"),
+                text: "Halt!".to_string(),
+                choices: Vec::new(),
+            }
+        );
+    }
+
+    #[test]
+    fn talked_returns_none_for_an_unknown_node() {
+        let npc = npc_with_node("start", "Halt!", Vec::new());
+        assert_eq!(Event::talked(&npc, &DialogueNodeId::new("missing")), None);
+    }
+
+    #[test]
+    fn dialogue_ended_carries_the_npcs_identity() {
+        let npc = npc_with_node("start", "Halt!", Vec::new());
+        assert_eq!(
+            Event::dialogue_ended(&npc),
+            Event::DialogueEnded {
+                npc_id: NpcId::new("guard"),
+                npc: "Guard".to_string(),
+            }
+        );
     }
 }

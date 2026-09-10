@@ -24,8 +24,8 @@ The engine is **MVC with a passive view**, wired up with two extension seams:
 - **`View`** is the _outbound_ hook. It only ever observes `Event`s and a shared
   `&WorldState` - it can never mutate the game. The trait lives in
   `crates/core/src/view.rs`; the terminal front-end ships a `TextView`
-  (`src/view.rs`) with the default player-facing wording. Swap in your own
-  `View` for different prose or map `Event`s straight to a GUI.
+  (`crates/cli/src/view.rs`) with the default player-facing wording. Swap in
+  your own `View` for different prose or map `Event`s straight to a GUI.
 
 ## Quick start
 
@@ -57,12 +57,13 @@ crates/core/        # engine library: state, input parsing, rules, view
     world/          # WorldState, items, rooms, player
     event.rs        # Event enum
     input/          # tokenizer + lexer: text -> Action
-    data.rs         # world data (YAML) types + loading
+    data/           # world data (YAML) types + loading
     view.rs         # View trait
-  data/             # world fixtures + test worlds (YAML)
   tests/            # integration tests (see Tests below)
+    fixtures/       # world fixtures + test worlds (YAML)
+crates/cli/          # the terminal front-end (TextView + CLI loop)
+  src/
 data/               # default runtime world definition (YAML)
-src/                # the terminal front-end (TextView + CLI loop)
 ```
 
 The engine world content lives in YAML: `data/items.yaml` describes items

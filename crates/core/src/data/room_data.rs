@@ -6,11 +6,13 @@ use crate::data::ExtraValue;
 use crate::model::object_id::ObjectId;
 use crate::model::room_id::RoomId;
 
+/// The top-level shape of a `rooms.yaml` file.
 #[derive(Debug, Deserialize)]
 pub(crate) struct RoomsFile {
     pub(crate) rooms: Vec<RoomData>,
 }
 
+/// A single room definition from world data (YAML).
 #[derive(Debug, Clone, Deserialize)]
 pub struct RoomData {
     #[serde(rename = "key")]

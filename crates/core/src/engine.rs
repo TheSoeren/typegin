@@ -10,23 +10,13 @@ use crate::rules::Rules;
 use crate::world;
 use crate::world::object::{self, ObjectId};
 
-/// The pure game state. Holds no rendering, I/O, or persistence logic.
+/// The pure game state: no rendering, I/O, or persistence logic.
 ///
-/// Create one with [`GameEngine::get`] (stock rules) or
-/// [`GameEngine::get_with_rules`] (custom [`Rules`]); then feed it raw text
-/// via [`GameEngine::handle_input`] and let a [`View`] render the resulting
-/// [`Event`]s.
-///
-/// Customization is done by injecting a [`Rules`] object at construction time
-/// (via [`GameEngine::get_with_rules`]); there is no need to wrap the engine
-/// in a newtype or re-delegate methods.
-///
-/// The engine is front-end agnostic by design: a text adventure feeds it the
-/// same [`Action`]s that a GUI synthesizes from clicks, and a point-and-click
-/// UI can *query* what is currently possible via
-/// [`GameEngine::interactions_for`] instead of re-implementing puzzle logic.
-///
-/// [`View`]: crate::view::View
+/// Create one with [`GameEngine::get`] or [`GameEngine::get_with_rules`] (to
+/// inject custom [`Rules`]), feed it text via [`GameEngine::handle_input`],
+/// and render the resulting [`Event`]s with a [`View`](crate::view::View). A
+/// point-and-click front-end can instead query what is currently possible via
+/// [`GameEngine::interactions_for`], without executing anything.
 #[derive(Getters, MutGetters)]
 pub struct GameEngine {
     #[getset(get = "pub", get_mut = "pub")]

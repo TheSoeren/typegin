@@ -42,4 +42,3 @@ a candidate core feature (each is general to adventure games, not E&H-specific).
 5. **Cosmetic multiplicity** — the 19 pads collapse to one _Padded wall_
    object (the meaningful third-from-top pad). The engine has one object per
    noun; dozens of identical-looking pads are not modelled.
-
