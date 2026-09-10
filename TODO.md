@@ -20,11 +20,12 @@ a candidate core feature (each is general to adventure games, not E&H-specific).
 
 ### Engine gaps (cannot be replicated — future core features)
 
-1. **Inventory-companion NPC** — Harvey is a carried item Edna talks to in her
-   inventory, not a resident of the room. `WorldState` NPCs are statically
-   room-bound; a "companion"/inventory item that speaks is not possible.
-   -> rather than implementing an "Inventory-companion npc", i need to be able to
-   use the verbs "use", "talk" etc on npcs, scene objects and items.
+1. ~~**Inventory-companion NPC**~~ — **Done.** `examine`/`use`/`talk` are now
+   target-oriented (`WorldState::resolve_target` resolves a name to either
+   `Target::Npc` or `Target::Object`), so `use <item> on <npc>` works the same
+   way as `use <item> on <object>`. Harvey-as-companion is still not
+   representable (NPCs remain room-bound, not carryable), but the verb gap
+   that blocked it is closed.
 2. **Verbless scene manipulation (push/operate)** — removing the fan is
    "Use the fan; Edna asks Harvey to help push it" with no inventory item.
    The engine's verbs are take/drop/examine/use/go/talk/choose; every `use`
