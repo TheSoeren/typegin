@@ -187,31 +187,22 @@ mod integration {
     fn take_item_in_room_1_move_to_room_2_drop_there() {
         let mut engine = setup_engine();
 
-        engine.handle_input("take sword");
-        assert!(player_has_item(
-            engine.world(),
-            &ObjectId::new("glowing-sword")
-        ));
+        engine.handle_input("take brass key");
+        assert!(player_has_item(engine.world(), &ObjectId::new("brass-key")));
 
         engine.handle_input("n");
         assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
 
-        engine.handle_input("drop sword");
+        engine.handle_input("drop key");
         assert!(!player_has_item(
             engine.world(),
-            &ObjectId::new("glowing-sword")
+            &ObjectId::new("brass-key")
         ));
-        assert!(room_has_item(
-            engine.world(),
-            &ObjectId::new("glowing-sword")
-        ));
+        assert!(room_has_item(engine.world(), &ObjectId::new("brass-key")));
 
         engine.handle_input("s");
         assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
-        assert!(!room_has_item(
-            engine.world(),
-            &ObjectId::new("glowing-sword")
-        ));
+        assert!(!room_has_item(engine.world(), &ObjectId::new("brass-key")));
     }
 
     #[test]

@@ -35,8 +35,10 @@ fn main() -> ExitCode {
 
     let mut view = view::TextView;
 
-    println!("You wake up in a padded cell of the sanatorium. Harvey is nowhere to be seen.");
-    println!("Type 'look' to see where you are. 'quit' to leave.\n");
+    println!(
+        "You wake up in a padded cell of the sanatorium. Harvey is in your hands, chin tucked against you."
+    );
+    println!("Type 'look' to see where you are, 'talk to harvey' to speak. 'quit' to leave.\n");
 
     let stdin = io::stdin();
     for line in stdin.lock().lines() {

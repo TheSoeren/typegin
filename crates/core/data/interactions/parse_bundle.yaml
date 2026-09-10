@@ -16,6 +16,5 @@
     - drop: stale-bread
     - reveal_object: stale-bread
 - verb: examine
-  item: rusty-lamp
   target:
-    object: wooden-door
+    object: rusty-lamp

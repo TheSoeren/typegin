@@ -1,39 +1,46 @@
+# Faithful to Edna & Harvey: The Breakout — the padded cell (first room).
+#
+# Only objects that exist in the game's opening cell are modelled. The one
+# meaningful pad is a stand-in for the 19 pads (see TODO.md). Harvey is a
+# room-bound NPC stand-in for the game's inventory-companion rabbit; the
+# tempomorph memory detour that yields "Harvey 1: Toenails" is approximated by
+# a dialogue choice (see TODO.md).
 objects:
-  ### PLAYER-CELL — Edna & Harvey: The Breakout opening cell
+  ### THE PADDED CELL
   - key: chair
-    primary_name: Hardwood chair
+    primary_name: Chair
     aliases: [chair]
     kind: Scene
     extra:
-      description: A hardwood chair, worn smooth.
+      description: A plain wooden chair. Its front-left leg is loose.
 
   - key: chair-leg
     primary_name: Chair leg
     aliases: [chair leg, leg]
     kind: Item
     extra:
-      description: A solid chair leg, about to become a tool.
+      description: The loose chair leg, good for breaking things.
 
   - key: broken-chair-leg
-    primary_name: Splintered chair leg
-    aliases: [splintered chair leg, broken chair leg, sharp stick, stick]
+    primary_name: Broken chair leg
+    aliases: [broken chair leg, splintered chair leg, stick, splinter]
     kind: Item
     extra:
-      description: A chair leg snapped into a splintered, weaponlike stick.
+      description: A chair leg broken into a splintered weapon.
 
   - key: table
     primary_name: Table
     aliases: [table]
     kind: Scene
     extra:
-      description: A plain wooden table.
+      description: A plain table, with a surface made for breaking things over.
 
-  - key: wall-polster
-    primary_name: Wall polster
-    aliases: [wall polster, polster, padding, pads]
+  - key: padding
+    primary_name: Padded wall
+    aliases: [padded wall, wall padding, padding, pads, wall]
     kind: Scene
     extra:
-      description: Endless layers of thick, soft wall padding. The top-left pad on the back wall bulges oddly.
+      description: Endless layers of soft padding. The third pad from the top, on the left of the back wall, is where the air conditioning disguises the way out.
 
   - key: door-grate
     primary_name: Door grate
@@ -46,110 +53,43 @@ objects:
     primary_name: Cell door
     aliases: [cell door, door]
     kind: Scene
-    door:
-      direction: east
-      to: corridor
-      locked: true
     extra:
-      description: The locked cell door. Solid, with a small grate up high.
+      description: The cell door, solidly locked. Up high, a grate.
+
+  - key: airy-gap
+    primary_name: Airy gap
+    aliases: [airy gap, gap]
+    kind: Scene
+    extra:
+      description: An airy gap in the padding where the torn pad fell away.
+
+  - key: vent-grille
+    primary_name: Vent grille
+    aliases: [vent grille, grille, screws]
+    kind: Scene
+    extra:
+      description: A grille held by four screws. Beyond it, the air conditioning.
 
   - key: fan
     primary_name: Air-conditioning fan
     aliases: [air conditioning fan, ac fan, fan, ventilator]
     kind: Scene
     extra:
-      description: A big air-conditioning fan hidden behind the wall padding. Silent for now.
+      description: A big air-conditioning fan. Still, for now.
 
-  - key: vent-grille
-    primary_name: Vent grille
-    aliases: [vent, grille, vent grille, air vent]
+  - key: shaft-entrance
+    primary_name: Ventilation shaft opening
+    aliases: [ventilation shaft, shaft, opening, hole]
     kind: Scene
     door:
       direction: north
       to: air-chute
       locked: true
       hidden: true
-    extra:
-      description: 'A grille held by four screws. Behind it: the air chute.'
 
   - key: toenail
     primary_name: Toenail
     aliases: [toenail, toe nail, nail]
     kind: Item
     extra:
-      description: A long, sturdy toenail. The shape of a tiny crowbar.
-
-  # NOTE: stand-in for the real opening's "Harvey 1: Toenails" memory item. A
-  # faithful intro would carry that memory in Edna's starting inventory (engine
-  # gap: initial inventory not yet supported), so the nail is clipped here.
-  - key: nail-clipper
-    primary_name: Nail clipper
-    aliases: [nail clipper, clipper]
-    kind: Item
-    extra:
-      description: A nail clipper. It has no business being in a padded cell.
-
-  ### AIR-CHUTE
-  - key: air-chute-to-cell
-    primary_name: Vent to the cell
-    aliases: [cell vent]
-    kind: Scene
-    door:
-      direction: south
-      to: player-cell
-
-  - key: air-chute-to-office
-    primary_name: Office vent grate
-    aliases: [office vent, chute grate]
-    kind: Scene
-    door:
-      direction: east
-      to: dr-marcel-office
-
-  ### DR. MARCEL'S OFFICE
-  - key: office-to-air-chute
-    primary_name: Vent back to the chute
-    aliases: [chute vent]
-    kind: Scene
-    door:
-      direction: west
-      to: air-chute
-
-  - key: office-door
-    primary_name: Office door
-    aliases: [door, office door]
-    kind: Scene
-    door:
-      direction: north
-      to: corridor
-      locked: true
-    extra:
-      description: A heavy oak door, locked from the outside.
-
-  - key: encyclopedia
-    primary_name: Encyclopedia
-    aliases: [encyclopedia, book]
-    kind: Item
-    extra:
-      description: A heavy encyclopedia, first volume.
-
-  - key: polo-mallet
-    primary_name: Polo mallet
-    aliases: [polo mallet, mallet]
-    kind: Item
-    extra:
-      description: A wooden polo mallet. Odd in a doctor's office.
-
-  - key: ballpoint-pen
-    primary_name: Ballpoint pen
-    aliases: [ballpoint pen, pen]
-    kind: Item
-    extra:
-      description: A ballpoint pen. It has something to say.
-
-  - key: cabinet
-    primary_name: Cabinet
-    aliases: [cabinet]
-    kind: Scene
-    extra:
-      description: A tall cabinet, large enough to hide a full-grown warden in.
+      description: A long, sturdy toenail. The chestnut thief's trick — you remember now.

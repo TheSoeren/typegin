@@ -28,16 +28,18 @@ fn player_has_item(world: &WorldState, id: &ObjectId) -> bool {
 }
 
 mod resolution {
+    use core::{Target, world::object::TargetResolution};
+
     use super::*;
 
-    fn resolves(name: &str) -> ObjectResolution {
+    fn resolves(name: &str) -> TargetResolution {
         engine().world().resolve_target(name)
     }
 
     #[test]
     fn exact_full_name() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new("glowing-sword")),
+            TargetResolution::Found(Target::Object(ObjectId::new("glowing-sword"))),
             resolves("glowing mysterious sword")
         );
     }
@@ -45,7 +47,7 @@ mod resolution {
     #[test]
     fn partial_alias_match() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new("glowing-sword")),
+            TargetResolution::Found(Target::Object(ObjectId::new("glowing-sword"))),
             resolves("glowing sword")
         );
     }
@@ -53,7 +55,7 @@ mod resolution {
     #[test]
     fn alias_match() {
         assert_eq!(
-            ObjectResolution::Found(ObjectId::new("iron-key")),
+            TargetResolution::Found(Target::Object(ObjectId::new("iron-key"))),
             resolves("iron key")
         );
     }
@@ -61,8 +63,11 @@ mod resolution {
     #[test]
     fn ambiguous_key() {
         assert_eq!(
-            ObjectResolution::Ambiguous {
-                ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+            TargetResolution::Ambiguous {
+                ids: vec![
+                    Target::Object(ObjectId::new("iron-key")),
+                    Target::Object(ObjectId::new("brass-key"))
+                ],
                 alias: "key".to_string()
             },
             resolves("key")
@@ -71,7 +76,7 @@ mod resolution {
 
     #[test]
     fn not_found() {
-        assert_eq!(ObjectResolution::NotFound, resolves("health potion"));
+        assert_eq!(TargetResolution::NotFound, resolves("health potion"));
     }
 }
 

@@ -1,4 +1,5 @@
 - verb: examine
-  item: wooden-door
+  target:
+    object: wooden-door
   effect:
     - reveal_object: secret-passage

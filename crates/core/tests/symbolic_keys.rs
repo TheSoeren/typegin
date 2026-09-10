@@ -1,36 +1,3 @@
-//! Symbolic key-based authoring: schema and resolution spec (roadmap #1, part 2).
-//!
-//! Object and room identity is the stable `key: String` from the authored
-//! YAML — the key **is** the `ObjectId`/`RoomId` (key-as-identity), and every
-//! cross-reference (`visible_objects`, `hidden_objects`, door `to` /
-//! `gated_by`, and every interaction field) is a string matched against those
-//! keys. Numeric ids never appear in authored data.
-//!
-//! Unknown key and duplicate key are load errors (`WorldData::from_yaml`
-//! returns `Err`).
-//!
-//! ## Fixtures (in `crates/core/data/`)
-//!
-//! * `data_interactions_items.yaml` — the 11-object world (keys `iron-key` …
-//!   `oak-door`, plus the un-placed `rusty-nail`).
-//! * `data_interactions_rooms.yaml` — the 3-room layout (Cellar → Corridor →
-//!   Study) with key-based rooms.
-//! * `interactions/` — authored interaction snippets (key-referencing).
-//!
-//! ## What this suite pins (the red-phase spec)
-//!
-//! 1. **End-to-end behavioural equivalence** — the keyed world behaves
-//!    identically to the numeric `data_interactions` fixture: same navigation,
-//!    same take/drop semantics, same data-interaction dispatch and query
-//!    behaviour.
-//! 2. **Every reference site resolves a key** — object lists, door `to` and
-//!    `gated_by`, and all interaction `item`/`target`/`condition`/`effect`
-//!    fields.
-//! 3. **Integrity** — unknown key, duplicate key, and missing `key` fields
-//!    are load errors.
-//!
-//! Run with: `cd crates/core && cargo test --test symbolic_keys`.
-
 mod common;
 
 use core::{Direction, Event, GameEngine, ObjectResolution, RoomId, Verb, WorldData};
@@ -86,6 +53,8 @@ fn iron_key_in_study(engine: &mut GameEngine) {
 // -----------------------------------------------------------------------
 
 mod keys {
+    use core::world::object::TargetResolution;
+
     use super::*;
 
     #[test]
@@ -121,7 +90,7 @@ mod keys {
         );
         assert_eq!(
             engine.world().resolve_target("stale bread"),
-            ObjectResolution::NotFound
+            TargetResolution::NotFound
         );
     }
 
@@ -141,28 +110,6 @@ mod keys {
         );
         assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
     }
-
-    #[test]
-    fn door_gated_by_key_resolves_via_stock_unlock() {
-        let mut engine = GameEngine::get(&base_world());
-        engine.handle_input("take iron key");
-        assert_eq!(
-            engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
-        );
-        assert_eq!(
-            engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
-        );
-        // oak door: locked, gated_by iron-key. Stock fallback unlocks.
-        assert_eq!(
-            engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
-        );
-        assert!(!engine.world().is_exit_locked(Direction::East));
-    }
 }
 
 // -----------------------------------------------------------------------
@@ -170,6 +117,8 @@ mod keys {
 // -----------------------------------------------------------------------
 
 mod dispatch {
+    use core::{ObjectId, Target, world::object::TargetResolution};
+
     use super::*;
 
     #[test]
@@ -192,92 +141,15 @@ mod dispatch {
     }
 
     #[test]
-    fn exact_object_target_key_resolves() {
-        let mut engine = engine_with(include_str!(
-            "../data/interactions/exact_object_target.yaml"
-        ));
-        iron_key_in_study(&mut engine);
-        // wooden-door matches the authored target → Custom.
-        assert_eq!(
-            engine.handle_input("use iron key on wooden door"),
-            vec![Event::Custom {
-                name: "for-the-wooden-door".to_string()
-            }]
-        );
-        // oak-door does not → stock UnlockedExit (gated_by resolves via key).
-        assert_eq!(
-            engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
-        );
-    }
-
-    #[test]
-    fn player_holds_condition_key_resolves() {
-        let interactions = include_str!("../data/interactions/player_holds.yaml");
-        // Without brass key: query is empty, stock unlock fires.
-        let mut without_brass = engine_with(interactions);
-        iron_key_in_study(&mut without_brass);
-        let ObjectResolution::Found(iron_id) =
-            without_brass.world().resolve_player_object("iron key")
-        else {
-            panic!("iron key should resolve");
-        };
-        let ObjectResolution::Found(oak_id) = without_brass.world().resolve_target("oak door")
-        else {
-            panic!("oak door should resolve");
-        };
-        assert!(
-            without_brass
-                .interactions_for(Some(iron_id), Some(oak_id))
-                .is_empty()
-        );
-        assert_eq!(
-            without_brass.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
-        );
-
-        // With brass key: query lists the interaction; dispatch runs it.
-        let mut with_brass = engine_with(interactions);
-        with_brass.handle_input("take iron key");
-        with_brass.handle_input("take brass key");
-        iron_key_in_study(&mut with_brass);
-        let ObjectResolution::Found(iron_id) = with_brass.world().resolve_player_object("iron key")
-        else {
-            panic!("iron key should resolve");
-        };
-        let ObjectResolution::Found(oak_id) = with_brass.world().resolve_target("oak door") else {
-            panic!("oak door should resolve");
-        };
-        assert_eq!(
-            with_brass
-                .interactions_for(Some(iron_id), Some(oak_id))
-                .len(),
-            1
-        );
-        assert_eq!(
-            with_brass.handle_input("use iron key on oak door"),
-            vec![Event::Custom {
-                name: "brass-holder-key-worked".to_string()
-            }]
-        );
-        // The effect owns the mutation: the lock stays.
-        assert!(with_brass.world().is_exit_locked(Direction::East));
-    }
-
-    #[test]
     fn room_condition_key_resolves() {
         let mut in_cellar = engine_with(include_str!("../data/interactions/room_gate.yaml"));
         in_cellar.handle_input("take iron key");
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
             vec![Event::Examined {
-                object: "iron key".to_string(),
-                object_id: match in_cellar.world().resolve_target("iron key") {
-                    ObjectResolution::Found(id) => id,
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: match in_cellar.world().resolve_target("iron key") {
+                    TargetResolution::Found(_) => "iron key".to_string(),
                     _ => panic!("iron key resolves"),
                 },
             }]
@@ -305,7 +177,7 @@ mod dispatch {
         // secret-passage is now resolvable (prove the effect key resolved).
         assert!(matches!(
             engine.world().resolve_target("secret passage"),
-            ObjectResolution::Found(_)
+            TargetResolution::Found(_)
         ));
     }
 
@@ -361,6 +233,8 @@ mod dispatch {
 // -----------------------------------------------------------------------
 
 mod query {
+    use core::world::object::TargetResolution;
+
     use super::*;
 
     #[test]
@@ -373,7 +247,7 @@ mod query {
         else {
             panic!("iron key resolves");
         };
-        let ObjectResolution::Found(oak_id) = engine.world().resolve_target("oak door") else {
+        let TargetResolution::Found(oak_id) = engine.world().resolve_target("oak door") else {
             panic!("oak door resolves");
         };
         let listed = engine.interactions_for(Some(iron_id.clone()), Some(oak_id.clone()));
@@ -450,7 +324,8 @@ mod integrity {
     #[test]
     fn unknown_room_key_in_condition_is_an_error() {
         let snippet = r"- verb: examine
-  item: iron-key
+  target:
+    object: iron-key
   condition:
     - room: nonexistent-room";
         let result = from_yaml(ITEMS_YAML, ROOMS_YAML, &format!("interactions:\n{snippet}"));

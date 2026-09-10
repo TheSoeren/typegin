@@ -163,6 +163,35 @@ impl typegin_core::View for TextView {
     fn render_unknown_event(&mut self, name: &str) -> Vec<typegin_core::RenderCommand> {
         vec![line(format!("I don't understand \"{name}\"."))]
     }
+
+    fn render_talked(
+        &mut self,
+        npc: &str,
+        text: &str,
+        choices: &[typegin_core::event::DialogueChoice],
+    ) -> Vec<typegin_core::RenderCommand> {
+        let mut out = vec![line(format!("{npc}: {text}"))];
+        for (i, choice) in choices.iter().enumerate() {
+            out.push(line(format!("  {}. {}", i + 1, choice.label)));
+        }
+        out
+    }
+
+    fn render_dialogue_ended(&mut self, npc: &str) -> Vec<typegin_core::RenderCommand> {
+        vec![line(format!("({npc} falls silent.)"))]
+    }
+
+    fn render_talk_npc_not_found(&mut self, npc: &str) -> Vec<typegin_core::RenderCommand> {
+        vec![line(format!("There is no {npc} here."))]
+    }
+
+    fn render_dialogue_invalid_choice(
+        &mut self,
+        _npc: &str,
+        choice: &str,
+    ) -> Vec<typegin_core::RenderCommand> {
+        vec![line(format!("\"{choice}\" isn't an option."))]
+    }
 }
 
 fn line(text: String) -> typegin_core::RenderCommand {

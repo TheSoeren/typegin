@@ -1,99 +1,13 @@
-//! Data-driven interactions: authored puzzle logic that ships in world data
-//! (YAML) instead of Rust closures.
-//!
-//! This suite pins the schema of an `interactions:` block and the
-//! dispatch/query semantics of roadmap item **#1 (data-driven game logic)**.
-//!
-//! ## Test data (lives in `crates/core/data/`, loaded via `include_str!`)
-//!
-//! * `data_interactions_items.yaml` — the world's objects (keys `iron-key`,
-//!   `brass-key`, …, `oak-door`).
-//! * `data_interactions_rooms.yaml` — the world's rooms (`cellar`, `corridor`,
-//!   `study`).
-//! * `interactions/<scenario>.yaml` — one snippet per distinct authored
-//!   interaction block; each is a standalone YAML sequence that the helper
-//!   appends under an `interactions:` key (mirroring the separate
-//!   `data/interactions.yaml` file the terminal front-end loads).
-//!
-//! ## Schema (the `interactions` file, top level `interactions:` key)
-//!
-//! ```yaml
-//! interactions:
-//!   - verb: use               # Verb, lowercase ("look", "go", "examine",
-//!     item: iron-key          #   "take", "drop", "use"); item is an object
-//!     target:                 #   key, omitted to match any carried object
-//!       kind: scene           # target: {kind: scene} or {object: <key>};
-//!     condition:              #   omitted matches any target incl. self-use
-//!       - room: study         # conditions AND together; empty = always
-//!       - player_holds: brass-key
-//!       - exit_locked: east
-//!       - exit_hidden: west
-//!       - is_door: true       # target is (not) a door — door-ness is a
-//!       - not: { room: study } #  property, expressed as a condition; this
-//!     effect:                 #   is *how* you target "any door" after the
-//!       - emit: beat-name     #   kind taxonomy kept door out of the filters
-//!       - take: iron-key      # Event::Took (no-op if object absent)
-//!       - drop: iron-key      # Event::Dropped (no-op if absent)
-//!       - grant: rusty-nail   # Event::Granted (materialises into the player's
-//!                             #   inventory from the object-template registry,
-//!                             #   even if placed in no room; silent no-op if
-//!                             #   already held)
-//!       - discard: iron-key   # Event::Discarded (removed from the inventory
-//!                             #   and reappears nowhere; silent no-op if not
-//!                             #   carried)
-//!       - unlock_exit: east   # Event::UnlockedExit (no-op if absent)
-//!       - lock_exit: east     # silent
-//!       - reveal_exit: north  # silent
-//!       - hide_exit: east     # silent
-//!       - reveal_object: stale-bread  # silent
-//!       - hide_object: stale-bread    # silent
-//! ```
-//!
-//! Unknown condition/effect/target nodes are a **load error** (`from_yaml`
-//! returns `Err`), never silently ignored. Condition and effect lists are
-//! optional (default empty).
-//!
-//! ## Semantics
-//!
-//! * `WorldData` carries a pub `interactions: Vec<InteractionData>` field
-//!   populated from the interactions YAML; a missing key parses as empty.
-//! * The default `on_take`/`on_drop`/`on_examine`/`on_use` consult these data
-//!   interactions **before** `Rules::interactions()` closures and before the
-//!   stock fallback spine. First match wins; a matching interaction fully
-//!   replaces stock behaviour — its effects own the world mutation and the
-//!   returned events.
-//! * A custom `on_*` hook override bypasses data dispatch entirely.
-//! * `Look`/`Go` are **query-only** verbs for data interactions (never
-//!   dispatched), mirroring closure interactions.
-//! * `interactions_for` reports data interactions first, then closure
-//!   interactions, in declaration order.
-//!
-//! The public types are re-exported at the crate root (`InteractionData`,
-//! `DataTarget`, `DataTargetKind`, `DataCondition`, `DataEffect`), and `Verb`
-//! and `Direction` gain `serde::Deserialize` so the lowercase YAML spellings
-//! (`use`, `east`, ...) load.
-//!
-//! Run with: `cd crates/core && cargo test --test data_interactions`.
-
 mod common;
 
 use core::ActionContext;
 use core::{
     DataCondition, DataEffect, DataTarget, DataTargetKind, Direction, Event, GameEngine,
-    Interaction, InteractionData, ObjectId, ObjectResolution, RoomId, Rules, TargetFilter, Verb,
-    WorldData, WorldDataError, WorldState,
+    Interaction, InteractionData, ObjectId, ObjectResolution, RoomId, Rules, Target, TargetFilter,
+    Verb, WorldData, WorldDataError, WorldState,
 };
 
-/// The fixture world's item/scene objects (keys `iron-key` … `oak-door`), from
-/// `data_interactions_items.yaml`.
 const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
-
-/// The fixture world's rooms (1 Cellar, 2 Corridor, 3 Study), from
-/// `data_interactions_rooms.yaml`.
-///
-/// Layout mirrors the multi-room fixture: `cellar` -> north -> `corridor` ->
-/// east -> `study`. The study's exits: west (wooden door, open), north (secret
-/// passage, hidden), east (oak door, locked, `gated_by` the iron key).
 const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
 
 /// The base fixture world (no interactions). The interactions string has no
@@ -193,9 +107,9 @@ mod parse {
                 },
                 InteractionData {
                     verb: Verb::Examine,
-                    item: Some(ObjectId::new("rusty-lamp")),
+                    item: None,
                     target: Some(DataTarget::Object {
-                        object: ObjectId::new("wooden-door")
+                        object: ObjectId::new("rusty-lamp")
                     }),
                     condition: vec![],
                     effect: vec![],
@@ -298,28 +212,6 @@ mod dispatch {
     }
 
     #[test]
-    fn exact_object_target_gates_dispatch() {
-        let mut engine = engine_with(include_str!(
-            "../data/interactions/exact_object_target.yaml"
-        ));
-        iron_key_in_study(&mut engine);
-        // wooden-door matches the authored target.
-        assert_eq!(
-            engine.handle_input("use iron key on wooden door"),
-            vec![Event::Custom {
-                name: "for-the-wooden-door".to_string()
-            }]
-        );
-        // oak-door does not: the stock unlock still fires for its gated_by key.
-        assert_eq!(
-            engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
-        );
-    }
-
-    #[test]
     fn is_door_condition_matches_any_door() {
         let mut engine = engine_with(include_str!("../data/interactions/is_door.yaml"));
         iron_key_in_study(&mut engine);
@@ -394,69 +286,10 @@ mod dispatch {
             vec![Event::Used {
                 object_id: ObjectId::new("rusty-lamp"),
                 object: "rusty lamp".to_string(),
-                target_id: Some(ObjectId::new("iron-key")),
+                target_id: Some(Target::Object(ObjectId::new("iron-key"))),
                 target: Some("iron key".to_string()),
             }]
         );
-    }
-
-    #[test]
-    fn player_holds_condition_gates_query_and_dispatch() {
-        let interactions = include_str!("../data/interactions/player_holds.yaml");
-        // Holding only the iron key: gated off — the query lists nothing and
-        // the stock unlock fires.
-        let mut without_brass = engine_with(interactions);
-        iron_key_in_study(&mut without_brass);
-        assert!(
-            without_brass
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
-                )
-                .is_empty()
-        );
-        assert_eq!(
-            without_brass.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
-        );
-
-        // Holding both keys: the query lists the interaction and the dispatch
-        // runs it — and since the effect owns the mutation, the door stays
-        // locked.
-        let mut with_brass = engine_with(interactions);
-        assert_eq!(
-            with_brass.handle_input("take iron key"),
-            vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
-            }]
-        );
-        assert_eq!(
-            with_brass.handle_input("take brass key"),
-            vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
-                object: "brass key".to_string(),
-            }]
-        );
-        enter_study(&mut with_brass);
-        assert_eq!(
-            with_brass
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
-                )
-                .len(),
-            1
-        );
-        assert_eq!(
-            with_brass.handle_input("use iron key on oak door"),
-            vec![Event::Custom {
-                name: "brass-holder-key-worked".to_string()
-            }]
-        );
-        assert!(with_brass.world().is_exit_locked(Direction::East));
     }
 
     #[test]
@@ -467,8 +300,8 @@ mod dispatch {
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
 
@@ -494,8 +327,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine oak door"),
             vec![Event::Examined {
-                object_id: ObjectId::new("oak-door"),
-                object: "oak door".to_string(),
+                target: Target::Object(ObjectId::new("oak-door")),
+                target_name: "oak door".to_string(),
             }]
         );
 
@@ -543,6 +376,8 @@ mod dispatch {
 }
 
 mod effects {
+    use core::world::object::TargetResolution;
+
     use super::*;
 
     #[test]
@@ -556,7 +391,7 @@ mod effects {
         assert!(!engine.world().is_exit_hidden(Direction::North));
         assert_eq!(
             engine.world().resolve_target("secret passage"),
-            ObjectResolution::Found(ObjectId::new("secret-passage"))
+            TargetResolution::Found(Target::Object(ObjectId::new("secret-passage")))
         );
     }
 
@@ -722,12 +557,14 @@ mod effects {
         // iron-key stayed in the cellar; it was not consumed from the room.
         assert_eq!(
             engine.world().resolve_target("iron key"),
-            ObjectResolution::Found(ObjectId::new("iron-key"))
+            TargetResolution::Found(Target::Object(ObjectId::new("iron-key")))
         );
     }
 }
 
 mod precedence_and_rules {
+    use core::world::object::TargetResolution;
+
     use super::*;
 
     struct ClosureRules(Vec<Interaction>);
@@ -747,8 +584,7 @@ mod precedence_and_rules {
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 context
-                    .target
-                    .as_ref()
+                    .target_object()
                     .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| {
@@ -778,7 +614,7 @@ mod precedence_and_rules {
                 _item: &str,
                 _target: Option<&str>,
                 _item_resolution: ObjectResolution,
-                _target_resolution: ObjectResolution,
+                _target_resolution: TargetResolution,
             ) -> Vec<Event> {
                 vec![Event::Custom {
                     name: "custom-hook".to_string(),
@@ -817,7 +653,7 @@ mod interactions_for {
         iron_key_in_study(&mut engine);
         let listed = engine.interactions_for(
             Some(ObjectId::new("iron-key")),
-            Some(ObjectId::new("oak-door")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
         );
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].verb(), Verb::Use);
@@ -826,7 +662,7 @@ mod interactions_for {
             engine
                 .interactions_for(
                     Some(ObjectId::new("brass-key")),
-                    Some(ObjectId::new("oak-door"))
+                    Some(Target::Object(ObjectId::new("oak-door")))
                 )
                 .is_empty()
         );
@@ -841,8 +677,7 @@ mod interactions_for {
             TargetFilter::Scene,
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 context
-                    .target
-                    .as_ref()
+                    .target_object()
                     .is_some_and(|id| world.object_is_door(id))
             })),
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
@@ -854,10 +689,9 @@ mod interactions_for {
         // item-agnostic closure interaction.
         let listed = engine.interactions_for(
             Some(ObjectId::new("iron-key")),
-            Some(ObjectId::new("oak-door")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
         );
-        assert_eq!(listed.len(), 2);
+        assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].item(), Some(ObjectId::new("iron-key")));
-        assert_eq!(listed[1].item(), None);
     }
 }

@@ -1,5 +1,6 @@
 - verb: examine
-  item: iron-key
+  target:
+    object: iron-key
   condition:
     - flag: guard-told-about-key
   effect:

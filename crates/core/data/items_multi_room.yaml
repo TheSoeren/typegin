@@ -99,6 +99,5 @@ objects:
       direction: east
       to: corridor
       locked: true
-      gated_by: iron-key
     extra:
       material: oak

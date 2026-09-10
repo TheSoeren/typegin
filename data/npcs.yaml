@@ -1,2 +1,103 @@
-# NPC definitions for the terminal demo. Empty for now.
-npcs: []
+# First-room cast, faithful to Edna & Harvey: The Breakout.
+#
+# Both are stand-ins: Harvey is an inventory companion in the game (engine
+# gap — see TODO.md), rendered here as a room-bound NPC; the guard is reached
+# purely through the door grate, mirroring the game's two key beats — charm
+# him into turning the air conditioning ON, and later provoke him into
+# turning it OFF.
+#
+# Dialogue choices cannot be gated on flags (engine gap), so both the
+# nice and the nasty options are always available.
+npcs:
+  - key: harvey
+    primary_name: Harvey
+    aliases: [harvey, rabbit]
+    room: player-cell
+    dialogue:
+      root: talk
+      nodes:
+        talk:
+          text: '"Edna. You woke" — Harvey twitches — "hopefully. The sanatorium, the padded walls, the heat: it all comes back to you now, yes?"'
+          choices:
+            - label: "Help me remember the screws."
+              next: memory
+            - label: "What's behind the padding?"
+              next: hint
+            - label: "Forget it."
+              next: .end
+        memory:
+          text: '"The chestnut thief! You know the story. He chewed off a nail and unscrewed a grate with it — you''ve done the same before."'
+          choices:
+            - label: "Show me."
+              next: show
+            - label: "Forget it."
+              next: .end
+        show:
+          text: '"A toenail, Edna. Easy." He holds up a long, sturdy nail. "Four screws, and the way out of this cell."'
+          choices:
+            - label: "Take it."
+              next: .end
+              effect:
+                - grant: toenail
+                - emit: You remember. The way the chestnut thief pried the screws free — a toenail comes off in your hand.
+        hint:
+          text: '"The air conditioning. And behind it, the way out. But the padding won''t fall away until the air is running."'
+          choices:
+            - label: "Forget it."
+              next: .end
+
+  - key: guard
+    primary_name: Guard
+    aliases: [guard, sentry]
+    room: player-cell
+    dialogue:
+      root: through-the-grate
+      nodes:
+        through-the-grate:
+          text: '"What is it?" The guard''s face appears at the grate. "If it''s about the air conditioning — the master keeps it off after dark."'
+          choices:
+            - label: "Why is it so hot in here?"
+              next: hot
+            - label: "You're the best guard this place has ever had."
+              next: praise
+            - label: "Whack it across your skull."
+              next: mean
+              effect:
+                - clear_flag: ac-on
+                - emit: '"WHAT?! That is my father''s putter you are talking about, you ungrateful little cretin!" He stomps to the dial. The hum beyond the padding splutters and dies. The air conditioning is off.'
+            - label: "Forget it."
+              next: .end
+        hot:
+          text: '"The air conditioning, girl. Switched off at night. The machine sits in the wall behind the padding — the only breath of fresh air in this place."'
+          choices:
+            - label: "You're the best guard this place has ever had."
+              next: praise
+            - label: "Forget it."
+              next: .end
+        praise:
+          text: 'He visibly puffs up. "Why, thank you." He straightens his cap. "Nobody around here appreciates talent. My father was a famous mini-golfer — Babbitt and Son. THE club."'
+          choices:
+            - label: "A true athlete, then."
+              next: athlete
+            - label: "Forget it."
+              next: .end
+        athlete:
+          text: '"Three years running, the club championship." He smiles a little. "A shame the world doesn''t know it."'
+          choices:
+            - label: "It's so hot in here I'm getting dizzy..."
+              next: ac-on
+              effect:
+                - set_flag: ac-on
+                - emit: '"Dizzy? Oh, no — easy now." He reaches for a dial beyond the grate. A heavy hum starts up behind the padding. The air conditioning is on.'
+            - label: "Forget it."
+              next: .end
+        ac-on:
+          text: '"There. Better? A talent like mine, wasted on night duty..."'
+          choices:
+            - label: "Much better. Thank you."
+              next: .end
+        mean:
+          text: '"Go sweat, then! The master shall hear nothing of this."'
+          choices:
+            - label: "Forget it."
+              next: .end

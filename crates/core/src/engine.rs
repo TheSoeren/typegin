@@ -4,7 +4,7 @@ use crate::data::WorldData;
 use crate::data::interactions_data::InteractionData;
 use crate::event::Event;
 use crate::input::{Action, parse_input};
-use crate::interaction::{ActionContext, Interaction};
+use crate::interaction::{ActionContext, Interaction, Target};
 use crate::rules::BasicRules;
 use crate::rules::Rules;
 use crate::world;
@@ -37,6 +37,11 @@ pub struct GameEngine {
     /// `Rules::interactions()`; dispatch itself goes through the default rules
     /// hooks (which read the raw data from the world).
     data_interactions: Vec<Interaction>,
+    /// One synthetic [`Interaction::talk_npc`] hotspot per NPC in the world,
+    /// so `interactions_for` reports current-room NPCs as [`Verb::Talk`]
+    /// targets for a point-and-click front-end. Presence is a live condition
+    /// (the NPC's room vs the player's current room), never a refresh.
+    talk_targets: Vec<Interaction>,
 }
 
 impl GameEngine {
@@ -51,6 +56,11 @@ impl GameEngine {
     /// a custom [`Rules`] implementation.
     pub fn get_with_rules(data: &WorldData, rules: impl Rules + 'static) -> Self {
         let world = world::WorldState::from_data(data);
+        let talk_targets = world
+            .npcs()
+            .iter()
+            .map(|npc| Interaction::talk_npc(npc.id().clone()))
+            .collect();
 
         GameEngine {
             world,
@@ -60,6 +70,7 @@ impl GameEngine {
                 .iter()
                 .map(InteractionData::compile)
                 .collect(),
+            talk_targets,
         }
     }
 
@@ -98,7 +109,7 @@ impl GameEngine {
                 let item_res = self.world.resolve_player_object(&item);
                 let target_res = match target {
                     Some(ref name) => self.world.resolve_target(name),
-                    None => object::ObjectResolution::NotFound,
+                    None => object::TargetResolution::NotFound,
                 };
                 self.rules.on_use(
                     &mut self.world,
@@ -116,23 +127,17 @@ impl GameEngine {
 
     /// Query which authored interactions are currently live for a given
     /// context, without executing any of them.
-    ///
-    /// This is the point-and-click hook: a GUI asks "what can the player do
-    /// with this target right now?" and gets back the interactions whose
-    /// conditions hold. `item` is the object being held/used (if any),
-    /// `target` the resolved target object's id.
-    ///
-    /// Stock `BasicRules` behaviour is not listed here — the query reports
-    /// *authored* interactions only; a front-end combines the result with the
-    /// world's own state (e.g. a locked door whose `gated_by` object is held)
-    /// to decide what to offer.
     #[must_use]
     pub fn interactions_for(
         &self,
         item: Option<ObjectId>,
-        target: Option<ObjectId>,
+        target: Option<Target>,
     ) -> Vec<&Interaction> {
         let context = ActionContext::new(None, item, target);
+        // The open "what can I click" query is the only one NPC hotspots
+        // belong in: they carry no item, so re-using their `matches` with an
+        // item-constrained context would report them for every carried object.
+        let open_query = context.item.is_none() && context.target.is_none();
         self.data_interactions
             .iter()
             .filter(|interaction| interaction.matches(&self.world, &context))
@@ -140,6 +145,13 @@ impl GameEngine {
                 self.rules
                     .interactions()
                     .iter()
+                    .filter(|interaction| interaction.matches(&self.world, &context)),
+            )
+            .chain(
+                open_query
+                    .then_some(&self.talk_targets)
+                    .into_iter()
+                    .flatten()
                     .filter(|interaction| interaction.matches(&self.world, &context)),
             )
             .collect()

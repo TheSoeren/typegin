@@ -19,7 +19,7 @@ pub use engine::GameEngine;
 pub use event::{DialogueChoice, Event};
 pub use input::parse_input;
 pub use input::{Action, Direction, DirectionResolution, DropResult, MoveResult, TakeResult};
-pub use interaction::{ActionContext, Interaction, TargetFilter, Verb};
+pub use interaction::{ActionContext, Interaction, Target, TargetFilter, Verb};
 pub use model::dialogue_node_id::DialogueNodeId;
 pub use model::dialogue_option_id::DialogueOptionId;
 pub use model::npc_id::NpcId;

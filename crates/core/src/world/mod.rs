@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use getset::Getters;
 use log::warn;
 
+use crate::Target;
 use crate::data;
 use crate::data::interactions_data::InteractionData;
 use crate::data::object_data;
@@ -15,6 +16,7 @@ use crate::input::action;
 use crate::input::direction;
 use crate::model::dialogue_node_id::DialogueNodeId;
 use crate::model::object_id::ObjectId;
+use crate::world::object::TargetResolution;
 use crate::world::object::{ObjectInfo, ObjectResolution};
 
 #[derive(Debug, Getters)]
@@ -101,13 +103,6 @@ impl WorldState {
     #[must_use]
     pub fn is_exit_hidden(&self, direction: direction::Direction) -> bool {
         self.current_room().is_exit_hidden(direction)
-    }
-
-    /// The id of the object that unlocks the exit in `direction`, if one is
-    /// declared. The gate link is data; unlocking behaviour is a rule.
-    #[must_use]
-    pub fn exit_gated_by(&self, direction: direction::Direction) -> Option<ObjectId> {
-        self.current_room().exit_gated_by(direction)
     }
 
     /// Public details about the exit in `direction`, if there is one.
@@ -316,8 +311,20 @@ impl WorldState {
     /// visible room objects and carried objects. Doors are ordinary scene
     /// objects, so they resolve here exactly like any other visible object.
     #[must_use]
-    pub fn resolve_target(&self, name: &str) -> ObjectResolution {
-        object::Object::resolve_by_name(&self.get_available_objects(), name)
+    pub fn resolve_target(&self, name: &str) -> TargetResolution {
+        match self.resolve_npc(name) {
+            Some(npc) => TargetResolution::Found(Target::Npc(npc.id.clone())),
+            None => match object::Object::resolve_by_name(&self.get_available_objects(), name) {
+                ObjectResolution::Found(object_id) => {
+                    TargetResolution::Found(Target::Object(object_id))
+                }
+                ObjectResolution::Ambiguous { ids, alias } => TargetResolution::Ambiguous {
+                    ids: ids.iter().map(|id| Target::Object(id.clone())).collect(),
+                    alias,
+                },
+                ObjectResolution::NotFound => TargetResolution::NotFound,
+            },
+        }
     }
 
     /// Resolve a noun against the objects in the current room only.

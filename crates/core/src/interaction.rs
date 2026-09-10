@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 use crate::input::action::Action;
 use crate::world::WorldState;
+use crate::world::npc::NpcId;
 use crate::world::object::ObjectId;
 
 /// The game's action vocabulary. An author writes interactions *for a verb*,
@@ -16,6 +17,7 @@ pub enum Verb {
     Take,
     Drop,
     Use,
+    Talk,
 }
 
 impl Verb {
@@ -32,27 +34,62 @@ impl Verb {
             Action::Take(_) => Some(Verb::Take),
             Action::Drop(_) => Some(Verb::Drop),
             Action::Use { .. } => Some(Verb::Use),
-            Action::Talk(_) | Action::Choose(_) | Action::Unknown(_) => None,
+            Action::Talk(_) => Some(Verb::Talk),
+            Action::Choose(_) | Action::Unknown(_) => None,
         }
     }
+}
+
+/// A resolved `Use`-with target: either a world object or an NPC in the
+/// current room.
+///
+/// NPCs are deliberately *not* objects — there is no coercion between the two
+/// types — but a use-with target may be either. `Target` is what lets an item
+/// be used on a character ("use mallet on guard") and what lets a
+/// point-and-click front-end offer NPCs as drop-targets in
+/// [`GameEngine::interactions_for`](crate::GameEngine::interactions_for).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Target {
+    /// A world object.
+    Object(ObjectId),
+    /// An NPC in the current room.
+    Npc(NpcId),
 }
 
 /// Runtime context handed to an interaction: which object was used/dropped and
 /// which target (if any) the verb was directed at.
 ///
-/// For `use X on Y`: `item` is the carried `X`, `target` is the resolved `Y`.
-/// For a self-use (`use X`), `target` is `None`.
+/// For `use X on Y`: `item` is the carried `X`, `target` is the resolved `Y`
+/// (object or NPC). For a self-use (`use X`), `target` is `None`.
 #[derive(Debug, Clone)]
 pub struct ActionContext {
     pub verb: Option<Verb>,
     pub item: Option<ObjectId>,
-    pub target: Option<ObjectId>,
+    pub target: Option<Target>,
 }
 
 impl ActionContext {
     #[must_use]
-    pub fn new(verb: Option<Verb>, item: Option<ObjectId>, target: Option<ObjectId>) -> Self {
+    pub fn new(verb: Option<Verb>, item: Option<ObjectId>, target: Option<Target>) -> Self {
         ActionContext { verb, item, target }
+    }
+
+    /// The object this context's target denotes, when the target is an object.
+    #[must_use]
+    pub fn target_object(&self) -> Option<&ObjectId> {
+        match &self.target {
+            Some(Target::Object(id)) => Some(id),
+            _ => None,
+        }
+    }
+
+    /// The NPC this context's target denotes, when the target is an NPC.
+    #[must_use]
+    pub fn target_npc(&self) -> Option<&NpcId> {
+        match &self.target {
+            Some(Target::Npc(id)) => Some(id),
+            _ => None,
+        }
     }
 }
 
@@ -72,11 +109,13 @@ pub enum TargetFilter {
 }
 
 impl TargetFilter {
-    pub(crate) fn matches(self, world: &WorldState, target: Option<&ObjectId>) -> bool {
+    pub(crate) fn matches(self, world: &WorldState, target: Option<&Target>) -> bool {
         match self {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
-            TargetFilter::Scene => target.is_some_and(|id| world.object_is_scene(id)),
+            TargetFilter::Scene => target.is_some_and(
+                |target| matches!(target, Target::Object(id) if world.object_is_scene(id)),
+            ),
         }
     }
 }
@@ -110,6 +149,11 @@ pub struct Interaction {
     target: TargetFilter,
     condition: Option<Box<InteractionCondition>>,
     effect: Box<InteractionEffect>,
+    /// When `Some`, this interaction denotes "talk to this NPC" — an NPC
+    /// hotspot in the `interactions_for` query rather than an object verb.
+    /// Dispatch of `Talk` still routes through `Rules::on_talk`; the entry
+    /// exists so a point-and-click front-end sees the NPC as a live target.
+    npc: Option<NpcId>,
 }
 
 impl Interaction {
@@ -137,6 +181,35 @@ impl Interaction {
             target,
             condition,
             effect,
+            npc: None,
+        }
+    }
+
+    /// Build a "talk to this NPC" interaction: a [`Verb::Talk`] hotspot for an
+    /// NPC, live only while the player is in the NPC's room.
+    ///
+    /// No object coupling: the entry carries no `item` or `target` filter, so
+    /// it only surfaces in the open `interactions_for(None, None)` query a
+    /// point-and-click UI uses to enumerate what is clickable right now. The
+    /// effect is inert — a `Talk` action dispatches through
+    /// `Rules::on_talk`, not through `Interaction` effects.
+    #[must_use]
+    pub fn talk_npc(npc: NpcId) -> Self {
+        let present_npc = npc.clone();
+        Interaction {
+            verb: Verb::Talk,
+            item: None,
+            target: TargetFilter::Any,
+            condition: Some(Box::new(
+                move |world: &WorldState, _context: &ActionContext| {
+                    world
+                        .npcs_in_room(&world.current_room_id())
+                        .iter()
+                        .any(|present| present.id() == &present_npc)
+                },
+            )),
+            effect: Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
+            npc: Some(npc),
         }
     }
 
@@ -158,6 +231,13 @@ impl Interaction {
         self.target
     }
 
+    /// The NPC this interaction denotes talking to, when it is a [`Verb::Talk`]
+    /// hotspot (as built by [`Interaction::talk_npc`]).
+    #[must_use]
+    pub fn npc(&self) -> Option<&NpcId> {
+        self.npc.as_ref()
+    }
+
     /// Whether this interaction applies to the given context under the given
     /// world state. Used both by the dispatcher (run it) and by the query
     /// API (list it).
@@ -165,7 +245,7 @@ impl Interaction {
     pub fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
         let item_ok = match &self.item {
             Some(id) => context.item.as_ref() == Some(id),
-            None => true,
+            None => context.item.is_none(),
         };
         item_ok
             && context.verb.is_none_or(|v| self.verb() == v)

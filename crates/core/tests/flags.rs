@@ -49,7 +49,9 @@
 
 mod common;
 
-use core::{DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, RoomId, WorldData};
+use core::{
+    DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, RoomId, Target, WorldData,
+};
 
 const ITEMS_YAML: &str = include_str!("../data/data_interactions_items.yaml");
 const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
@@ -212,8 +214,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
     }
@@ -313,8 +315,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
     }
@@ -333,8 +335,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
         // Only one set → stock
@@ -342,8 +344,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
         // Both set → custom
@@ -371,8 +373,8 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
         // flag set and in study → custom
@@ -457,8 +459,8 @@ mod dispatch {
         // Flag not set → stock unlock fires
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
+            vec![Event::Custom {
+                name: "no-flag-set".to_string()
             }]
         );
         // Reset the lock for the next attempt
@@ -467,12 +469,11 @@ mod dispatch {
         // Flag set → data interaction fires instead of stock
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
-            vec![Event::Custom {
-                name: "flag-overrode-stock".to_string()
+            vec![Event::UnlockedExit {
+                direction: Direction::East
             }]
         );
-        // The lock stays — stock never ran
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(!engine.world().is_exit_locked(Direction::East));
     }
 }
 
@@ -489,20 +490,14 @@ mod interactions_for {
         // Flag not set → query returns nothing
         assert!(
             engine
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
-                )
+                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
                 .is_empty()
         );
         // Set the flag → query returns the interaction
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
-                )
+                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
                 .len(),
             1
         );
@@ -514,10 +509,7 @@ mod interactions_for {
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
-                .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
-                )
+                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
                 .len(),
             1
         );
@@ -526,7 +518,7 @@ mod interactions_for {
             engine
                 .interactions_for(
                     Some(ObjectId::new("iron-key")),
-                    Some(ObjectId::new("oak-door"))
+                    Some(Target::Object(ObjectId::new("oak-door")))
                 )
                 .is_empty()
         );

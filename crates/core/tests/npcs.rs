@@ -1025,6 +1025,8 @@ mod view_hooks {
 // ---------------------------------------------------------------------------
 
 mod integration {
+    use core::Target;
+
     use super::*;
 
     #[test]
@@ -1045,8 +1047,8 @@ mod integration {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
         // Talk to guard, choose the option that sets the flag
@@ -1088,9 +1090,205 @@ mod integration {
         // Query now returns the interaction
         assert_eq!(
             engine
-                .interactions_for(Some(ObjectId::new("iron-key")), None)
+                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
                 .len(),
             1
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Query: NPCs as part of interactions_for
+// ---------------------------------------------------------------------------
+
+/// NPCs live in the open `interactions_for(None, None)` query as `Talk`
+/// hotspots, so a point-and-click front-end renders every clickable thing in
+/// one listing — NPCs and objects alike — without coercing NPCs into objects.
+mod interactions_for_talk {
+    use super::*;
+    use core::{Target, TargetFilter, Verb};
+
+    #[test]
+    fn npc_in_current_room_is_a_talk_target() {
+        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        // Starts in the cellar; the guard lives in the corridor.
+        assert!(engine.interactions_for(None, None).is_empty());
+
+        enter_corridor(&mut engine);
+        let listed = engine.interactions_for(None, None);
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].verb(), Verb::Talk);
+        assert_eq!(listed[0].npc(), Some(&NpcId::new("guard")));
+        // An NPC hotspot is not an object verb: no item, any target.
+        assert_eq!(listed[0].item(), None);
+        assert_eq!(listed[0].target(), TargetFilter::Any);
+    }
+
+    #[test]
+    fn leaving_the_room_removes_talk_targets() {
+        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        enter_corridor(&mut engine);
+        assert_eq!(engine.interactions_for(None, None).len(), 1);
+
+        engine.handle_input("go south");
+        assert!(engine.interactions_for(None, None).is_empty());
+    }
+
+    #[test]
+    fn every_npc_in_the_room_is_listed() {
+        let mut engine = engine_with(include_str!("../data/npcs_two_npcs.yaml"));
+        enter_corridor(&mut engine);
+        let listed = engine.interactions_for(None, None);
+        assert_eq!(listed.len(), 2);
+        assert!(
+            listed
+                .iter()
+                .any(|interaction| interaction.npc() == Some(&NpcId::new("guard")))
+        );
+        assert!(
+            listed
+                .iter()
+                .any(|interaction| interaction.npc() == Some(&NpcId::new("warden")))
+        );
+    }
+
+    #[test]
+    fn targeted_queries_never_list_npc_hotspots() {
+        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        enter_corridor(&mut engine);
+        let with_item = engine.interactions_for(Some(ObjectId::new("iron-key")), None);
+        assert!(
+            with_item
+                .iter()
+                .all(|interaction| interaction.verb() != Verb::Talk)
+        );
+        let with_target = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(Target::Object(ObjectId::new("oak-door"))),
+        );
+        assert!(
+            with_target
+                .iter()
+                .all(|interaction| interaction.verb() != Verb::Talk)
+        );
+    }
+
+    #[test]
+    fn talk_target_still_dispatches_via_talk_action() {
+        let mut engine = engine_with(include_str!("../data/npcs_effects.yaml"));
+        enter_corridor(&mut engine);
+        // The open query surfaces the NPC as a talk hotspot...
+        assert_eq!(engine.interactions_for(None, None).len(), 1);
+        // ...while the text front-end still routes talk through `on_talk`.
+        let events = engine.handle_input("talk to guard");
+        assert_eq!(events.len(), 1);
+        assert!(matches!(&events[0], Event::Talked { npc, .. } if npc == "guard"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Use item on NPC (roadmap: NPCs as first-class `Use` targets)
+// ---------------------------------------------------------------------------
+
+/// "Use X on guard" resolves the target as an NPC (npc-first over objects),
+/// dispatches an interaction keyed to `target: npc: <key>`, and falls back to
+/// the generic `Used` event (its `target_id` widened to a `Target::Npc`) when
+/// nothing is authored.
+///
+/// `interactions_for` accepts `Target::Npc(...)` so a point-and-click UI can
+/// offer NPCs as drop-targets.
+mod use_on_npc {
+    use super::*;
+    use core::{Target, Verb};
+
+    #[test]
+    fn use_item_on_npc_without_interaction_emits_used() {
+        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        enter_corridor(&mut engine);
+        // The NPC carries its typed identity through the same `Used` event an
+        // object target would (the `target_id` channel widened to `Target`).
+        assert_eq!(
+            engine.handle_input("use iron key on guard"),
+            vec![Event::Used {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+                target_id: Some(Target::Npc(NpcId::new("guard"))),
+                target: Some("guard".to_string()),
+            }]
+        );
+    }
+
+    #[test]
+    fn use_item_on_npc_runs_authored_interaction() {
+        let mut engine = GameEngine::get(&world_with_npc_and_interactions(
+            include_str!("../data/npcs_guard.yaml"),
+            include_str!("../data/interactions/use_npc.yaml"),
+        ));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        enter_corridor(&mut engine);
+        assert_eq!(
+            engine.handle_input("use iron key on guard"),
+            vec![Event::Custom {
+                name: "key-shown-to-guard".to_string(),
+            }]
+        );
+        // The authored effect is immutable state: a second use re-fires it.
+        assert_eq!(
+            engine.handle_input("use iron key on guard"),
+            vec![Event::Custom {
+                name: "key-shown-to-guard".to_string(),
+            }]
+        );
+    }
+
+    #[test]
+    fn query_reports_npc_targeted_use_interaction() {
+        let mut engine = GameEngine::get(&world_with_npc_and_interactions(
+            include_str!("../data/npcs_guard.yaml"),
+            include_str!("../data/interactions/use_npc.yaml"),
+        ));
+        enter_corridor(&mut engine);
+        let listed = engine.interactions_for(
+            Some(ObjectId::new("iron-key")),
+            Some(Target::Npc(NpcId::new("guard"))),
+        );
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].verb(), Verb::Use);
+        assert_eq!(listed[0].item(), Some(ObjectId::new("iron-key")));
+    }
+
+    #[test]
+    fn use_item_on_unknown_npc_reports_target_not_found() {
+        let mut engine = engine_with(include_str!("../data/npcs_guard.yaml"));
+        assert_eq!(
+            engine.handle_input("take iron key"),
+            vec![Event::Took {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+            }]
+        );
+        enter_corridor(&mut engine);
+        // No NPC (and no object) named "warden" → the generic object not-found.
+        assert_eq!(
+            engine.handle_input("use iron key on warden"),
+            vec![Event::UsedTargetNotFound {
+                object_id: ObjectId::new("iron-key"),
+                object: "iron key".to_string(),
+                target: "warden".to_string(),
+            }]
         );
     }
 }
