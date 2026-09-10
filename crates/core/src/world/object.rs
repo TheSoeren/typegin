@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::Target;
 use crate::data::{self, object_data};
 use crate::input::direction::Direction;
 use crate::world::room::RoomId;
@@ -11,6 +12,14 @@ pub use crate::model::object_id::ObjectId;
 pub enum ObjectResolution {
     Found(ObjectId),
     Ambiguous { ids: Vec<ObjectId>, alias: String },
+    NotFound,
+}
+
+/// Outcome of resolving a player-typed noun against the world.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TargetResolution {
+    Found(Target),
+    Ambiguous { ids: Vec<Target>, alias: String },
     NotFound,
 }
 
@@ -36,7 +45,6 @@ pub struct DoorState {
     pub(crate) direction: Direction,
     pub(crate) to: RoomId,
     pub(crate) locked: bool,
-    pub(crate) gated_by: Option<ObjectId>,
 }
 
 impl Object {
@@ -69,7 +77,6 @@ impl Object {
                 direction,
                 to: door_data.to.clone().into(),
                 locked: door_data.locked,
-                gated_by: door_data.gated_by.clone().map(ObjectId::from),
             })
         });
 
@@ -102,7 +109,6 @@ pub struct DoorInfo {
     pub direction: Direction,
     pub to: RoomId,
     pub locked: bool,
-    pub gated_by: Option<ObjectId>,
 }
 
 impl ObjectInfo {
@@ -121,7 +127,6 @@ impl ObjectInfo {
                 direction: door.direction,
                 to: door.to.clone(),
                 locked: door.locked,
-                gated_by: door.gated_by.clone(),
             }),
             extra: object.extra.clone(),
         }

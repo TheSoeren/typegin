@@ -1,4 +1,5 @@
 - verb: examine
-  item: oak-door
+  target: 
+    object: oak-door
   effect:
     - reveal_exit: north

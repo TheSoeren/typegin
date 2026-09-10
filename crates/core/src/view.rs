@@ -87,11 +87,14 @@ pub trait View {
                 Event::UsedTargetAmbiguous { object, .. } => {
                     self.render_used_target_ambiguous(object)
                 }
-                Event::Examined { object, .. } => self.render_examined(object),
-                Event::ExaminedObjectNotFound { object } => {
+                Event::Examined {
+                    target_name: object,
+                    ..
+                } => self.render_examined(object),
+                Event::ExaminedTargetNotFound { target: object } => {
                     self.render_examined_object_not_found(object)
                 }
-                Event::ExaminedObjectAmbiguous { object, .. } => {
+                Event::ExaminedTargetAmbiguous { target: object, .. } => {
                     self.render_examined_object_ambiguous(object)
                 }
                 Event::UnknownEvent { name } => self.render_unknown_event(name),
@@ -143,7 +146,7 @@ pub trait View {
         Vec::new()
     }
 
-    /// A locked exit was unlocked by using its `gated_by` object on it.
+    /// A locked exit was unlocked
     fn render_unlocked_exit(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
         Vec::new()
     }

@@ -2,7 +2,7 @@ use crate::data::interactions_data;
 use crate::input::action;
 use crate::interaction::{ActionContext, Interaction, Verb};
 use crate::world;
-use crate::world::object::ObjectResolution;
+use crate::world::object::{ObjectResolution, TargetResolution};
 use crate::{Event, event, object_data};
 
 /// Minimal rules that reuse every default hook.
@@ -175,23 +175,23 @@ pub trait Rules {
         &mut self,
         world: &mut world::WorldState,
         name: &str,
-        resolution: ObjectResolution,
+        resolution: TargetResolution,
     ) -> Vec<event::Event> {
-        let ObjectResolution::Found(object_id) = resolution else {
+        let TargetResolution::Found(target) = resolution else {
             return match resolution {
-                ObjectResolution::Ambiguous { ids, alias } => {
-                    vec![event::Event::ExaminedObjectAmbiguous {
-                        object_ids: ids,
-                        object: alias,
+                TargetResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::ExaminedTargetAmbiguous {
+                        target_ids: ids,
+                        target: alias,
                     }]
                 }
-                _ => vec![event::Event::ExaminedObjectNotFound {
-                    object: name.to_string(),
+                _ => vec![event::Event::ExaminedTargetNotFound {
+                    target: name.to_string(),
                 }],
             };
         };
 
-        let context = ActionContext::new(Some(Verb::Examine), Some(object_id.clone()), None);
+        let context = ActionContext::new(Some(Verb::Examine), None, Some(target.clone()));
         if let Some(events) = interactions_data::dispatch_data(world, &context) {
             return events;
         }
@@ -204,30 +204,19 @@ pub trait Rules {
         }
 
         vec![event::Event::Examined {
-            object_id,
-            object: name.to_string(),
+            target,
+            target_name: name.to_string(),
         }]
     }
 
     /// Decide what happens when the player uses an object, optionally on a target.
-    ///
-    /// The default runs three stages:
-    ///
-    /// 1. Match an authored [`Interaction`] (see [`Rules::interactions`]) — the
-    ///    custom-puzzle slot.
-    /// 2. Otherwise, fall back to the stock behaviour: a successful use on an
-    ///    object emits `Used`; using an object on a *locked* door whose
-    ///    `gated_by` is the used object unlocks it (`UnlockedExit`).
-    /// 3. Everything else (wrong target, missing target, already open door)
-    ///    gets a generic refusal event (`CannotUse`, etc.) — the fallback
-    ///    spine that makes authored interactions cheap to write.
     fn on_use(
         &mut self,
         world: &mut world::WorldState,
         item: &str,
         target: Option<&str>,
         item_resolution: ObjectResolution,
-        target_resolution: ObjectResolution,
+        target_resolution: TargetResolution,
     ) -> Vec<event::Event> {
         let ObjectResolution::Found(item_id) = item_resolution else {
             return match item_resolution {
@@ -244,7 +233,7 @@ pub trait Rules {
         };
 
         let target_id = match &target_resolution {
-            ObjectResolution::Found(id) => Some(id.clone()),
+            TargetResolution::Found(t) => Some(t.clone()),
             _ => None,
         };
         let context = ActionContext::new(Some(Verb::Use), Some(item_id.clone()), target_id);
@@ -261,30 +250,15 @@ pub trait Rules {
 
         let target_text = target.map(str::to_string);
         match target_resolution {
-            ObjectResolution::Found(target_id) => {
-                if let Some(direction) = world.exit_direction_of(&target_id) {
-                    // It's a door.
-                    if world.is_exit_locked(direction)
-                        && world.exit_gated_by(direction) == Some(item_id)
-                    {
-                        world.unlock_exit(direction);
-                        vec![event::Event::UnlockedExit { direction }]
-                    } else {
-                        vec![event::Event::CannotUse {
-                            item: item.to_string(),
-                            target: target_text.unwrap_or_default(),
-                        }]
-                    }
-                } else {
-                    vec![event::Event::Used {
-                        object_id: item_id,
-                        object: item.to_string(),
-                        target_id: Some(target_id),
-                        target: target_text.clone(),
-                    }]
-                }
+            TargetResolution::Found(target_id) => {
+                vec![event::Event::Used {
+                    object_id: item_id,
+                    object: item.to_string(),
+                    target_id: Some(target_id),
+                    target: target_text.clone(),
+                }]
             }
-            ObjectResolution::Ambiguous { ids, alias } => {
+            TargetResolution::Ambiguous { ids, alias } => {
                 vec![event::Event::UsedTargetAmbiguous {
                     object_id: item_id,
                     object: item.to_string(),
@@ -292,7 +266,7 @@ pub trait Rules {
                     target: alias,
                 }]
             }
-            ObjectResolution::NotFound => match target_text {
+            TargetResolution::NotFound => match target_text {
                 None => vec![event::Event::UsedTargetNeeded {
                     object_id: item_id,
                     object: item.to_string(),

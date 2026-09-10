@@ -1,5 +1,6 @@
 - verb: examine
-  item: iron-key
+  target:
+    object: iron-key
   condition:
     - room: study
   effect:

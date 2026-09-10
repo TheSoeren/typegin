@@ -1,5 +1,6 @@
 use crate::Npc;
 use crate::input::direction::Direction;
+use crate::interaction::Target;
 use crate::model::dialogue_node_id::DialogueNodeId;
 use crate::model::dialogue_option_id::DialogueOptionId;
 use crate::model::npc_id::NpcId;
@@ -35,18 +36,9 @@ pub enum Event {
     WentExitLocked(Direction),
     WentInvalidDirection(Direction),
 
-    /// A locked exit was unlocked (typically by using a matching `gated_by`
-    /// object on it).
+    /// A locked exit was unlocked
     UnlockedExit {
         direction: Direction,
-    },
-
-    /// An attempted interaction that makes no sense ("use the sword on the
-    /// open door"): the entities resolved fine but the combination does not
-    /// apply. The generic fallback answer.
-    CannotUse {
-        item: String,
-        target: String,
     },
 
     /// The player took an object into inventory.
@@ -90,11 +82,11 @@ pub enum Event {
         object: String,
     },
 
-    /// The player used one object, optionally on a target.
+    /// The player used one object, optionally on a target (object or NPC).
     Used {
         object_id: ObjectId,
         object: String,
-        target_id: Option<ObjectId>,
+        target_id: Option<Target>,
         target: Option<String>,
     },
     UsedObjectNotFound {
@@ -116,21 +108,28 @@ pub enum Event {
     UsedTargetAmbiguous {
         object_id: ObjectId,
         object: String,
-        target_ids: Vec<ObjectId>,
+        target_ids: Vec<Target>,
+        target: String,
+    },
+    /// An attempted interaction that makes no sense ("use the sword on the
+    /// open door"): the entities resolved fine but the combination does not
+    /// apply. The generic fallback answer.
+    CannotUse {
+        item: String,
         target: String,
     },
 
     /// The player examined an object
     Examined {
-        object_id: ObjectId,
-        object: String,
+        target: Target,
+        target_name: String,
     },
-    ExaminedObjectNotFound {
-        object: String,
+    ExaminedTargetNotFound {
+        target: String,
     },
-    ExaminedObjectAmbiguous {
-        object_ids: Vec<ObjectId>,
-        object: String,
+    ExaminedTargetAmbiguous {
+        target_ids: Vec<Target>,
+        target: String,
     },
 
     /// A global flag was set.

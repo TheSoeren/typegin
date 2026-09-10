@@ -53,7 +53,7 @@ mod data_parsing {
     }
 
     #[test]
-    fn door_object_parses_locked_and_gated_flags() {
+    fn door_object_parses_locked_flags() {
         let data = common::multi_room_world_data();
         let oak = data
             .find_object(&ObjectId::new("oak-door"))
@@ -61,7 +61,6 @@ mod data_parsing {
         let oak_door = oak.door.as_ref().expect("door data");
         assert_eq!(oak_door.to, "corridor".to_string());
         assert!(oak_door.locked);
-        assert_eq!(oak_door.gated_by, Some("iron-key".to_string()));
 
         let vault = data
             .find_object(&ObjectId::new("hidden-vault"))

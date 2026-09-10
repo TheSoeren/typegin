@@ -4,8 +4,9 @@ use crate::data::{WorldData, WorldDataError};
 use crate::event::Event;
 use crate::input::action::{DiscardResult, DropResult, GrantResult, TakeResult};
 use crate::input::direction::{Direction, DirectionResolution};
-use crate::interaction::{ActionContext, Interaction, TargetFilter, Verb};
+use crate::interaction::{ActionContext, Interaction, Target, TargetFilter, Verb};
 use crate::world::WorldState;
+use crate::world::npc::NpcId;
 use crate::world::object::ObjectId;
 use crate::world::room::RoomId;
 
@@ -31,6 +32,14 @@ impl InteractionData {
                     self.verb, object
                 ))
             })?;
+        }
+        if let Some(DataTarget::Npc { npc }) = &self.target
+            && !data.npcs.iter().any(|npc_data| &npc_data.id == npc)
+        {
+            return Err(WorldDataError::Validation(format!(
+                "interaction with verb `{:?}` references unknown npc key `{}`",
+                self.verb, npc
+            )));
         }
         for condition in &self.condition {
             condition.validate_references(data)?;
@@ -76,12 +85,15 @@ impl InteractionData {
             && self.condition_applies(world, context)
     }
 
-    fn target_matches(&self, world: &WorldState, target: Option<&ObjectId>) -> bool {
+    fn target_matches(&self, world: &WorldState, target: Option<&Target>) -> bool {
         match &self.target {
             None => target.is_none(),
-            Some(DataTarget::Object { object }) => target == Some(object),
+            Some(DataTarget::Object { object }) => target == Some(&Target::Object(object.clone())),
+            Some(DataTarget::Npc { npc }) => target == Some(&Target::Npc(npc.clone())),
             Some(DataTarget::Kind { kind }) => match kind {
-                DataTargetKind::Scene => target.is_some_and(|id| world.object_is_scene(id)),
+                DataTargetKind::Scene => target.is_some_and(
+                    |target| matches!(target, Target::Object(id) if world.object_is_scene(id)),
+                ),
             },
         }
     }
@@ -113,7 +125,18 @@ impl InteractionData {
                     TargetFilter::Targeted,
                     Some(
                         Box::new(move |_world: &WorldState, context: &ActionContext| {
-                            context.target == Some(object.clone())
+                            context.target == Some(Target::Object(object.clone()))
+                        }) as Box<InteractionConditionFn>,
+                    ),
+                )
+            }
+            Some(DataTarget::Npc { npc }) => {
+                let npc = npc.clone();
+                (
+                    TargetFilter::Targeted,
+                    Some(
+                        Box::new(move |_world: &WorldState, context: &ActionContext| {
+                            context.target == Some(Target::Npc(npc.clone()))
                         }) as Box<InteractionConditionFn>,
                     ),
                 )
@@ -148,6 +171,8 @@ impl InteractionData {
 pub enum DataTarget {
     /// Only the exact object with this id.
     Object { object: ObjectId },
+    /// Only the exact NPC with this id (a "use item on guard" target).
+    Npc { npc: NpcId },
     /// Any target of the coarse structural kind.
     Kind { kind: DataTargetKind },
 }
@@ -192,7 +217,7 @@ impl DataCondition {
             DataCondition::ExitLocked { exit_locked } => world.is_exit_locked(*exit_locked),
             DataCondition::ExitHidden { exit_hidden } => world.is_exit_hidden(*exit_hidden),
             DataCondition::IsDoor { is_door } => {
-                context.target.as_ref().map(|id| world.object_is_door(id)) == Some(*is_door)
+                context.target_object().map(|id| world.object_is_door(id)) == Some(*is_door)
             }
             DataCondition::Flag { flag } => world.has_flag(flag),
             DataCondition::Not { not } => !not.matches(world, context),

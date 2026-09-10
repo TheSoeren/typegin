@@ -178,14 +178,6 @@ impl Room {
             .is_some_and(|id| self.hidden_objects.iter().any(|object| object.id == id))
     }
 
-    /// The id of the object that unlocks the door in `direction`, if one is
-    /// declared (i.e. the gate exists).
-    pub(crate) fn exit_gated_by(&self, direction: input::Direction) -> Option<object::ObjectId> {
-        self.door_in_direction(direction)
-            .and_then(|object| object.door.as_ref())
-            .and_then(|door| door.gated_by.clone())
-    }
-
     /// Directions leading to an *open* (passable) exit in this room.
     pub(crate) fn exit_directions(&self) -> Vec<input::Direction> {
         DIRECTIONS

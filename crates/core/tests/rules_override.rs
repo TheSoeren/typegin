@@ -14,7 +14,10 @@ mod common;
 use common::{setup_engine, setup_engine_with_rules};
 use core::{
     Direction, Event, GameEngine, Interaction, ObjectId, Rules, TargetFilter, Verb,
-    world::{WorldState, object},
+    world::{
+        WorldState,
+        object::{self, TargetResolution},
+    },
 };
 
 /// Overrides every hook to return a distinctive marker event so a test can
@@ -60,7 +63,7 @@ impl Rules for TestRules {
         &mut self,
         _world: &mut WorldState,
         _name: &str,
-        _resolution: object::ObjectResolution,
+        _resolution: TargetResolution,
     ) -> Vec<Event> {
         Self::override_event("examine")
     }
@@ -71,7 +74,7 @@ impl Rules for TestRules {
         _item: &str,
         _target: Option<&str>,
         _item_resolution: object::ObjectResolution,
-        _target_resolution: object::ObjectResolution,
+        _target_resolution: TargetResolution,
     ) -> Vec<Event> {
         Self::override_event("use")
     }
@@ -86,6 +89,8 @@ fn marker(label: &str) -> Vec<Event> {
 }
 
 mod everything_overridden {
+    use core::Target;
+
     use super::*;
 
     #[test]
@@ -134,8 +139,8 @@ mod everything_overridden {
         assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }],
             default.handle_input("examine iron key")
         );
@@ -183,7 +188,7 @@ mod everything_overridden {
 
         let interactions = vec![Interaction::build(
             Verb::Use,
-            None,
+            Some(ObjectId::new("iron-key")),
             TargetFilter::Any,
             None,
             Box::new(|_world, _context| {

@@ -8,7 +8,7 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, Event, ObjectId, RoomId};
+use core::{Direction, Event, ObjectId, RoomId, Target};
 
 // --- on_look ---
 
@@ -211,8 +211,8 @@ mod on_examine {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                object_id: ObjectId::new("iron-key"),
-                object: "iron key".to_string(),
+                target: Target::Object(ObjectId::new("iron-key")),
+                target_name: "iron key".to_string(),
             }]
         );
     }
@@ -222,8 +222,8 @@ mod on_examine {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("examine bogus"),
-            vec![Event::ExaminedObjectNotFound {
-                object: "bogus".to_string()
+            vec![Event::ExaminedTargetNotFound {
+                target: "bogus".to_string()
             }]
         );
     }
@@ -233,9 +233,12 @@ mod on_examine {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("examine key"),
-            vec![Event::ExaminedObjectAmbiguous {
-                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
-                object: "key".to_string()
+            vec![Event::ExaminedTargetAmbiguous {
+                target_ids: vec![
+                    Target::Object(ObjectId::new("iron-key")),
+                    Target::Object(ObjectId::new("brass-key"))
+                ],
+                target: "key".to_string()
             }]
         );
     }
@@ -279,7 +282,7 @@ mod on_use {
             vec![Event::Used {
                 object_id: ObjectId::new("iron-key"),
                 object: "iron key".to_string(),
-                target_id: Some(ObjectId::new("locked-chest")),
+                target_id: Some(Target::Object(ObjectId::new("locked-chest"))),
                 target: Some("chest".to_string()),
             }]
         );

@@ -3,6 +3,15 @@
   target:
     object: oak-door
   condition:
+    - not:
+        flag: override-stock
+  effect:
+    - emit: no-flag-set
+- verb: use
+  item: iron-key
+  target:
+    object: oak-door
+  condition:
     - flag: override-stock
   effect:
-    - emit: flag-overrode-stock
+    - unlock_exit: east

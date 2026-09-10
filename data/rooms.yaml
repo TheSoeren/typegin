@@ -1,30 +1,17 @@
+# Rooms for the terminal demo — faithful to Edna & Harvey: The Breakout.
+# Only the first room (the padded cell) is playable; it ends in the
+# ventilation shaft, where the game's second section would begin.
 rooms:
   - key: player-cell
     name: The Padded Cell
-    visible_objects: [chair, table, wall-polster, door-grate, cell-door,
-      nail-clipper]
-    hidden_objects: [chair-leg, fan, vent-grille]
+    visible_objects: [chair, table, padding, door-grate, cell-door]
+    hidden_objects: [chair-leg, airy-gap, vent-grille, fan, shaft-entrance]
     extra:
-      description: A padded cell, every wall bundled in soft polster. Edna's head hurts.
+      description: A padded cell in the sanatorium. It is oppressively hot — the air conditioning is off.
 
   - key: air-chute
-    name: The Air Chute
-    visible_objects: [air-chute-to-cell, air-chute-to-office]
-    hidden_objects: []
-    extra:
-      description: A cramped, dusty ventilation chute.
-
-  - key: dr-marcel-office
-    name: Dr. Marcel's Office
-    visible_objects: [office-to-air-chute, office-door, encyclopedia, polo-mallet, ballpoint-pen,
-      cabinet]
-    hidden_objects: []
-    extra:
-      description: The office of Dr. Marcel. Books, a diploma, and somewhere to hide.
-
-  - key: corridor
-    name: The Guard Corridor
+    name: The Ventilation Shaft
     visible_objects: []
     hidden_objects: []
     extra:
-      description: The corridor outside the cell. A guard polishes his putter.
+      description: You crawl through the fan opening into a dark, dusty ventilation shaft. Somewhere ahead, two men are talking. The first-room escape is complete.

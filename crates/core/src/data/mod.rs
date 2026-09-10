@@ -55,9 +55,8 @@ impl WorldData {
     }
 
     /// Check the world data for structural integrity: unique object and room
-    /// keys, and every key reference (room memberships, door `to`/`gated_by`,
-    /// interaction fields, and NPC room/dialogue references) resolving to a
-    /// declared key.
+    /// keys, and every key reference (room memberships, door `to`, interaction
+    /// fields, and NPC room/dialogue references) resolving to a declared key.
     ///
     /// # Errors
     ///
@@ -91,14 +90,6 @@ impl WorldData {
                         object.id, door.to
                     ))
                 })?;
-                if let Some(gated_by) = &door.gated_by {
-                    self.find_object(&ObjectId::new(gated_by)).ok_or_else(|| {
-                        WorldDataError::Validation(format!(
-                            "door `{}` references unknown object key `{}`",
-                            object.id, gated_by
-                        ))
-                    })?;
-                }
             }
         }
 

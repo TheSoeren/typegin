@@ -1,7 +1,15 @@
 - verb: examine
-  item: oak-door
+  target:
+    object: oak-door
   condition:
     - not:
         exit_locked: east
   effect:
     - emit: door-checked-twice
+
+- verb: use
+  item: iron-key
+  target:
+    object: oak-door
+  effect:
+    - unlock_exit: east
