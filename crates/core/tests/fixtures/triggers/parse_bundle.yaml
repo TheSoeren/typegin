@@ -1,0 +1,11 @@
+- id: guard-alert
+  condition:
+    - room: study
+    - flag: alarm-armed
+  effect:
+    - emit: guard-alert
+    - set_flag: guard-alerted
+- id: door-sensor
+  condition: []
+  effect:
+    - emit: sensor-tick

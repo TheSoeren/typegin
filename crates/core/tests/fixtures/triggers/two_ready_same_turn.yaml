@@ -1,0 +1,10 @@
+- id: first-in-study
+  condition:
+    - room: study
+  effect:
+    - emit: first-beat
+- id: second-in-study
+  condition:
+    - room: study
+  effect:
+    - emit: second-beat

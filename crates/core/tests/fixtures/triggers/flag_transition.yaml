@@ -1,0 +1,5 @@
+- id: ac-off-alert
+  condition:
+    - flag: ac-off
+  effect:
+    - emit: fan-still

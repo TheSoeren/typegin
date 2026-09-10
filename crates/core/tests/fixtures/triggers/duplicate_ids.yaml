@@ -1,0 +1,8 @@
+- id: dup
+  condition: []
+  effect:
+    - emit: first
+- id: dup
+  condition: []
+  effect:
+    - emit: second
