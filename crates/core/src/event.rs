@@ -1,4 +1,9 @@
+use crate::Npc;
 use crate::input::direction::Direction;
+use crate::model::dialogue_node_id::DialogueNodeId;
+use crate::model::dialogue_option_id::DialogueOptionId;
+use crate::model::npc_id::NpcId;
+use crate::world::npc::DialogueChoice as NpcDialogueChoice;
 use crate::world::object::ObjectId;
 
 /// Structured result of executing an `Action` against the world.
@@ -136,4 +141,74 @@ pub enum Event {
     FlagCleared {
         flag: String,
     },
+
+    // -- NPC / dialogue --
+    /// The player initiated or advanced a dialogue with an NPC.
+    Talked {
+        npc_id: NpcId,
+        npc: String,
+        node_id: DialogueNodeId,
+        text: String,
+        choices: Vec<DialogueChoice>,
+    },
+    /// A dialogue conversation ended (reached the end marker or no choices).
+    DialogueEnded {
+        npc_id: NpcId,
+        npc: String,
+    },
+    /// No NPC by that name was found in the current room.
+    TalkNpcNotFound {
+        npc: String,
+    },
+    /// The player's choice didn't match any available dialogue option.
+    DialogueInvalidChoice {
+        npc: String,
+        choice: String,
+    },
+}
+
+impl Event {
+    /// Build a `Talked` event showing `node_id` of `npc`'s dialogue, or
+    /// `None` if the node is not part of the graph.
+    #[must_use]
+    pub(crate) fn talked(npc: &Npc, node_id: &DialogueNodeId) -> Option<Event> {
+        let node = npc.dialogue_node(node_id)?;
+        Some(Event::Talked {
+            npc_id: npc.id.clone(),
+            npc: npc.primary_name().to_string(),
+            node_id: node_id.clone(),
+            text: node.text().to_string(),
+            choices: node.choices().iter().map(Into::into).collect(),
+        })
+    }
+
+    /// Build a `DialogueEnded` event for `npc`.
+    #[must_use]
+    pub(crate) fn dialogue_ended(npc: &Npc) -> Event {
+        Event::DialogueEnded {
+            npc_id: npc.id.clone(),
+            npc: npc.primary_name().to_string(),
+        }
+    }
+}
+
+/// A player choice presented inside an [`Event::Talked`] event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogueChoice {
+    /// The stable authored id of the choice, if one was declared.
+    pub option_id: Option<DialogueOptionId>,
+    pub label: String,
+    /// The next node id, or `None` to terminate the conversation.
+    pub next: Option<DialogueNodeId>,
+}
+
+/// Bridge from the runtime dialogue choice model to the event payload.
+impl From<&NpcDialogueChoice> for DialogueChoice {
+    fn from(choice: &NpcDialogueChoice) -> Self {
+        DialogueChoice {
+            option_id: choice.option_id().cloned(),
+            label: choice.label().to_string(),
+            next: choice.next().cloned(),
+        }
+    }
 }

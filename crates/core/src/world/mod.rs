@@ -1,3 +1,4 @@
+pub mod npc;
 pub mod object;
 pub mod player;
 pub mod room;
@@ -12,7 +13,9 @@ use crate::data::interactions_data::InteractionData;
 use crate::data::object_data;
 use crate::input::action;
 use crate::input::direction;
-use crate::world::object::{ObjectId, ObjectInfo, ObjectResolution};
+use crate::model::dialogue_node_id::DialogueNodeId;
+use crate::model::object_id::ObjectId;
+use crate::world::object::{ObjectInfo, ObjectResolution};
 
 #[derive(Debug, Getters)]
 pub struct WorldState {
@@ -28,6 +31,17 @@ pub struct WorldState {
     /// Object templates from world data, used to materialise an object into
     /// the player's inventory that is not placed in any room (`grant`).
     object_templates: HashMap<ObjectId, object::Object>,
+    /// NPCs loaded from world data.
+    #[getset(get = "pub")]
+    npcs: Vec<npc::Npc>,
+    /// Current dialogue node per NPC. The most recently talked-to NPC is the
+    /// "active" one for `Choose` dispatch.
+    #[getset(get = "pub")]
+    dialogue_state: HashMap<npc::NpcId, DialogueNodeId>,
+    /// The NPC the player is currently talking to; `Choose` dispatch reads
+    /// this NPC's current node from `dialogue_state`.
+    #[getset(get = "pub")]
+    active_npc: Option<npc::NpcId>,
 }
 
 /// Navigation: location and movement within the world.
@@ -64,9 +78,12 @@ impl WorldState {
     }
 
     /// Change the current room to `room_id`, if it is known to the world.
+    ///
+    /// Moving rooms ends any active conversation.
     pub fn move_to_room(&mut self, room_id: room::RoomId) -> action::MoveResult {
         if self.rooms.contains_key(&room_id) {
             self.current_room_id = room_id;
+            self.clear_all_dialogue();
             action::MoveResult::Success
         } else {
             warn!("Tried to move to unknown room (id: {room_id})!");
@@ -348,6 +365,58 @@ impl WorldState {
     }
 }
 
+/// NPC helpers
+impl WorldState {
+    /// NPCs present in the given room.
+    #[must_use]
+    pub fn npcs_in_room(&self, room_id: &room::RoomId) -> Vec<&npc::Npc> {
+        self.npcs
+            .iter()
+            .filter(|npc| npc.room_id() == room_id)
+            .collect()
+    }
+
+    /// Resolve an NPC by name (primary name or alias) in the current room.
+    #[must_use]
+    pub fn resolve_npc(&self, name: &str) -> Option<&npc::Npc> {
+        self.npcs_in_room(&self.current_room_id)
+            .into_iter()
+            .find(|npc| npc.has_name(name))
+    }
+
+    /// The current dialogue node id for the given NPC, if in conversation.
+    #[must_use]
+    pub fn npc_dialogue_node(&self, npc_id: &npc::NpcId) -> Option<&DialogueNodeId> {
+        self.dialogue_state.get(npc_id)
+    }
+
+    /// Set the dialogue node for an NPC.
+    pub fn set_dialogue_node(&mut self, npc_id: npc::NpcId, node_id: DialogueNodeId) {
+        self.dialogue_state.insert(npc_id, node_id);
+    }
+
+    /// Clear the dialogue state for an NPC (end conversation).
+    pub fn clear_dialogue(&mut self, npc_id: &npc::NpcId) {
+        self.dialogue_state.remove(npc_id);
+    }
+
+    /// Clear all dialogue state (e.g. on room change).
+    pub fn clear_all_dialogue(&mut self) {
+        self.dialogue_state.clear();
+        self.active_npc = None;
+    }
+
+    /// Mark the NPC the player is currently talking to.
+    pub fn set_active_npc(&mut self, npc_id: npc::NpcId) {
+        self.active_npc = Some(npc_id);
+    }
+
+    /// Clear the active NPC (e.g. when a conversation ends).
+    pub fn clear_active_npc(&mut self) {
+        self.active_npc = None;
+    }
+}
+
 impl WorldState {
     /// The authored data-driven interactions, in declaration order.
     pub(crate) fn data_interactions(&self) -> &[InteractionData] {
@@ -407,6 +476,9 @@ impl WorldState {
             current_room_id: first_room_id,
             data_interactions: data.interactions.clone(),
             object_templates,
+            npcs: data.npcs.iter().map(npc::Npc::from_data).collect(),
+            dialogue_state: HashMap::new(),
+            active_npc: None,
         }
     }
 }

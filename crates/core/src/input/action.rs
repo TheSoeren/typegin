@@ -26,6 +26,10 @@ pub enum Action {
         item: String,
         target: Option<String>,
     },
+    /// The player initiated a dialogue with an NPC.
+    Talk(String),
+    /// The player chose a dialogue option (by index or label).
+    Choose(String),
     /// A command that matched no known action.
     Unknown(String),
 }

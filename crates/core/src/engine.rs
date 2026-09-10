@@ -108,6 +108,8 @@ impl GameEngine {
                     target_res,
                 )
             }
+            Action::Talk(name) => self.rules.on_talk(&mut self.world, &name),
+            Action::Choose(choice) => self.rules.on_choose(&mut self.world, &choice),
             Action::Unknown(phrase) => self.rules.on_unknown(&mut self.world, phrase),
         }
     }

@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use serde::Deserialize;
 
 use crate::data::ExtraValue;
-use crate::{ObjectId, RoomId};
+use crate::model::object_id::ObjectId;
+use crate::model::room_id::RoomId;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct RoomsFile {

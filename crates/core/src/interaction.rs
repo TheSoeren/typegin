@@ -32,7 +32,7 @@ impl Verb {
             Action::Take(_) => Some(Verb::Take),
             Action::Drop(_) => Some(Verb::Drop),
             Action::Use { .. } => Some(Verb::Use),
-            Action::Unknown(_) => None,
+            Action::Talk(_) | Action::Choose(_) | Action::Unknown(_) => None,
         }
     }
 }
