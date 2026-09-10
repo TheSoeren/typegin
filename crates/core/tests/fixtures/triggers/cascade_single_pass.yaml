@@ -1,0 +1,10 @@
+- id: enter-sets-flag
+  condition:
+    - room: study
+  effect:
+    - set_flag: chain-flag
+- id: depends-on-chain-flag
+  condition:
+    - flag: chain-flag
+  effect:
+    - emit: chain-fired

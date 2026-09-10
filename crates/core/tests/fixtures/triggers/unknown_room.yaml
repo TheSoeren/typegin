@@ -1,0 +1,5 @@
+- id: bad-trigger
+  condition:
+    - room: nonexistent-room
+  effect:
+    - emit: never
