@@ -1,0 +1,19 @@
+# NPC choice with effects that return events (emit + set_flag).
+npcs:
+  - key: guard
+    primary_name: guard
+    aliases: [sentry]
+    room: corridor
+    dialogue:
+      root: greeting
+      nodes:
+        greeting:
+          text: "The guard looks at you."
+          choices:
+            - label: Ask about the key
+              next: about-key
+              effect:
+                - set_flag: guard-told-about-key
+                - emit: key-hint
+        about-key:
+          text: "The key is hidden nearby."

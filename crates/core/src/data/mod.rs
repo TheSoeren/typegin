@@ -1,6 +1,7 @@
 pub mod door_data;
 pub mod global_data;
 pub mod interactions_data;
+pub mod npc_data;
 pub mod object_data;
 pub mod room_data;
 
@@ -13,9 +14,11 @@ use serde::Deserialize;
 
 use crate::data::global_data::GlobalFile;
 use crate::data::interactions_data::{InteractionData, InteractionsFile};
+use crate::data::npc_data::{NpcData, NpcsFile};
 use crate::data::object_data::{ObjectData, ObjectsFile};
 use crate::data::room_data::{RoomData, RoomsFile};
-use crate::{ObjectId, RoomId};
+use crate::model::object_id::ObjectId;
+use crate::model::room_id::RoomId;
 
 #[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(untagged)]
@@ -35,6 +38,7 @@ pub struct WorldData {
     pub objects: Vec<ObjectData>,
     pub rooms: Vec<RoomData>,
     pub interactions: Vec<InteractionData>,
+    pub npcs: Vec<NpcData>,
 }
 
 impl WorldData {
@@ -52,7 +56,8 @@ impl WorldData {
 
     /// Check the world data for structural integrity: unique object and room
     /// keys, and every key reference (room memberships, door `to`/`gated_by`,
-    /// and interaction fields) resolving to a declared key.
+    /// interaction fields, and NPC room/dialogue references) resolving to a
+    /// declared key.
     ///
     /// # Errors
     ///
@@ -99,6 +104,10 @@ impl WorldData {
 
         for interaction in &self.interactions {
             interaction.validate_references(self)?;
+        }
+
+        for npc in &self.npcs {
+            npc.validate_references(self)?;
         }
 
         Ok(())
@@ -177,17 +186,20 @@ impl WorldData {
         items_yaml: &str,
         rooms_yaml: &str,
         interactions_yaml: &str,
+        npcs_yaml: &str,
     ) -> Result<Self, WorldDataError> {
         let globals: GlobalFile = serde_yaml_ng::from_str(globals_yaml)?;
         let objects: ObjectsFile = serde_yaml_ng::from_str(items_yaml)?;
         let rooms: RoomsFile = serde_yaml_ng::from_str(rooms_yaml)?;
         let interactions: InteractionsFile = serde_yaml_ng::from_str(interactions_yaml)?;
+        let npcs: NpcsFile = serde_yaml_ng::from_str(npcs_yaml)?;
 
         let data = WorldData {
             flags: globals.flags,
             objects: objects.objects,
             rooms: rooms.rooms,
             interactions: interactions.interactions,
+            npcs: npcs.npcs,
         };
         data.validate()?;
 
@@ -206,12 +218,20 @@ impl WorldData {
         items_path: impl AsRef<Path>,
         rooms_path: impl AsRef<Path>,
         interactions_path: impl AsRef<Path>,
+        npcs_path: impl AsRef<Path>,
     ) -> Result<Self, WorldDataError> {
         let globals_yaml = std::fs::read_to_string(globals_path)?;
         let items_yaml = std::fs::read_to_string(items_path)?;
         let rooms_yaml = std::fs::read_to_string(rooms_path)?;
         let interactions_yaml = std::fs::read_to_string(interactions_path)?;
+        let npcs_yaml = std::fs::read_to_string(npcs_path)?;
 
-        Self::from_yaml(&globals_yaml, &items_yaml, &rooms_yaml, &interactions_yaml)
+        Self::from_yaml(
+            &globals_yaml,
+            &items_yaml,
+            &rooms_yaml,
+            &interactions_yaml,
+            &npcs_yaml,
+        )
     }
 }

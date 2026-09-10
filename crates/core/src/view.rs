@@ -97,6 +97,14 @@ pub trait View {
                 Event::UnknownEvent { name } => self.render_unknown_event(name),
                 Event::FlagSet { flag } => self.render_flag_set(flag),
                 Event::FlagCleared { flag } => self.render_flag_cleared(flag),
+                Event::Talked {
+                    npc, text, choices, ..
+                } => self.render_talked(npc, text, choices),
+                Event::DialogueEnded { npc, .. } => self.render_dialogue_ended(npc),
+                Event::TalkNpcNotFound { npc } => self.render_talk_npc_not_found(npc),
+                Event::DialogueInvalidChoice { npc, choice } => {
+                    self.render_dialogue_invalid_choice(npc, choice)
+                }
                 other => self.render_generic(other),
             })
             .collect()
@@ -242,6 +250,31 @@ pub trait View {
 
     /// A global flag was cleared.
     fn render_flag_cleared(&mut self, _flag: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// An NPC spoke; `choices` are the player's available responses.
+    fn render_talked(
+        &mut self,
+        _npc: &str,
+        _text: &str,
+        _choices: &[crate::event::DialogueChoice],
+    ) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// A dialogue conversation ended.
+    fn render_dialogue_ended(&mut self, _npc: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// The player tried to talk to an NPC that is not in the current room.
+    fn render_talk_npc_not_found(&mut self, _npc: &str) -> Vec<RenderCommand> {
+        Vec::new()
+    }
+
+    /// The player picked a dialogue option that does not exist.
+    fn render_dialogue_invalid_choice(&mut self, _npc: &str, _choice: &str) -> Vec<RenderCommand> {
         Vec::new()
     }
 }

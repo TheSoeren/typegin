@@ -1,0 +1,26 @@
+# Two NPCs in the same room with independent dialogue graphs.
+npcs:
+  - key: guard
+    primary_name: guard
+    aliases: [sentry]
+    room: corridor
+    dialogue:
+      root: greeting
+      nodes:
+        greeting:
+          text: "The guard looks at you."
+          choices:
+            - label: Hello guard
+              next: .end
+  - key: warden
+    primary_name: warden
+    aliases: [director]
+    room: corridor
+    dialogue:
+      root: greeting
+      nodes:
+        greeting:
+          text: "The warden ignores you."
+          choices:
+            - label: Hello warden
+              next: .end

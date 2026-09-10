@@ -1,0 +1,18 @@
+# NPC with two choices that each lead to a different leaf node.
+npcs:
+  - key: guard
+    primary_name: guard
+    aliases: [sentry]
+    room: corridor
+    dialogue:
+      root: greeting
+      nodes:
+        greeting:
+          text: "The guard looks at you."
+          choices:
+            - label: Ask about the exit
+              next: about-exit
+            - label: Say nothing
+              next: .end
+        about-exit:
+          text: "The exit is to the north."

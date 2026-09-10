@@ -37,6 +37,20 @@ pub fn lex(tokens: &[&str]) -> Action {
         },
         ["go", direction] => direction_to_action(direction, tokens),
         [direction] => direction_to_action(direction, tokens),
+        ["talk", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Talk(rest.join(" "))
+            }
+        }
+        ["choose", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Choose(rest.join(" "))
+            }
+        }
         _ => Action::Unknown(tokens.join(" ")),
     }
 }

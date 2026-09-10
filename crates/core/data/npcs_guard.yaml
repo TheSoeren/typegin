@@ -1,0 +1,11 @@
+# Minimal NPC with a single dialogue node (no choices → immediate end).
+npcs:
+  - key: guard
+    primary_name: guard
+    aliases: [sentry]
+    room: corridor
+    dialogue:
+      root: greeting
+      nodes:
+        greeting:
+          text: "The guard nods at you."

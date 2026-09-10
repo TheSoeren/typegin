@@ -56,13 +56,20 @@ const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
 const GLOBALS_YAML: &str = "{}";
 
 fn base_world() -> WorldData {
-    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, "{}").expect("base fixture parses")
+    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, "{}", "{}")
+        .expect("base fixture parses")
 }
 
 fn world_with(interactions: &str) -> WorldData {
     let interactions_yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, &interactions_yaml)
-        .expect("fixture with authored interactions parses")
+    WorldData::from_yaml(
+        GLOBALS_YAML,
+        ITEMS_YAML,
+        ROOMS_YAML,
+        &interactions_yaml,
+        "{}",
+    )
+    .expect("fixture with authored interactions parses")
 }
 
 fn engine_with(interactions: &str) -> GameEngine {
@@ -552,9 +559,14 @@ mod initial_flags {
     fn initial_flags_are_queryable_by_interactions() {
         let interactions = include_str!("../data/interactions/flag_condition.yaml");
         let interactions_yaml = format!("interactions:\n{interactions}");
-        let mut data =
-            WorldData::from_yaml(GLOBALS_YAML, ITEMS_YAML, ROOMS_YAML, &interactions_yaml)
-                .expect("parses");
+        let mut data = WorldData::from_yaml(
+            GLOBALS_YAML,
+            ITEMS_YAML,
+            ROOMS_YAML,
+            &interactions_yaml,
+            "{}",
+        )
+        .expect("parses");
         data.flags = vec!["quest-started".to_string()];
         let mut engine = GameEngine::get(&data);
         assert_eq!(

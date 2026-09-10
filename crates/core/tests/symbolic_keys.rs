@@ -40,14 +40,14 @@ const ROOMS_YAML: &str = include_str!("../data/data_interactions_rooms.yaml");
 
 /// The base keyed world (no interactions).
 fn base_world() -> WorldData {
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, "{}").expect("keyed fixture parses")
+    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, "{}", "{}").expect("keyed fixture parses")
 }
 
 /// The keyed world with an authored interaction snippet (same pattern as the
 /// `data_interactions` suite).
 fn world_with(interactions: &str) -> WorldData {
     let yaml = format!("interactions:\n{interactions}");
-    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, &yaml)
+    WorldData::from_yaml("{}", ITEMS_YAML, ROOMS_YAML, &yaml, "{}")
         .expect("keyed fixture with interactions parses")
 }
 
@@ -407,7 +407,7 @@ mod integrity {
         rooms: &str,
         interactions: &str,
     ) -> Result<WorldData, Box<dyn std::error::Error>> {
-        WorldData::from_yaml("{}", items, rooms, interactions).map_err(Into::into)
+        WorldData::from_yaml("{}", items, rooms, interactions, "{}").map_err(Into::into)
     }
 
     // ---- unknown keys in references ----

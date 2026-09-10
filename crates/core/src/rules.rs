@@ -1,10 +1,9 @@
 use crate::data::interactions_data;
-use crate::event;
 use crate::input::action;
 use crate::interaction::{ActionContext, Interaction, Verb};
-use crate::object_data;
 use crate::world;
 use crate::world::object::ObjectResolution;
+use crate::{Event, event, object_data};
 
 /// Minimal rules that reuse every default hook.
 ///
@@ -305,6 +304,117 @@ pub trait Rules {
                 }],
             },
         }
+    }
+
+    /// Decide what happens when the player talks to an NPC by name.
+    ///
+    /// Start (or advance) the NPC's conversation: show the current dialogue
+    /// node, and end the conversation when the node has no choices.
+    fn on_talk(&mut self, world: &mut world::WorldState, name: &str) -> Vec<event::Event> {
+        let Some(npc) = world.resolve_npc(name) else {
+            return vec![Event::TalkNpcNotFound {
+                npc: name.to_string(),
+            }];
+        };
+
+        let node_id = world
+            .npc_dialogue_node(&npc.id)
+            .cloned()
+            .unwrap_or_else(|| npc.root.clone());
+        let Some(talk_event) = Event::talked(npc, &node_id) else {
+            return Vec::new();
+        };
+        let ended = npc
+            .dialogue_node(&node_id)
+            .is_some_and(|node| node.choices().is_empty());
+        let ended_event = ended.then(|| Event::dialogue_ended(npc));
+        let npc_id = npc.id.clone();
+
+        world.set_active_npc(npc_id.clone());
+        world.set_dialogue_node(npc_id.clone(), node_id);
+
+        let mut events = vec![talk_event];
+        if let Some(ended_event) = ended_event {
+            events.push(ended_event);
+            world.clear_dialogue(&npc_id);
+            world.clear_active_npc();
+        }
+        events
+    }
+
+    /// Decide what happens when the player picks a dialogue option.
+    ///
+    /// Match the choice on the active conversation by 1-based index or
+    /// case-insensitive label, run its effects, and advance to the next node
+    /// (or end). `UnknownEvent` when no conversation is active, and
+    /// `DialogueInvalidChoice` when nothing matches.
+    fn on_choose(&mut self, world: &mut world::WorldState, choice: &str) -> Vec<event::Event> {
+        let Some(npc_id) = world.active_npc().clone() else {
+            return vec![Event::UnknownEvent {
+                name: choice.to_string(),
+            }];
+        };
+        let Some(current_node_id) = world.npc_dialogue_node(&npc_id).cloned() else {
+            return vec![Event::UnknownEvent {
+                name: choice.to_string(),
+            }];
+        };
+
+        // Resolve the current node and chosen option read-only, so the effects
+        // can then mutate the world freely.
+        let Some(npc) = world.npcs().iter().find(|npc| npc.id() == &npc_id) else {
+            return vec![Event::UnknownEvent {
+                name: choice.to_string(),
+            }];
+        };
+        let npc_name = npc.primary_name().to_string();
+        let Some(chosen) = npc
+            .dialogue_node(&current_node_id)
+            .and_then(|node| node.find_choice(choice))
+        else {
+            return vec![Event::DialogueInvalidChoice {
+                npc: npc_name,
+                choice: choice.to_string(),
+            }];
+        };
+
+        let next_node_id = chosen.next().cloned();
+        let effects = chosen.effect().to_vec();
+        let next_event = next_node_id
+            .as_ref()
+            .and_then(|next| Event::talked(npc, next));
+        let ended = match &next_node_id {
+            None => true,
+            Some(next) => npc
+                .dialogue_node(next)
+                .is_some_and(|node| node.choices().is_empty()),
+        };
+
+        let mut events = interactions_data::DataEffect::apply_all(&effects, world);
+
+        if let Some(next) = next_node_id {
+            if let Some(next_event) = next_event {
+                events.push(next_event);
+            }
+            if ended {
+                events.push(Event::DialogueEnded {
+                    npc_id: npc_id.clone(),
+                    npc: npc_name,
+                });
+                world.clear_dialogue(&npc_id);
+                world.clear_active_npc();
+            } else {
+                world.set_dialogue_node(npc_id, next);
+            }
+        } else {
+            events.push(Event::DialogueEnded {
+                npc_id: npc_id.clone(),
+                npc: npc_name,
+            });
+            world.clear_dialogue(&npc_id);
+            world.clear_active_npc();
+        }
+        events
     }
 
     /// Decide what happens for an unrecognised command.

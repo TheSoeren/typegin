@@ -13,6 +13,7 @@ pub(crate) fn multi_room_world_data() -> WorldData {
         include_str!("../../data/items_multi_room.yaml"),
         include_str!("../../data/rooms_multi_room.yaml"),
         "{}",
+        "{}",
     )
     .expect("parse multi-room test world data")
 }
@@ -23,6 +24,7 @@ pub(crate) fn test_world_data() -> WorldData {
         "{}",
         include_str!("../../data/items.yaml"),
         include_str!("../../data/rooms.yaml"),
+        "{}",
         "{}",
     )
     .expect("parse single-room test world data")

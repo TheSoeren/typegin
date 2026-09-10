@@ -96,10 +96,7 @@ impl InteractionData {
     /// it and returning the events to report.
     #[must_use]
     pub(crate) fn run(&self, world: &mut WorldState) -> Vec<Event> {
-        self.effect
-            .iter()
-            .filter_map(|effect| effect.apply(world))
-            .collect()
+        DataEffect::apply_all(&self.effect, world)
     }
 
     /// Compile this data interaction into the closure [`Interaction`] shape
@@ -275,6 +272,16 @@ pub enum DataEffect {
 }
 
 impl DataEffect {
+    /// Apply a list of effects in order, mutating the world and returning the
+    /// events they emit. Silent effects emit no event.
+    #[must_use]
+    pub(crate) fn apply_all(effects: &[DataEffect], world: &mut WorldState) -> Vec<Event> {
+        effects
+            .iter()
+            .filter_map(|effect| effect.apply(world))
+            .collect()
+    }
+
     #[must_use]
     fn apply(&self, world: &mut WorldState) -> Option<Event> {
         match self {
@@ -325,7 +332,7 @@ impl DataEffect {
     /// # Errors
     ///
     /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
-    fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+    pub(crate) fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
         let id = match self {
             DataEffect::Take { take } => take,
             DataEffect::Grant { grant } => grant,

@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use serde::Deserialize;
 
-use crate::{
-    ObjectId,
-    data::{ExtraValue, door_data::DoorData},
-};
+use crate::data::ExtraValue;
+use crate::data::door_data::DoorData;
+use crate::model::object_id::ObjectId;
 
 /// The two object kinds of the Visionaire model:
 ///

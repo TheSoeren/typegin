@@ -15,12 +15,14 @@ fn main() -> ExitCode {
     let items_path = data_dir.join("items.yaml");
     let rooms_path = data_dir.join("rooms.yaml");
     let interactions_path = data_dir.join("interactions.yaml");
+    let npcs_path = data_dir.join("npcs.yaml");
 
     let world_data = match typegin_core::WorldData::load(
         &globals_path,
         &items_path,
         &rooms_path,
         &interactions_path,
+        &npcs_path,
     ) {
         Ok(data) => data,
         Err(err) => {
