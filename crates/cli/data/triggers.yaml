@@ -32,8 +32,8 @@ triggers:
     effect:
       - emit: The hum beyond the padding splutters and dies. The air conditioning is off.
 
-  - key: shaft-entry-beat
+  - key: end-beat
     condition:
       - room: air-chute
     effect:
-      - emit: Somewhere ahead, two men are talking. The first-room escape is complete.
+      - emit: This is the END of the prototype!
