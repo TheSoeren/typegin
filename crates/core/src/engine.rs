@@ -30,8 +30,10 @@ pub struct GameEngine {
     data_interactions: Vec<Interaction>,
     /// One synthetic [`Interaction::talk_npc`] hotspot per NPC in the world,
     /// so `interactions_for` reports current-room NPCs as [`Verb::Talk`]
-    /// targets for a point-and-click front-end. Presence is a live condition
-    /// (the NPC's room vs the player's current room), never a refresh.
+    /// targets for a point-and-click front-end — both the open "what is
+    /// clickable" query and a query targeted at that NPC specifically.
+    /// Presence is a live condition (the NPC's room vs the player's current
+    /// room), never a refresh.
     talk_targets: Vec<Interaction>,
 }
 
@@ -127,10 +129,6 @@ impl GameEngine {
         target: Option<Target>,
     ) -> Vec<&Interaction> {
         let context = ActionContext::new(None, item, target);
-        // The open "what can I click" query is the only one NPC hotspots
-        // belong in: they carry no item, so re-using their `matches` with an
-        // item-constrained context would report them for every carried object.
-        let open_query = context.item.is_none() && context.target.is_none();
         self.data_interactions
             .iter()
             .filter(|interaction| interaction.matches(&self.world, &context))
@@ -141,10 +139,8 @@ impl GameEngine {
                     .filter(|interaction| interaction.matches(&self.world, &context)),
             )
             .chain(
-                open_query
-                    .then_some(&self.talk_targets)
-                    .into_iter()
-                    .flatten()
+                self.talk_targets
+                    .iter()
                     .filter(|interaction| interaction.matches(&self.world, &context)),
             )
             .collect()

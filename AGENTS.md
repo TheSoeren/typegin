@@ -145,7 +145,7 @@ adventure games** too. In particular:
 | Run                  | `cargo run`                                                |
 | Test (all)           | `cargo test`                                              |
 | Test (unit tier only)| `cargo test -p core --lib`                                |
-| Test (single suite)  | `cargo test --test <name>` (names: `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `symbolic_keys`, `triggers`, `world`) |
+| Test (single suite)  | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
 | Lint                 | `cargo clippy --workspace --all-targets`                  |
 | Format               | `cargo fmt`                                               |
 | Format check         | `cargo fmt --check`                                       |

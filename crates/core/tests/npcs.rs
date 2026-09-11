@@ -1303,9 +1303,21 @@ mod use_on_npc {
             Some(ObjectId::new("iron-key")),
             Some(Target::Npc(NpcId::new("guard"))),
         );
-        assert_eq!(listed.len(), 1);
-        assert_eq!(listed[0].verb(), Verb::Use);
-        assert_eq!(listed[0].item(), Some(ObjectId::new("iron-key")));
+        // A query targeted straight at an NPC reports both the authored Use
+        // interaction and the Talk hotspot: talking to a present NPC is
+        // always possible regardless of which item happens to be selected.
+        assert_eq!(listed.len(), 2);
+        assert!(
+            listed
+                .iter()
+                .any(|interaction| interaction.verb() == Verb::Use
+                    && interaction.item() == Some(ObjectId::new("iron-key")))
+        );
+        assert!(
+            listed
+                .iter()
+                .any(|interaction| interaction.verb() == Verb::Talk)
+        );
     }
 
     #[test]

@@ -2,7 +2,7 @@ use crate::world::WorldState;
 use crate::world::npc::NpcId;
 use crate::world::object::ObjectId;
 
-use super::{ActionContext, TargetFilter, Verb};
+use super::{ActionContext, Target, TargetFilter, Verb};
 
 /// The condition of an interaction: a pure predicate over the world and the
 /// interaction context. Runs both when dispatching and (via the query API)
@@ -70,11 +70,14 @@ impl Interaction {
     /// Build a "talk to this NPC" interaction: a [`Verb::Talk`] hotspot for an
     /// NPC, live only while the player is in the NPC's room.
     ///
-    /// No object coupling: the entry carries no `item` or `target` filter, so
-    /// it only surfaces in the open `interactions_for(None, None)` query a
-    /// point-and-click UI uses to enumerate what is clickable right now. The
-    /// effect is inert — a `Talk` action dispatches through
-    /// `Rules::on_talk`, not through `Interaction` effects.
+    /// No object coupling (`item` is always `None`, matching any queried
+    /// item), but the condition does check the *target*: it matches a query
+    /// naming this NPC specifically (`target: Some(Target::Npc(this_npc))`,
+    /// any item), and also the fully open "what is clickable right now" query
+    /// (`item: None, target: None`) a point-and-click UI uses to enumerate
+    /// hotspots. It never matches a query targeted at something else. The
+    /// effect is inert — a `Talk` action dispatches through `Rules::on_talk`,
+    /// not through `Interaction` effects.
     #[must_use]
     pub fn talk_npc(npc: NpcId) -> Self {
         let present_npc = npc.clone();
@@ -83,11 +86,17 @@ impl Interaction {
             item: None,
             target: TargetFilter::Any,
             condition: Some(Box::new(
-                move |world: &WorldState, _context: &ActionContext| {
-                    world
-                        .npcs_in_room(&world.current_room_id())
-                        .iter()
-                        .any(|present| present.id() == &present_npc)
+                move |world: &WorldState, context: &ActionContext| {
+                    let target_ok = match &context.target {
+                        Some(Target::Npc(id)) => id == &present_npc,
+                        Some(Target::Object(_)) => false,
+                        None => context.item.is_none(),
+                    };
+                    target_ok
+                        && world
+                            .npcs_in_room(&world.current_room_id())
+                            .iter()
+                            .any(|present| present.id() == &present_npc)
                 },
             )),
             effect: Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
