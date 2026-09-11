@@ -111,7 +111,7 @@ impl InteractionData {
 
 impl DataCondition {
     #[must_use]
-    fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
+    pub(crate) fn matches(&self, world: &WorldState, context: &ActionContext) -> bool {
         match self {
             DataCondition::Room { room } => *room == world.current_room_id(),
             DataCondition::PlayerHolds { player_holds } => world.player_holds(player_holds),
@@ -335,6 +335,7 @@ mod tests {
             ],
             interactions,
             npcs: Vec::new(),
+            triggers: Vec::new(),
         };
         WorldState::from_data(&data)
     }

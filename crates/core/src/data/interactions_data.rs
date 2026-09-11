@@ -125,7 +125,7 @@ impl DataCondition {
     /// # Errors
     ///
     /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
-    fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
+    pub(crate) fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
         match self {
             DataCondition::Room { room } => data.find_room(room).map(|_| ()).ok_or_else(|| {
                 WorldDataError::Validation(format!(

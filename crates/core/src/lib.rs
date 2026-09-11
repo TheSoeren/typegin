@@ -9,6 +9,7 @@ pub mod input;
 pub mod interaction;
 pub mod keys;
 pub mod rules;
+pub mod trigger;
 pub mod view;
 pub mod world;
 
@@ -17,6 +18,7 @@ pub use data::interactions_data::{
 };
 pub use data::npc_data::{DialogueChoiceData, DialogueData, DialogueNodeData, NpcData};
 pub use data::object_data;
+pub use data::trigger_data::TriggerData;
 pub use data::{ExtraValue, WorldData, WorldDataError};
 pub use engine::GameEngine;
 pub use event::{DialogueChoice, Event};

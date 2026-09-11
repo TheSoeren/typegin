@@ -7,6 +7,7 @@ use crate::input::{Action, parse_input};
 use crate::interaction::{ActionContext, Interaction, Target};
 use crate::rules::BasicRules;
 use crate::rules::Rules;
+use crate::trigger::check_triggers;
 use crate::world;
 use crate::world::object::{self, ObjectId};
 
@@ -80,7 +81,7 @@ impl GameEngine {
     /// so a front-end can reuse the same [`Action`] value multiple times or
     /// build one programmatically without going through text.
     pub fn execute_action(&mut self, action: Action) -> Vec<Event> {
-        match action {
+        let mut events = match action {
             Action::Look => self.rules.on_look(&mut self.world),
             Action::Go(direction) => self.rules.on_go(&mut self.world, direction),
             Action::Examine(name) => {
@@ -112,7 +113,9 @@ impl GameEngine {
             Action::Talk(name) => self.rules.on_talk(&mut self.world, &name),
             Action::Choose(choice) => self.rules.on_choose(&mut self.world, &choice),
             Action::Unknown(phrase) => self.rules.on_unknown(&mut self.world, phrase),
-        }
+        };
+        events.extend(check_triggers(&mut self.world));
+        events
     }
 
     /// Query which authored interactions are currently live for a given
