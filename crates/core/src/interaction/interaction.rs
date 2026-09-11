@@ -194,6 +194,7 @@ mod tests {
             }],
             interactions: Vec::new(),
             npcs,
+            triggers: Vec::new(),
         };
         WorldState::from_data(&data)
     }

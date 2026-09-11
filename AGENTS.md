@@ -43,14 +43,23 @@ were tackled:
    <npc>` works the same way as `use <item> on <object>`. NPCs are still
    room-bound, not carryable (no inventory-companion NPC). See
    `crates/core/tests/npcs.rs`.
-3. **Room-event / trigger system** — spec written, implementation pending.
-   Non-item-triggered beats (entering a room, a flag transitioning), the
-   analogue of a "World" hook distinct from `Interaction`'s verb-object
-   shape. The dispatch contract (a `TriggerData` list reusing the existing
-   `DataCondition`/`DataEffect` vocabulary, checked after every action,
-   one-shot, all-ready-fire-in-declaration-order, no same-turn cascade) is
-   pinned down as a red-phase suite in `crates/core/tests/triggers.rs` —
-   read its module doc comment before touching this area.
+3. **Room-event / trigger system** — done. Non-item-triggered beats (entering
+   a room, a flag transitioning), the analogue of a "World" hook distinct
+   from `Interaction`'s verb-object shape. `TriggerData` (schema in
+   `crates/core/src/data/trigger_data.rs`, authored under `data/triggers:`)
+   reuses the existing `DataCondition`/`DataEffect` vocabulary; runtime
+   dispatch lives in `crates/core/src/trigger.rs`
+   (`check_triggers(&mut WorldState)`), called from the tail of
+   `GameEngine::execute_action` so it runs after *every* action, not just a
+   specific verb. Dispatch contract: on each call, every not-yet-fired
+   trigger's condition is checked against a readiness snapshot taken before
+   any trigger in that pass runs its effects, so one trigger's effect cannot
+   make another trigger in the same pass newly eligible (a chain resolves
+   over multiple player turns, never within one); all triggers ready in a
+   pass fire, in declaration order; each trigger fires at most once, ever
+   (`WorldState`'s `fired_triggers` set, no re-arm). See
+   `crates/core/tests/triggers.rs` (its module doc comment states the
+   contract) and `crates/core/src/trigger.rs`'s module doc comment.
 4. **Inventory / verb-coin UI primitives** and **combine-two-carried-items**
    scope (a distinct Take-vs-combine overlap) — not started.
 

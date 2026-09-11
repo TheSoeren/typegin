@@ -3,7 +3,7 @@ pub mod object;
 pub mod player;
 pub mod room;
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use getset::Getters;
 use log::warn;
@@ -12,10 +12,12 @@ use crate::Target;
 use crate::data;
 use crate::data::interactions_data::InteractionData;
 use crate::data::object_data;
+use crate::data::trigger_data::TriggerData;
 use crate::input::action;
 use crate::input::direction;
 use crate::keys::dialogue_node_id::DialogueNodeId;
 use crate::keys::object_id::ObjectId;
+use crate::keys::trigger_id::TriggerId;
 use crate::world::object::TargetResolution;
 use crate::world::object::{ObjectInfo, ObjectResolution};
 
@@ -33,6 +35,12 @@ pub struct WorldState {
     /// Authored data-driven interactions shipped in world data. Queried by the
     /// default rules hooks *before* `Rules::interactions()` closures.
     data_interactions: Vec<InteractionData>,
+    /// Authored triggers shipped in world data, in declaration order. Checked
+    /// after every action by `crate::trigger::check_triggers`.
+    triggers: Vec<TriggerData>,
+    /// Ids of triggers that have already fired. Each trigger fires at most
+    /// once, ever (no re-arm).
+    fired_triggers: HashSet<TriggerId>,
     /// Object templates from world data, used to materialise an object into
     /// the player's inventory that is not placed in any room (`grant`).
     object_templates: HashMap<ObjectId, object::Object>,
@@ -442,6 +450,25 @@ impl WorldState {
     }
 }
 
+/// Trigger access.
+impl WorldState {
+    /// The authored triggers, in declaration order.
+    pub(crate) fn triggers(&self) -> &[TriggerData] {
+        &self.triggers
+    }
+
+    /// Whether the trigger with `id` has already fired.
+    #[must_use]
+    pub(crate) fn trigger_fired(&self, id: &TriggerId) -> bool {
+        self.fired_triggers.contains(id)
+    }
+
+    /// Mark the trigger with `id` as fired (idempotent).
+    pub(crate) fn mark_trigger_fired(&mut self, id: TriggerId) {
+        self.fired_triggers.insert(id);
+    }
+}
+
 /// Data import
 impl WorldState {
     /// Build a `WorldState` directly from world data (YAML), with no database.
@@ -493,6 +520,8 @@ impl WorldState {
             rooms,
             current_room_id: first_room_id,
             data_interactions: data.interactions.clone(),
+            triggers: data.triggers.clone(),
+            fired_triggers: HashSet::new(),
             object_templates,
             npcs: data.npcs.iter().map(npc::Npc::from_data).collect(),
             dialogue_state: HashMap::new(),

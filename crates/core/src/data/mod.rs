@@ -3,6 +3,7 @@ pub mod interactions_data;
 pub mod npc_data;
 pub mod object_data;
 pub mod room_data;
+pub mod trigger_data;
 
 use std::collections::HashMap;
 use std::error::Error;
@@ -11,6 +12,7 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use crate::TriggerData;
 use crate::data::interactions_data::InteractionData;
 use crate::data::npc_data::NpcData;
 use crate::data::object_data::ObjectData;
@@ -37,6 +39,7 @@ pub struct WorldData {
     pub rooms: Vec<RoomData>,
     pub interactions: Vec<InteractionData>,
     pub npcs: Vec<NpcData>,
+    pub triggers: Vec<TriggerData>,
 }
 
 impl WorldData {
@@ -68,6 +71,10 @@ impl WorldData {
             self.rooms.iter().map(|room| &room.id),
             "room key `{key}` declared more than once",
         )?;
+        ensure_unique_keys(
+            self.triggers.iter().map(|trigger| &trigger.id),
+            "trigger key `{key}` declared more than once",
+        )?;
 
         if self.rooms.is_empty() {
             return Err(WorldDataError::Validation(
@@ -89,6 +96,10 @@ impl WorldData {
 
         for npc in &self.npcs {
             npc.validate_references(self)?;
+        }
+
+        for trigger in &self.triggers {
+            trigger.validate_references(self)?;
         }
 
         Ok(())
@@ -173,6 +184,8 @@ struct WorldDataFile {
     interactions: Vec<InteractionData>,
     #[serde(default)]
     npcs: Vec<NpcData>,
+    #[serde(default)]
+    triggers: Vec<TriggerData>,
 }
 
 impl WorldData {
@@ -193,6 +206,7 @@ impl WorldData {
             rooms: file.rooms,
             interactions: file.interactions,
             npcs: file.npcs,
+            triggers: file.triggers,
         };
         data.validate()?;
 
