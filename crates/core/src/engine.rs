@@ -10,6 +10,7 @@ use crate::interaction::{ActionContext, Interaction, Target};
 use crate::rules::BasicRules;
 use crate::rules::Rules;
 use crate::trigger::check_triggers;
+use crate::world::SaveError;
 use crate::world::object::{self, ObjectId};
 use crate::{Verb, world};
 
@@ -172,5 +173,44 @@ impl GameEngine {
             .collect();
         verbs.extend(self.rules.default_verbs(target, self.world()));
         verbs
+    }
+
+    /// Serialize the current game's *progress* (not the authored content)
+    /// to a human-readable string.
+    ///
+    /// See [`GameEngine::load`] for what "progress" means and why it's a
+    /// narrower thing than the whole `WorldState`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SaveError`] if the progress cannot be serialized.
+    pub fn save(&self) -> Result<String, SaveError> {
+        self.world.save()
+    }
+
+    /// Rebuild a `GameEngine` from `data` and `rules` — exactly as
+    /// [`GameEngine::get_with_rules`] would, with fresh compiled
+    /// interactions, fresh trigger definitions, and fresh NPC dialogue trees
+    /// — then restore the progress captured by [`GameEngine::save`] on top
+    /// of it: flags, player inventory, each room's object membership, door
+    /// lock state, fired triggers, and NPC dialogue progress.
+    ///
+    /// `data` may be a different (patched) version of the world than `save`
+    /// was taken against: static content always comes from `data`, never
+    /// from the save, so a content change since the save was made is picked
+    /// up. An object, room, or NPC id the save mentions that no longer
+    /// exists in `data` is silently skipped rather than erroring.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`SaveError`] if `save` cannot be parsed.
+    pub fn load(
+        data: &WorldData,
+        rules: impl Rules + 'static,
+        save: &str,
+    ) -> Result<GameEngine, SaveError> {
+        let mut engine = Self::get_with_rules(data, rules);
+        engine.world.restore(save)?;
+        Ok(engine)
     }
 }

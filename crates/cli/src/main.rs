@@ -50,7 +50,9 @@ fn main() -> ExitCode {
     println!(
         "You wake up in a padded cell of the sanatorium. Harvey is in your hands, chin tucked against you."
     );
-    println!("Type 'look' to see where you are, 'talk to harvey' to speak. 'quit' to leave.\n");
+    println!(
+        "Type 'look' to see where you are, 'talk to harvey' to speak. 'save'/'load' [file] to save or resume. 'quit' to leave.\n"
+    );
 
     let stdin = io::stdin();
     for line in stdin.lock().lines() {
@@ -64,6 +66,46 @@ fn main() -> ExitCode {
         }
         if input == "quit" || input == "exit" {
             break;
+        }
+
+        let (cmd, argument) = match input.split_once(' ') {
+            Some((cmd, rest)) => (cmd, rest.trim()),
+            None => (input.as_str(), ""),
+        };
+        let save_path = if argument.is_empty() {
+            "savegame.yaml"
+        } else {
+            argument
+        };
+
+        if cmd == "save" {
+            match engine.save() {
+                Ok(save) => match std::fs::write(save_path, save) {
+                    Ok(()) => println!("Game saved to {save_path}."),
+                    Err(err) => println!("Failed to write save file: {err}"),
+                },
+                Err(err) => println!("Failed to save game: {err}"),
+            }
+            continue;
+        }
+        if cmd == "load" {
+            match std::fs::read_to_string(save_path) {
+                Ok(save) => {
+                    match typegin_core::GameEngine::load(
+                        &world_data,
+                        typegin_core::BasicRules,
+                        &save,
+                    ) {
+                        Ok(loaded) => {
+                            engine = loaded;
+                            println!("Game loaded from {save_path}.");
+                        }
+                        Err(err) => println!("Failed to load game: {err}"),
+                    }
+                }
+                Err(err) => println!("Failed to read save file: {err}"),
+            }
+            continue;
         }
 
         let events = engine.handle_input(&input);
