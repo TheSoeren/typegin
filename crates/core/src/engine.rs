@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use getset::{Getters, MutGetters};
 
 use crate::data::WorldData;
@@ -8,8 +10,8 @@ use crate::interaction::{ActionContext, Interaction, Target};
 use crate::rules::BasicRules;
 use crate::rules::Rules;
 use crate::trigger::check_triggers;
-use crate::world;
 use crate::world::object::{self, ObjectId};
+use crate::{Verb, world};
 
 /// The pure game state: no rendering, I/O, or persistence logic.
 ///
@@ -17,7 +19,8 @@ use crate::world::object::{self, ObjectId};
 /// inject custom [`Rules`]), feed it text via [`GameEngine::handle_input`],
 /// and render the resulting [`Event`]s with a [`View`](crate::view::View). A
 /// point-and-click front-end can instead query what is currently possible via
-/// [`GameEngine::interactions_for`], without executing anything.
+/// [`GameEngine::interactions_for`] and [`GameEngine::verbs_for`], without
+/// executing anything.
 #[derive(Getters, MutGetters)]
 pub struct GameEngine {
     #[getset(get = "pub", get_mut = "pub")]
@@ -30,8 +33,10 @@ pub struct GameEngine {
     data_interactions: Vec<Interaction>,
     /// One synthetic [`Interaction::talk_npc`] hotspot per NPC in the world,
     /// so `interactions_for` reports current-room NPCs as [`Verb::Talk`]
-    /// targets for a point-and-click front-end. Presence is a live condition
-    /// (the NPC's room vs the player's current room), never a refresh.
+    /// targets for a point-and-click front-end — both the open "what is
+    /// clickable" query and a query targeted at that NPC specifically.
+    /// Presence is a live condition (the NPC's room vs the player's current
+    /// room), never a refresh.
     talk_targets: Vec<Interaction>,
 }
 
@@ -127,10 +132,6 @@ impl GameEngine {
         target: Option<Target>,
     ) -> Vec<&Interaction> {
         let context = ActionContext::new(None, item, target);
-        // The open "what can I click" query is the only one NPC hotspots
-        // belong in: they carry no item, so re-using their `matches` with an
-        // item-constrained context would report them for every carried object.
-        let open_query = context.item.is_none() && context.target.is_none();
         self.data_interactions
             .iter()
             .filter(|interaction| interaction.matches(&self.world, &context))
@@ -141,12 +142,35 @@ impl GameEngine {
                     .filter(|interaction| interaction.matches(&self.world, &context)),
             )
             .chain(
-                open_query
-                    .then_some(&self.talk_targets)
-                    .into_iter()
-                    .flatten()
+                self.talk_targets
+                    .iter()
                     .filter(|interaction| interaction.matches(&self.world, &context)),
             )
             .collect()
+    }
+
+    /// Query every verb currently applicable to `target`, for a
+    /// point-and-click front-end's verb coin.
+    ///
+    /// The union of every [`Verb`] a currently-live *item-agnostic*
+    /// interaction reports for `target` (`interactions_for(None,
+    /// Some(target))` — this also picks up the NPC-hotspot `Verb::Talk` when
+    /// `target` names a present NPC) with [`Rules::default_verbs`],
+    /// deduplicated. An interaction gated on a specific carried item never
+    /// contributes here, regardless of what the player holds: the coin is a
+    /// pure function of the target and world state, never inventory-reactive
+    /// (see AGENTS.md's north star item 4). Discovering that a specific
+    /// carried item does something to `target` is a separate query —
+    /// `interactions_for(Some(item), Some(target))` — fired when that item is
+    /// actually used against it.
+    #[must_use]
+    pub fn verbs_for(&self, target: Target) -> HashSet<Verb> {
+        let mut verbs: HashSet<Verb> = self
+            .interactions_for(None, Some(target.clone()))
+            .iter()
+            .map(|interaction| interaction.verb())
+            .collect();
+        verbs.extend(self.rules.default_verbs(target, self.world()));
+        verbs
     }
 }

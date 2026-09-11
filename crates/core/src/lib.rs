@@ -13,9 +13,7 @@ pub mod trigger;
 pub mod view;
 pub mod world;
 
-pub use data::interactions_data::{
-    DataCondition, DataEffect, DataTarget, DataTargetKind, InteractionData,
-};
+pub use data::interactions_data::{DataCondition, DataEffect, DataTarget, InteractionData};
 pub use data::npc_data::{DialogueChoiceData, DialogueData, DialogueNodeData, NpcData};
 pub use data::object_data;
 pub use data::trigger_data::TriggerData;
@@ -24,7 +22,9 @@ pub use engine::GameEngine;
 pub use event::{DialogueChoice, Event};
 pub use input::parse_input;
 pub use input::{Action, Direction, DirectionResolution, Outcome};
-pub use interaction::{ActionContext, Interaction, Target, TargetFilter, TargetResolution, Verb};
+pub use interaction::{
+    ActionContext, Interaction, Target, TargetFilter, TargetKind, TargetResolution, Verb,
+};
 pub use keys::dialogue_node_id::DialogueNodeId;
 pub use keys::dialogue_option_id::DialogueOptionId;
 pub use keys::npc_id::NpcId;

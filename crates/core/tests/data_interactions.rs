@@ -2,8 +2,8 @@ mod common;
 
 use core::ActionContext;
 use core::{
-    DataCondition, DataEffect, DataTarget, DataTargetKind, Direction, Event, GameEngine,
-    Interaction, InteractionData, ObjectId, ObjectResolution, RoomId, Rules, Target, TargetFilter,
+    DataCondition, DataEffect, DataTarget, Direction, Event, GameEngine, Interaction,
+    InteractionData, ObjectId, ObjectResolution, RoomId, Rules, Target, TargetFilter, TargetKind,
     Verb, WorldData, WorldDataError, WorldState,
 };
 
@@ -58,7 +58,7 @@ mod parse {
                     verb: Verb::Use,
                     item: Some(ObjectId::new("iron-key")),
                     target: Some(DataTarget::Kind {
-                        kind: DataTargetKind::Scene
+                        kind: TargetKind::Scene
                     }),
                     condition: vec![
                         DataCondition::Room {
@@ -710,7 +710,7 @@ mod precedence_and_rules {
         let closure = vec![Interaction::build(
             Verb::Use,
             Some(ObjectId::new("iron-key")),
-            TargetFilter::Scene,
+            TargetFilter::Kind(TargetKind::Scene),
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 context
                     .target_object()
@@ -810,7 +810,7 @@ mod interactions_for {
         let closure = vec![Interaction::build(
             Verb::Use,
             None,
-            TargetFilter::Scene,
+            TargetFilter::Kind(TargetKind::Scene),
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 context
                     .target_object()

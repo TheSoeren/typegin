@@ -1,3 +1,5 @@
+use serde::Deserialize;
+
 use crate::world::WorldState;
 use crate::world::npc::NpcId;
 use crate::world::object::ObjectId;
@@ -22,8 +24,26 @@ pub enum Target {
 /// (object or NPC) in scope.
 pub type TargetResolution = crate::keys::Resolution<Target>;
 
+/// A structural *world-position* class a use-with target can belong to.
+/// Properties of a target — door-ness, lock state, ... — are expressed as
+/// conditions, not kinds.
+///
+/// Deserialized directly from authored YAML (`target: kind: scene`) as
+/// [`DataTarget::Kind`](crate::data::interactions_data::DataTarget::Kind),
+/// and reused as-is by [`TargetFilter::Kind`] at runtime — one type spans the
+/// authored schema and the compiled shape, the same way
+/// [`Verb`](crate::interaction::Verb) does.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TargetKind {
+    /// A scene object (stays in the world; every door is one).
+    Scene,
+    /// An object currently in the player's inventory.
+    Carried,
+}
+
 /// Coarse structural filter deciding which targets an interaction applies to:
-/// arity (`Any` vs `Targeted`) and world-position (`Scene`). The task-specific
+/// arity (`Any` vs `Targeted`) and world-position (`Kind`). The task-specific
 /// selection on top of it lives in the interaction's `condition`, which can
 /// inspect the concrete target (a door's direction, its door-ness, lock state,
 /// ...).
@@ -33,8 +53,8 @@ pub enum TargetFilter {
     Any,
     /// Only a targeted interaction (use X on Y); no self-use.
     Targeted,
-    /// Only use-with on a *scene* object (stays in the world).
-    Scene,
+    /// Only use-with on a target of this structural world-position kind.
+    Kind(TargetKind),
 }
 
 impl TargetFilter {
@@ -42,8 +62,11 @@ impl TargetFilter {
         match self {
             TargetFilter::Any => true,
             TargetFilter::Targeted => target.is_some(),
-            TargetFilter::Scene => target.is_some_and(
+            TargetFilter::Kind(TargetKind::Scene) => target.is_some_and(
                 |target| matches!(target, Target::Object(id) if world.object_is_scene(id)),
+            ),
+            TargetFilter::Kind(TargetKind::Carried) => target.is_some_and(
+                |target| matches!(target, Target::Object(id) if world.player_holds(id)),
             ),
         }
     }
@@ -115,18 +138,18 @@ mod tests {
     #[test]
     fn scene_requires_a_scene_object_target() {
         let world = world();
-        assert!(!TargetFilter::Scene.matches(&world, None));
-        assert!(
-            TargetFilter::Scene.matches(&world, Some(&Target::Object(ObjectId::new("cabinet"))))
-        );
-        assert!(
-            !TargetFilter::Scene.matches(&world, Some(&Target::Object(ObjectId::new("sword"))))
-        );
+        let scene = TargetFilter::Kind(TargetKind::Scene);
+        assert!(!scene.matches(&world, None));
+        assert!(scene.matches(&world, Some(&Target::Object(ObjectId::new("cabinet")))));
+        assert!(!scene.matches(&world, Some(&Target::Object(ObjectId::new("sword")))));
     }
 
     #[test]
     fn scene_rejects_an_npc_target() {
         let world = world();
-        assert!(!TargetFilter::Scene.matches(&world, Some(&Target::Npc(NpcId::new("guard")))));
+        assert!(
+            !TargetFilter::Kind(TargetKind::Scene)
+                .matches(&world, Some(&Target::Npc(NpcId::new("guard"))))
+        );
     }
 }

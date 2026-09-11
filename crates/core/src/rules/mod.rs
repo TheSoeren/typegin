@@ -1,9 +1,9 @@
 use crate::data::interactions_data::DataEffect;
 use crate::input::action;
 use crate::interaction::{ActionContext, Interaction, Verb, dispatch_data};
-use crate::world;
 use crate::world::object::{ObjectResolution, TargetResolution};
 use crate::{Event, event, object_data};
+use crate::{Target, world};
 
 mod basic;
 
@@ -388,5 +388,14 @@ pub trait Rules {
     /// Decide what happens for an unrecognised command.
     fn on_unknown(&mut self, _world: &mut world::WorldState, phrase: String) -> Vec<event::Event> {
         vec![event::Event::UnknownEvent { name: phrase }]
+    }
+
+    /// Verbs that work on `target` unconditionally, unioned into
+    /// [`GameEngine::verbs_for`](crate::GameEngine::verbs_for) alongside
+    /// whatever item-agnostic interactions currently apply. Entirely the
+    /// consumer's call — a game might return every verb for every hotspot;
+    /// another might return none. The default always offers `Examine`.
+    fn default_verbs(&self, _target: Target, _world: &world::WorldState) -> Vec<Verb> {
+        vec![Verb::Examine]
     }
 }

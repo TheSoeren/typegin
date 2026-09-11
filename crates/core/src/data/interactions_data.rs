@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use crate::data::{WorldData, WorldDataError};
 use crate::input::direction::Direction;
-use crate::interaction::Verb;
+use crate::interaction::{TargetKind, Verb};
 use crate::keys::npc_id::NpcId;
 use crate::keys::object_id::ObjectId;
 use crate::keys::room_id::RoomId;
@@ -81,18 +81,7 @@ pub enum DataTarget {
     /// Only the exact NPC with this id (a "use item on guard" target).
     Npc { npc: NpcId },
     /// Any target of the coarse structural kind.
-    Kind { kind: DataTargetKind },
-}
-
-/// Coarse *structural* target kind (matching
-/// [`TargetFilter`](crate::interaction::TargetFilter)). Properties of a
-/// target — door-ness, lock state, ... — are expressed as conditions, not
-/// kinds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum DataTargetKind {
-    /// A scene object (stays in the world; every door is one).
-    Scene,
+    Kind { kind: TargetKind },
 }
 
 /// A pure predicate over the world and interaction context. Conditions AND
