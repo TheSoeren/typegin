@@ -1,0 +1,39 @@
+# Room-event / world triggers — the "World" hook distinct from item/verb
+# interactions (AGENTS.md engine-status item 3): environmental beats that
+# follow the *world* changing (a flag flipping, a room entered), not the
+# player poking at a specific object.
+#
+# Faithful to Edna & Harvey: The Breakout's own staging: the AC's hum is
+# heard the instant the guard throws the switch — not only once the player
+# later goes and examines the fan or the padding — and the airy gap exposes
+# itself the moment both the padding is torn and the air is on, in whichever
+# order the player reaches them, with no need to re-use the stick on the
+# padding a second time. The "voices ahead" cue plays once, automatically,
+# the moment the player crawls into the ventilation shaft, rather than being
+# repeated on every subsequent `look`.
+triggers:
+  - key: ac-on-ambient
+    condition:
+      - flag: ac-on
+    effect:
+      - emit: A heavy hum starts up behind the padding. The air conditioning is on.
+
+  - key: airy-gap-reveal
+    condition:
+      - flag: pads-ripped
+      - flag: ac-on
+    effect:
+      - reveal_object: airy-gap
+      - emit: A gust from the air conditioning plucks the torn pad from the wall and it flutters down, leaving an airy gap.
+
+  - key: ac-off-ambient
+    condition:
+      - flag: ac-shut-off
+    effect:
+      - emit: The hum beyond the padding splutters and dies. The air conditioning is off.
+
+  - key: shaft-entry-beat
+    condition:
+      - room: air-chute
+    effect:
+      - emit: Somewhere ahead, two men are talking. The first-room escape is complete.

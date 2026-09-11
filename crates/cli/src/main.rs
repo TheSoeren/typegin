@@ -18,6 +18,7 @@ fn read_world_yaml(data_dir: &Path) -> Result<String, typegin_core::WorldDataErr
         "rooms.yaml",
         "interactions.yaml",
         "npcs.yaml",
+        "triggers.yaml",
     ] {
         yaml.push_str(&std::fs::read_to_string(data_dir.join(file_name))?);
         yaml.push('\n');

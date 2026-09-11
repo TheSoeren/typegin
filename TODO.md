@@ -6,7 +6,7 @@ The first-room (padded cell) puzzle is now replicated in `data/` as faithfully
 as the current engine allows. Everything below could NOT be replicated and is
 a candidate core feature (each is general to adventure games, not E&H-specific).
 
-### Replicated (works today, in `data/{items,rooms,interactions,npcs}.yaml`)
+### Replicated (works today, in `data/{items,rooms,interactions,npcs,triggers}.yaml`)
 
 1. Examine the chair → loose chair leg is found.
 2. Break the chair leg over the table → broken chair leg.
@@ -17,6 +17,12 @@ a candidate core feature (each is general to adventure games, not E&H-specific).
 6. Get a **toenail** → unscrew the grille → **fan** exposed.
 7. Provoke the guard → **air conditioning OFF** → remove the now-still fan →
    crawl into the ventilation shaft.
+8. The AC's hum starting/stopping, the airy gap exposing itself once the
+   padding is torn *and* the air is on, and the "voices ahead" cue on
+   crawling into the shaft are now `data/triggers.yaml` world-event beats —
+   they fire the instant the underlying flags/room hold, same turn,
+   regardless of order and with no need to re-use an item a second time to
+   "notice" the change (see gap 4, now narrowed).
 
 ### Engine gaps (cannot be replicated — future core features)
 
@@ -36,9 +42,13 @@ a candidate core feature (each is general to adventure games, not E&H-specific).
    dialogue choices cannot be gated on flags/conditions, so both are always
    offered. (Flag-gated _room interactions_ work; only _choices_ lack
    conditions.)
-4. **Environmental / ambient state** — heat, AC on/off is flavour-only (flags
-   - prose). Survival-relevant state is not a first-class concept, though
-     flag-gated descriptions cover the visible consequence here.
+4. **Environmental / ambient state** — narrowed by the trigger system: the
+   AC's hum and the shaft-entry cue are now genuine one-shot world-reactive
+   beats (`data/triggers.yaml`), not something the player has to poke an
+   object to reveal. What's still missing: heat/AC state has no
+   survival-relevant consequence (no timer, no penalty for delay) — it
+   remains flavour, just no longer flavour gated behind an object
+   interaction.
 5. **Cosmetic multiplicity** — the 19 pads collapse to one _Padded wall_
    object (the meaningful third-from-top pad). The engine has one object per
    noun; dozens of identical-looking pads are not modelled.

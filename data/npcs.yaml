@@ -8,6 +8,11 @@
 #
 # Dialogue choices cannot be gated on flags (engine gap), so both the
 # nice and the nasty options are always available.
+#
+# The guard's own lines narrate his personal reaction to the AC switch; the
+# room's environmental response (the hum starting/stopping) is a separate
+# `data/triggers.yaml` world-event beat, fired the instant the flag actually
+# flips rather than baked into the dialogue.
 npcs:
   - key: harvey
     primary_name: Harvey
@@ -64,7 +69,8 @@ npcs:
               next: mean
               effect:
                 - clear_flag: ac-on
-                - emit: '"WHAT?! That is my father''s putter you are talking about, you ungrateful little cretin!" He stomps to the dial. The hum beyond the padding splutters and dies. The air conditioning is off.'
+                - set_flag: ac-shut-off
+                - emit: '"WHAT?! That is my father''s putter you are talking about, you ungrateful little cretin!" He stomps to the dial.'
             - label: "Forget it."
               next: .end
         hot:
@@ -88,7 +94,7 @@ npcs:
               next: ac-on
               effect:
                 - set_flag: ac-on
-                - emit: '"Dizzy? Oh, no — easy now." He reaches for a dial beyond the grate. A heavy hum starts up behind the padding. The air conditioning is on.'
+                - emit: '"Dizzy? Oh, no — easy now." He reaches for a dial beyond the grate.'
             - label: "Forget it."
               next: .end
         ac-on:

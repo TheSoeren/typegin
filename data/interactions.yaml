@@ -6,6 +6,12 @@
 # the vent grille, (4) unscrew it with a toenail to expose the fan, (5) have the
 # guard turn the air conditioning OFF, (6) remove the still fan and crawl out.
 #
+# Step (2)'s reveal is a `data/triggers.yaml` world-event, not an interaction
+# here: the airy gap exposes itself automatically the instant both
+# `pads-ripped` and `ac-on` hold, in whichever order the player reaches them
+# — no need to re-use the stick on the padding a second time once the air
+# turns on.
+#
 # Dispatch is first-match, so gated variants are ordered before their fallback.
 interactions:
   ### THE PADDED CELL
@@ -47,19 +53,8 @@ interactions:
       - set_flag: pads-ripped
       - emit: You slash the padding to ribbons. The third pad from the top, on the left of the back wall, tears open in a way the others don't.
 
-  # 4) The torn pad only falls away once the air conditioning is ON.
-  - verb: use
-    item: broken-chair-leg
-    target:
-      object: padding
-    condition:
-      - flag: pads-ripped
-      - flag: ac-on
-    effect:
-      - reveal_object: airy-gap
-      - emit: A gust from the air conditioning plucks the torn pad from the wall and it flutters down, leaving an airy gap.
-
-  # Hint: the pad holds fast while the air is off.
+  # Hint: the pad holds fast while the air is off (once it has fallen away,
+  # this no longer matches — see the `airy-gap-reveal` trigger).
   - verb: use
     item: broken-chair-leg
     target:
