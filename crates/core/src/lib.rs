@@ -33,6 +33,6 @@ pub use keys::room_id::RoomId;
 pub use keys::trigger_id::TriggerId;
 pub use rules::{BasicRules, Rules};
 pub use view::{RenderCommand, View};
-pub use world::WorldState;
 pub use world::npc::{DialogueGraph, DialogueNode, Npc};
 pub use world::object::{ObjectInfo, ObjectResolution};
+pub use world::{SaveError, WorldState};

@@ -2,11 +2,14 @@ pub mod npc;
 pub mod object;
 pub mod player;
 pub mod room;
+mod save;
 
 use std::collections::{HashMap, HashSet};
 
 use getset::Getters;
 use log::warn;
+
+pub use save::SaveError;
 
 use crate::Target;
 use crate::data;

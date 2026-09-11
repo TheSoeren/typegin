@@ -19,7 +19,17 @@ pub mod trigger_id;
 macro_rules! define_id {
     ($(#[$meta:meta])* $name:ident) => {
         $(#[$meta])*
-        #[derive(Debug, Clone, PartialEq, Eq, Hash, ::serde::Deserialize)]
+        #[derive(
+            Debug,
+            Clone,
+            PartialEq,
+            Eq,
+            Hash,
+            PartialOrd,
+            Ord,
+            ::serde::Serialize,
+            ::serde::Deserialize
+        )]
         pub struct $name(String);
 
         impl $name {

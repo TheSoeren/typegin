@@ -80,11 +80,18 @@ tackled:
    actually used against the target (a drag-and-drop, a click with an item
    selected) — never surfaced through the coin itself. See
    `crates/core/tests/verb_coin.rs` and `crates/core/tests/combine.rs`.
-5. **Persistable world state (save/load)** — not started. Nothing in `core`
-   can serialize a `WorldState` (or round-trip one back in) today. Every
-   shippable modern adventure needs mid-chapter saves and a "continue" on
-   launch; treat this as a real gap against the north star, not an optional
-   nice-to-have, once the work above lands.
+5. **Persistable world state (save/load)** — in progress.
+   `GameEngine::save`/`GameEngine::load` are a *progress snapshot*, not a
+   `WorldState` dump: `WorldState` also carries a full copy of the static
+   authored content (`data_interactions`, `triggers`, `object_templates`,
+   every NPC's dialogue tree), so serializing it wholesale would duplicate
+   that content into every save and let an old save pin a stale copy of it
+   past a content patch. `save` persists only the dynamic slice (flags,
+   inventory, room object membership, door lock state, fired triggers,
+   dialogue progress); `load(data, rules, save)` rebuilds fresh static
+   content from `data` (which may differ from what `save` was taken
+   against — a content patch between save and load must be picked up) and
+   restores the dynamic slice on top. See `crates/core/tests/save_load.rs`.
 6. **Multiple playable/controllable characters** — not started.
    `WorldState` has exactly one `Player`
    (`crates/core/src/world/player.rs`); there is no second controllable
@@ -184,7 +191,7 @@ adventure game, not just something shaped like Deponia. In particular:
 | Run                  | `cargo run`                                                |
 | Test (all)           | `cargo test`                                              |
 | Test (unit tier only)| `cargo test -p core --lib`                                |
-| Test (single suite)  | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
+| Test (single suite)  | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `save_load`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
 | Lint                 | `cargo clippy --workspace --all-targets`                  |
 | Format               | `cargo fmt`                                               |
 | Format check         | `cargo fmt --check`                                       |

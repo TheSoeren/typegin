@@ -19,9 +19,9 @@ pub const DIRECTIONS: [input::Direction; 4] = [
 #[derive(Debug, Getters, MutGetters, Default, Clone)]
 #[getset(get = "pub(crate)")]
 pub struct Room {
-    #[get_mut(get_mut = "pub(crate)")]
+    #[getset(get_mut = "pub(crate)")]
     objects: Vec<object::Object>,
-    #[get_mut(get_mut = "pub(crate)")]
+    #[getset(get_mut = "pub(crate)")]
     hidden_objects: Vec<object::Object>,
     /// Derived index: door direction → the scene object occupying it. Built
     /// from the room's door objects (visible + hidden) at construction; it is
