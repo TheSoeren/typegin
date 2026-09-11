@@ -6,9 +6,7 @@
 //! module); this is the behaviour that schema drives, so it lives on the
 //! `interaction` side of the data/world boundary instead.
 
-use crate::data::interactions_data::{
-    DataCondition, DataEffect, DataTarget, DataTargetKind, InteractionData,
-};
+use crate::data::interactions_data::{DataCondition, DataEffect, DataTarget, InteractionData};
 use crate::event::Event;
 use crate::input::action::Outcome;
 use crate::input::direction::DirectionResolution;
@@ -35,11 +33,7 @@ impl InteractionData {
             None => target.is_none(),
             Some(DataTarget::Object { object }) => target == Some(&Target::Object(object.clone())),
             Some(DataTarget::Npc { npc }) => target == Some(&Target::Npc(npc.clone())),
-            Some(DataTarget::Kind { kind }) => match kind {
-                DataTargetKind::Scene => target.is_some_and(
-                    |target| matches!(target, Target::Object(id) if world.object_is_scene(id)),
-                ),
-            },
+            Some(DataTarget::Kind { kind }) => TargetFilter::Kind(*kind).matches(world, target),
         }
     }
 
@@ -86,9 +80,7 @@ impl InteractionData {
                     ),
                 )
             }
-            Some(DataTarget::Kind {
-                kind: DataTargetKind::Scene,
-            }) => (TargetFilter::Scene, None),
+            Some(DataTarget::Kind { kind }) => (TargetFilter::Kind(*kind), None),
         };
         let condition_data = self.clone();
         let effect_data = self.clone();
@@ -251,7 +243,7 @@ mod tests {
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
     use crate::input::direction::Direction;
-    use crate::interaction::Verb;
+    use crate::interaction::{TargetKind, Verb};
     use crate::keys::room_id::RoomId;
     use std::collections::HashMap;
 
@@ -841,7 +833,7 @@ mod tests {
     fn interaction_data_scene_kind_target_matches_any_scene_object() {
         let interaction = InteractionData {
             target: Some(DataTarget::Kind {
-                kind: DataTargetKind::Scene,
+                kind: TargetKind::Scene,
             }),
             ..base_interaction(Verb::Use)
         };

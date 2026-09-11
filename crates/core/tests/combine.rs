@@ -9,20 +9,21 @@
 //!
 //! ## Schema additions
 //!
-//! `DataTargetKind` gains an `Item` variant and `TargetFilter` gains the
-//! matching `Carried` variant, mirroring the existing `Scene`/`Scene` pair:
+//! `TargetKind` (shared, like `Verb`, between the authored schema and the
+//! compiled runtime filter — see `crates/core/src/interaction/target.rs`)
+//! gains a `Carried` variant alongside the existing `Scene`:
 //!
 //! ```yaml
 //! interactions:
 //!   - verb: use
 //!     item: brass-key
 //!     target:
-//!       kind: item        # any *carried* object, not one fixed key
+//!       kind: carried     # any *carried* object, not one fixed key
 //!     effect:
 //!       - emit: key-touched-something-carried
 //! ```
 //!
-//! `target: kind: item` matches *any* currently-carried object, the way
+//! `target: kind: carried` matches *any* currently-carried object, the way
 //! `target: kind: scene` already matches any room object — it authors a
 //! reaction that should fire regardless of *which* carried object the item
 //! was used on, not a fixed two-item recipe. A specific recipe ("brass key +
@@ -37,11 +38,12 @@
 //! 1. `use <item> on <target>` resolves `target` via
 //!    `WorldState::resolve_target`, which searches the current room *and*
 //!    the player's inventory — unchanged by this feature.
-//! 2. An interaction scoped `target: kind: item` (`TargetFilter::Carried`)
-//!    matches only when the resolved target is `Target::Object(id)` and
-//!    `world.player_holds(id)`; it never matches an NPC target or a room
-//!    object, symmetric with `target: kind: scene` (`TargetFilter::Scene`)
-//!    never matching a carried object.
+//! 2. An interaction scoped `target: kind: carried`
+//!    (`TargetFilter::Kind(TargetKind::Carried)`) matches only when the
+//!    resolved target is `Target::Object(id)` and `world.player_holds(id)`;
+//!    it never matches an NPC target or a room object, symmetric with
+//!    `target: kind: scene` (`TargetFilter::Kind(TargetKind::Scene)`) never
+//!    matching a carried object.
 //! 3. When no authored interaction matches (target not carried, or nothing
 //!    authored at all), dispatch falls through to the stock `on_use`
 //!    fallback exactly as for any other `use` — a carried target is not a
@@ -56,7 +58,7 @@
 mod common;
 
 use common::{engine_with_interactions as engine_with, world_with_interactions as world_with};
-use core::{DataTarget, DataTargetKind, Event, GameEngine, ObjectId, Target, Verb};
+use core::{DataTarget, Event, GameEngine, ObjectId, Target, TargetKind, Verb};
 
 /// Takes the brass key and rusty lamp, leaving the player in The Cellar.
 fn carry_brass_key_and_rusty_lamp(engine: &mut GameEngine) {
@@ -77,37 +79,37 @@ fn carry_brass_key_and_rusty_lamp(engine: &mut GameEngine) {
 }
 
 // ---------------------------------------------------------------------------
-// Schema: `target: kind: item`
+// Schema: `target: kind: carried`
 // ---------------------------------------------------------------------------
 
 mod parse {
     use super::*;
 
     #[test]
-    fn target_kind_item_parses_as_data_target_kind_item() {
+    fn target_kind_carried_parses_as_target_kind_carried() {
         let world = world_with(
             r"- verb: use
   item: brass-key
   target:
-    kind: item
+    kind: carried
   effect:
     - emit: combined",
         );
         assert_eq!(
             world.interactions[0].target,
             Some(DataTarget::Kind {
-                kind: DataTargetKind::Item
+                kind: TargetKind::Carried
             })
         );
     }
 
     #[test]
-    fn target_kind_item_and_scene_are_distinct_variants() {
+    fn target_kind_carried_and_scene_are_distinct_variants() {
         let world = world_with(
             r"- verb: use
   item: brass-key
   target:
-    kind: item
+    kind: carried
   effect:
     - emit: combined
 - verb: use
@@ -120,13 +122,13 @@ mod parse {
         assert_eq!(
             world.interactions[0].target,
             Some(DataTarget::Kind {
-                kind: DataTargetKind::Item
+                kind: TargetKind::Carried
             })
         );
         assert_eq!(
             world.interactions[1].target,
             Some(DataTarget::Kind {
-                kind: DataTargetKind::Scene
+                kind: TargetKind::Scene
             })
         );
         assert_ne!(world.interactions[0].target, world.interactions[1].target);
@@ -183,16 +185,16 @@ mod combine_dispatch {
 }
 
 // ---------------------------------------------------------------------------
-// `target: kind: item` (`TargetFilter::Carried`) scoping
+// `target: kind: carried` (`TargetFilter::Kind(TargetKind::Carried)`) scoping
 // ---------------------------------------------------------------------------
 
 mod carried_kind_scope {
     use super::*;
 
-    const KIND_ITEM_YAML: &str = r"- verb: use
+    const KIND_CARRIED_YAML: &str = r"- verb: use
   item: brass-key
   target:
-    kind: item
+    kind: carried
   effect:
     - emit: combined";
 
@@ -206,7 +208,7 @@ mod carried_kind_scope {
     const BOTH_SCOPES_YAML: &str = r"- verb: use
   item: brass-key
   target:
-    kind: item
+    kind: carried
   effect:
     - emit: combine-beat
 - verb: use
@@ -217,8 +219,8 @@ mod carried_kind_scope {
     - emit: scene-beat";
 
     #[test]
-    fn kind_item_target_fires_for_any_carried_object_not_just_one() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+    fn kind_carried_target_fires_for_any_carried_object_not_just_one() {
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -243,8 +245,8 @@ mod carried_kind_scope {
     }
 
     #[test]
-    fn kind_item_target_rejects_a_room_object_target() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+    fn kind_carried_target_rejects_a_room_object_target() {
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
@@ -253,7 +255,7 @@ mod carried_kind_scope {
             }]
         );
         // `cellar-stairs` is a Scene object left in the room, not carried, so
-        // `target: kind: item` never matches it.
+        // `target: kind: carried` never matches it.
         assert_eq!(
             engine.handle_input("use brass key on cellar stairs"),
             vec![Event::Used {
@@ -303,7 +305,7 @@ mod carried_kind_scope {
 
     #[test]
     fn interactions_for_reports_the_carried_scoped_interaction_only_for_a_carried_target() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         carry_brass_key_and_rusty_lamp(&mut engine);
 
         let for_carried = engine.interactions_for(
@@ -329,16 +331,16 @@ mod carried_kind_scope {
 mod not_found_and_ambiguous {
     use super::*;
 
-    const KIND_ITEM_YAML: &str = r"- verb: use
+    const KIND_CARRIED_YAML: &str = r"- verb: use
   item: brass-key
   target:
-    kind: item
+    kind: carried
   effect:
     - emit: combined";
 
     #[test]
     fn combine_item_not_carried_is_used_object_not_found() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
@@ -356,7 +358,7 @@ mod not_found_and_ambiguous {
 
     #[test]
     fn combine_target_not_in_scope_is_used_target_not_found() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
@@ -376,7 +378,7 @@ mod not_found_and_ambiguous {
 
     #[test]
     fn combine_item_alias_ambiguous_between_two_carried_items() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
@@ -410,7 +412,7 @@ mod not_found_and_ambiguous {
 
     #[test]
     fn combine_target_alias_ambiguous_between_two_carried_items() {
-        let mut engine = engine_with(KIND_ITEM_YAML);
+        let mut engine = engine_with(KIND_CARRIED_YAML);
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {

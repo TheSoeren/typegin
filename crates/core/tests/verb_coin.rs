@@ -1,9 +1,8 @@
-//! Spec for the verb-coin UI primitives (AGENTS.md engine gap #4, first
-//! half): `GameEngine::verbs_for` and `Rules::default_verbs`. A
-//! point-and-click front-end rendering an Edna & Harvey-style "verb coin"
-//! needs one query — "what verbs are possible for this clicked target, given
-//! whatever I'm carrying" — instead of guessing which carried item is
-//! selected and calling `interactions_for` once per candidate itself.
+//! Spec for the verb-coin UI primitives: `GameEngine::verbs_for` and
+//! `Rules::default_verbs`. A point-and-click front-end (Deponia-style: a
+//! static per-hotspot verb coin, not a menu that grows and shrinks as
+//! inventory changes) needs one query — "what verbs are possible for this
+//! target, on its own" — to populate that coin.
 //!
 //! No new YAML schema, `Action`, or `Event`: this is a pure read-only query
 //! layered on the existing `interactions_for`/dispatch machinery, so (unlike
@@ -11,37 +10,48 @@
 //!
 //! ## New API
 //!
-//! * `GameEngine::verbs_for(&self, target: Target) -> Vec<Verb>` — the union
-//!   of every `Verb` a currently-live interaction reports for `target`:
-//!   `interactions_for(None, Some(target))` (item-agnostic interactions,
-//!   including the NPC-hotspot's `Verb::Talk` when `target` names a present
-//!   NPC) unioned with `interactions_for(Some(item), Some(target))` for
-//!   every `ObjectId` the player currently carries, then unioned with
-//!   `Rules::default_verbs` and deduplicated. This delegates entirely to
-//!   `interactions_for` — no separate NPC-presence check is needed, because
-//!   `interactions_for` itself now answers a query targeted straight at an
-//!   NPC correctly (see `Interaction::talk_npc`'s target-identity check,
-//!   fixed as a prerequisite for this suite).
+//! * `GameEngine::verbs_for(&self, target: Target) -> HashSet<Verb>` — the union
+//!   of every `Verb` a currently-live *item-agnostic* interaction reports for
+//!   `target` (`interactions_for(None, Some(target))` — including the
+//!   NPC-hotspot's `Verb::Talk` when `target` names a present NPC), unioned
+//!   with `Rules::default_verbs`, deduplicated.
+//!
+//!   An interaction that requires a specific carried item (`item: <id>`)
+//!   never contributes here, no matter what the player is holding — whether
+//!   combining an item with `target` does anything is discovered separately,
+//!   at the moment a specific item is actually used against it
+//!   (`interactions_for(Some(item), Some(target))`, e.g. dragging an
+//!   inventory item onto the hotspot), never by browsing the coin. This
+//!   keeps the coin's contents a pure function of the *target and world
+//!   state*: a hotspot's available verbs never change just because the
+//!   player happened to pick something up, matching how the "reveal
+//!   hotspots" affordance and the verb coin behave in modern point-and-click
+//!   UIs (Deponia included) — both are static per room state, never
+//!   inventory-reactive.
 //! * `Rules::default_verbs(&self, target: Target, world: &WorldState) ->
 //!   Vec<Verb>` — verbs that work on `target` unconditionally, entirely the
-//!   consumer's call (an Edna & Harvey-style game might return all seven
-//!   verbs for everything; another might return only `Examine`). Defaults to
-//!   `Vec::new()` (inherited by `BasicRules` automatically, same as
-//!   `Rules::interactions`'s default). Exercised only through `verbs_for`
-//!   here — `default_rules.rs`'s own convention is to drive every hook
-//!   through the public API, never call it directly, and this suite follows
-//!   suit rather than adding a one-off exception.
+//!   consumer's call (a game might return all its verbs for every hotspot;
+//!   another might return only `Examine`). The trait default returns
+//!   `vec![Verb::Examine]` unconditionally (see `crates/core/src/rules/mod.rs`),
+//!   inherited by `BasicRules` as-is, so `verbs_for` is never empty under
+//!   `BasicRules` even with zero authored interactions. Exercised only
+//!   through `verbs_for` here — `default_rules.rs`'s own convention is to
+//!   drive every hook through the public API, never call it directly, and
+//!   this suite follows suit rather than adding a one-off exception.
 //!
 //! Run with: `cargo test --test verb_coin`.
 
 mod common;
+
+use std::collections::HashSet;
 
 use common::{
     base_world, engine_with_interactions as engine_with, engine_with_npcs, enter_corridor,
     world_with_interactions as world_with, world_with_npcs,
 };
 use core::{
-    GameEngine, Interaction, NpcId, ObjectId, Rules, Target, TargetFilter, Verb, WorldState,
+    GameEngine, Interaction, NpcId, ObjectId, Rules, Target, TargetFilter, TargetKind, Verb,
+    WorldState,
 };
 
 /// Minimal NPC (a guard in the corridor) with a single dialogue node.
@@ -64,17 +74,20 @@ mod data_driven_aggregation {
     use super::*;
 
     #[test]
-    fn no_interactions_returns_empty_with_basic_rules() {
+    fn no_interactions_still_includes_basic_rules_default_verbs() {
+        // `BasicRules` inherits `Rules::default_verbs`'s trait default
+        // unmodified, which unconditionally returns `[Verb::Examine]` (see
+        // `crates/core/src/rules/mod.rs`) — so even with zero authored
+        // interactions, `verbs_for` is never empty under `BasicRules`.
         let engine = GameEngine::get(&base_world());
-        assert!(
-            engine
-                .verbs_for(Target::Object(ObjectId::new("rusty-lamp")))
-                .is_empty()
+        assert_eq!(
+            engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp"))),
+            HashSet::from([Verb::Examine])
         );
     }
 
     #[test]
-    fn includes_item_agnostic_interaction_without_any_item_held() {
+    fn includes_an_item_agnostic_interaction() {
         let engine = engine_with(
             r"- verb: examine
   target:
@@ -88,7 +101,7 @@ mod data_driven_aggregation {
     }
 
     #[test]
-    fn includes_item_gated_interaction_only_when_that_item_is_carried() {
+    fn excludes_an_item_gated_interaction_even_once_that_item_is_carried() {
         let mut engine = engine_with(
             r"- verb: examine
   target:
@@ -100,55 +113,34 @@ mod data_driven_aggregation {
         );
         let target = Target::Object(ObjectId::new("rusty-lamp"));
 
+        // Before picking anything up: only the item-agnostic Examine shows.
         let before = engine.verbs_for(target.clone());
         assert!(before.contains(&Verb::Examine));
         assert!(!before.contains(&Verb::Use));
 
+        // Picking up the exact item the recipe needs must not change the
+        // coin: combining is discovered by using the item on the target
+        // directly, never by browsing the coin.
         engine.handle_input("take brass key");
         let after = engine.verbs_for(target);
         assert!(after.contains(&Verb::Examine));
-        assert!(after.contains(&Verb::Use));
+        assert!(!after.contains(&Verb::Use));
     }
 
     #[test]
-    fn aggregates_across_every_carried_item() {
-        let mut engine = engine_with(
+    fn dedups_a_verb_matched_by_multiple_item_agnostic_interactions() {
+        let engine = engine_with(
             r"- verb: use
-  item: brass-key
   target:
     object: rusty-lamp
-- verb: examine
-  item: iron-key
-  target:
-    object: rusty-lamp",
-        );
-        let target = Target::Object(ObjectId::new("rusty-lamp"));
-
-        engine.handle_input("take brass key");
-        let with_brass_key_only = engine.verbs_for(target.clone());
-        assert!(with_brass_key_only.contains(&Verb::Use));
-        assert!(!with_brass_key_only.contains(&Verb::Examine));
-
-        engine.handle_input("take iron key");
-        let with_both = engine.verbs_for(target);
-        assert!(with_both.contains(&Verb::Use));
-        assert!(with_both.contains(&Verb::Examine));
-    }
-
-    #[test]
-    fn dedups_a_verb_matched_by_multiple_interactions() {
-        let mut engine = engine_with(
-            r"- verb: use
-  item: brass-key
-  target:
-    object: rusty-lamp
+  effect:
+    - emit: first
 - verb: use
-  item: iron-key
   target:
-    object: rusty-lamp",
+    object: rusty-lamp
+  effect:
+    - emit: second",
         );
-        engine.handle_input("take brass key");
-        engine.handle_input("take iron key");
 
         let verbs = engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp")));
         assert_eq!(verbs.iter().filter(|verb| **verb == Verb::Use).count(), 1);
@@ -174,7 +166,7 @@ mod closure_driven_aggregation {
         let interaction = Interaction::build(
             Verb::Examine,
             None,
-            TargetFilter::Scene,
+            TargetFilter::Kind(TargetKind::Scene),
             None,
             Box::new(|_world, _context| Vec::new()),
         );
@@ -244,16 +236,14 @@ mod default_verbs_hook {
 
     #[test]
     fn custom_default_verbs_union_with_authored_verbs_without_duplication() {
-        let mut engine = GameEngine::get_with_rules(
+        let engine = GameEngine::get_with_rules(
             &world_with(
                 r"- verb: use
-  item: brass-key
   target:
     object: rusty-lamp",
             ),
             UseAndTalkEverywhere,
         );
-        engine.handle_input("take brass key");
 
         let verbs = engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp")));
         assert_eq!(verbs.iter().filter(|verb| **verb == Verb::Use).count(), 1);
@@ -283,11 +273,15 @@ mod npc_targets {
     #[test]
     fn excludes_talk_once_the_npc_has_left_scope() {
         // The player starts in The Cellar; the guard lives in the corridor.
+        // `BasicRules`'s inherited `default_verbs` still contributes
+        // `Examine` unconditionally (see the equivalent note on
+        // `no_interactions_still_includes_basic_rules_default_verbs`), so
+        // the coin isn't empty — only `Talk` must be gone.
         let engine = engine_with_npcs(VERB_COIN_GUARD_YAML);
         assert!(
-            engine
+            !engine
                 .verbs_for(Target::Npc(NpcId::new("guard")))
-                .is_empty()
+                .contains(&Verb::Talk)
         );
     }
 
@@ -330,25 +324,19 @@ mod read_only_query {
 
     #[test]
     fn verbs_for_does_not_mutate_the_world() {
-        let mut engine = engine_with(
+        let engine = engine_with(
             r"- verb: use
-  item: brass-key
   target:
     object: rusty-lamp
   effect:
-    - discard: brass-key
     - discard: rusty-lamp
     - grant: rusty-nail",
         );
-        engine.handle_input("take brass key");
-        engine.handle_input("take rusty lamp");
 
         let target = Target::Object(ObjectId::new("rusty-lamp"));
         assert!(engine.verbs_for(target.clone()).contains(&Verb::Use));
         assert!(engine.verbs_for(target).contains(&Verb::Use));
 
-        assert!(engine.world().player_holds(&ObjectId::new("brass-key")));
-        assert!(engine.world().player_holds(&ObjectId::new("rusty-lamp")));
         assert!(!engine.world().player_holds(&ObjectId::new("rusty-nail")));
     }
 }

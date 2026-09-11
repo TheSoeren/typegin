@@ -17,20 +17,26 @@ Text-adventure engine in Rust. Workspace with two crates:
 
 ## North star goal (important, drive all feature work toward this)
 
-The engine's unifying aim is to cover **every engine feature needed to
-theoretically build [Edna & Harvey: The Breakout](https://en.wikipedia.org/wiki/Edna_%26_Harvey%3A_The_Breakout)**
-(a Daedalic point-and-click adventure) — so that any engine-level gap is a
-defect against this goal. When weighing a feature or design choice, ask:
-"does this move us toward being able to ship an Edna & Harvey title?"
+The engine's unifying aim is to cover **every engine-level feature a modern
+narrative point-and-click adventure needs** — the genre as shipped today by
+studios like Daedalic (*Deponia*, *The Whispered World*, *A New Beginning*)
+and its contemporaries, not the much sparser command-parser adventures of the
+1980s. When weighing a feature or design choice, ask: "does this move us
+toward being able to ship a modern point-and-click title?" Any engine-level
+gap against that bar is a defect against this goal — and the bar should be
+read generously: prefer scoping in a genuinely load-bearing modern-genre
+feature over deferring it for being unfamiliar.
 
-The mechanical adventure core (rooms, doors, items, take/drop/examine/use, and
-the point-and-click `interactions_for` query) works. Puzzle logic is
-data-driven interactions in YAML world data (verbs, items, conditions,
-effects — `InteractionData` in `crates/core/src/data/interactions_data.rs`,
-authored under `data/interactions.yaml`) instead of Rust closures, though a
-consumer can still supply closures via `Rules::interactions()` for anything
-data-driven interactions don't cover. Content-layer status, in the order they
-were tackled:
+*Deponia* is the reference point for scope, not a spec to hardcode — see
+"Non-negotiable" below. The mechanical adventure core (rooms, doors, items,
+take/drop/examine/use, and the point-and-click `interactions_for` query)
+works. Puzzle logic is data-driven interactions in YAML world data (verbs,
+items, conditions, effects — `InteractionData` in
+`crates/core/src/data/interactions_data.rs`, authored under
+`data/interactions.yaml`) instead of Rust closures, though a consumer can
+still supply closures via `Rules::interactions()` for anything data-driven
+interactions don't cover. Content-layer status, in the order they were
+tackled:
 
 1. **Flags / global quest / causal state** — done. A first-class `flags`
    model on `WorldState` (`has_flag`/`set_flag`/`clear_flag`), with
@@ -60,34 +66,67 @@ were tackled:
    (`WorldState`'s `fired_triggers` set, no re-arm). See
    `crates/core/tests/triggers.rs` (its module doc comment states the
    contract) and `crates/core/src/trigger.rs`'s module doc comment.
-4. **Inventory / verb-coin UI primitives** and **combine-two-carried-items**
-   scope (a distinct Take-vs-combine overlap) — not started.
+4. **Point-and-click verb-coin UI primitives** (`GameEngine::verbs_for`,
+   `Rules::default_verbs`) and **combine-two-carried-items** (`use <item> on
+   <other carried item>`, `TargetKind::Carried`) — in progress. `verbs_for`
+   answers "what verbs apply to this target" as a pure function of the
+   target and world state alone (item-agnostic interactions unioned with
+   `default_verbs`, deduplicated) — it deliberately does **not** vary by what
+   the player happens to be carrying, matching how a point-and-click UI's
+   verb coin and "reveal hotspots" affordance actually behave: static per
+   room state, never inventory-reactive. Whether a specific carried item does
+   something to a target is a *separate* question, answered by
+   `interactions_for(Some(item), Some(target))` at the moment that item is
+   actually used against the target (a drag-and-drop, a click with an item
+   selected) — never surfaced through the coin itself. See
+   `crates/core/tests/verb_coin.rs` and `crates/core/tests/combine.rs`.
+5. **Persistable world state (save/load)** — not started. Nothing in `core`
+   can serialize a `WorldState` (or round-trip one back in) today. Every
+   shippable modern adventure needs mid-chapter saves and a "continue" on
+   launch; treat this as a real gap against the north star, not an optional
+   nice-to-have, once the work above lands.
+6. **Multiple playable/controllable characters** — not started.
+   `WorldState` has exactly one `Player`
+   (`crates/core/src/world/player.rs`); there is no second controllable
+   character, let alone switching control between two mid-scene.
+   Character-switch puzzles (two characters in different rooms cooperating on
+   one puzzle) are a recurring modern-genre shape (*Chaos on Deponia*, *Day
+   of the Tentacle*, *Broken Age*); scoping this is future work, not
+   committed yet, but it's a real gap, not a stretch feature to wave away.
 
 Feature work should be judged against these; when a step maps to one of them,
 say so explicitly when handing off a spec.
 
 ### Non-negotiable: it stays an ENGINE, and the consumer stays in control
 
-Edna & Harvey is a _benchmark to test completeness_, never a spec to hardcode.
-The engine must remain general-purpose so it can ship **other, different
-adventure games** too. In particular:
+The genre bar above is a _benchmark to test completeness_, never a spec to
+hardcode. The engine must remain general-purpose so it can ship **any**
+adventure game, not just something shaped like Deponia. In particular:
 
-- **Never bake Edna & Harvey's specific content, characters, verbs, or puzzle
-  logic into the core.** It's a test case / completeness metric, not a product
-  to embed. Its features are only worth adding insofar as they generalize to
-  any adventure (dialogue trees, flags, triggers, etc.).
+- **Never bake any specific game's content, characters, verbs, or puzzle
+  logic into the core.** Named games are test cases / completeness metrics,
+  not products to embed. A feature is only worth adding insofar as it
+  generalizes to any adventure (dialogue trees, flags, triggers, verb-coin
+  queries, ...).
 - **Preserve the consumer's freedom to pick between the three front-end
-  modalities** — meaning a single game can be played three ways:
+  modalities.** A consumer always chooses exactly *one* modality for their
+  actual game — this is not a claim that every game must ship as all three
+  at once. The obligation is on the *engine*: it must never implement
+  anything that would foreclose any of the three as a possible choice for
+  some future consumer. The three:
   1. **text-in / text-out** (pure terminal parser + prose view),
   2. **text-in / GUI-out** (parser drives commands, GUI renders events/state),
   3. **full point-and-click** (no parser needed at all: a GUI synthesizes
-     `Action`s from clicks and uses `interactions_for`, rendering via
-     `RenderCommand` or reading `Event`s/`WorldState` directly).
-- The engine must keep these three interchangeable — **no design choice may
-  assume one modality**, or silently close the door on another. Anything that
-  would force a specific input source or output rendering is a defect. Guard
-  this when adding verbs, the `interactions_for` query, `Event`/`RenderCommand`
-  shapes, and the `View`/`Rules` traits.
+     `Action`s from clicks, using `interactions_for`/`verbs_for`, and renders
+     via `RenderCommand` or by reading `Event`s/`WorldState` directly).
+  No design choice may assume one modality or silently close the door on
+  another — that includes convenience queries like the verb-coin primitives
+  above: `verbs_for` exists *in addition to* the parser path, an option a
+  point-and-click consumer can lean on, never a replacement the other two
+  modalities are forced through. Anything that would force a specific input
+  source or output rendering is a defect. Guard this when adding verbs, the
+  `interactions_for`/`verbs_for` queries, `Event`/`RenderCommand` shapes, and
+  the `View`/`Rules` traits.
 - **Core parses exactly one YAML document.** `WorldData::from_yaml`/`load`
   take a single string/path, not a fixed set of named files — how a
   consumer organizes authored content across files (one file, five files,

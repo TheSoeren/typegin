@@ -160,12 +160,12 @@ impl Interaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Target;
     use crate::data::WorldData;
     use crate::data::npc_data::{DialogueData, NpcData};
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
     use crate::keys::room_id::RoomId;
+    use crate::{Target, TargetKind};
     use std::collections::HashMap;
 
     /// A one-room world containing a single `Item` object `sword`, and
@@ -334,13 +334,13 @@ mod tests {
         let interaction = Interaction::build(
             Verb::Use,
             Some(ObjectId::new("sword")),
-            TargetFilter::Scene,
+            TargetFilter::Kind(TargetKind::Scene),
             None,
             no_op_effect(),
         );
         assert_eq!(interaction.verb(), Verb::Use);
         assert_eq!(interaction.item(), Some(ObjectId::new("sword")));
-        assert_eq!(interaction.target(), TargetFilter::Scene);
+        assert_eq!(interaction.target(), TargetFilter::Kind(TargetKind::Scene));
         assert_eq!(interaction.npc(), None);
     }
 
