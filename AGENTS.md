@@ -19,7 +19,7 @@ Text-adventure engine in Rust. Workspace with two crates:
 
 The engine's unifying aim is to cover **every engine-level feature a modern
 narrative point-and-click adventure needs** — the genre as shipped today by
-studios like Daedalic (*Deponia*, *The Whispered World*, *A New Beginning*)
+studios like Daedalic (_Deponia_, _The Whispered World_, _A New Beginning_)
 and its contemporaries, not the much sparser command-parser adventures of the
 1980s. When weighing a feature or design choice, ask: "does this move us
 toward being able to ship a modern point-and-click title?" Any engine-level
@@ -27,7 +27,7 @@ gap against that bar is a defect against this goal — and the bar should be
 read generously: prefer scoping in a genuinely load-bearing modern-genre
 feature over deferring it for being unfamiliar.
 
-*Deponia* is the reference point for scope, not a spec to hardcode — see
+_Deponia_ is the reference point for scope, not a spec to hardcode — see
 "Non-negotiable" below. The mechanical adventure core (rooms, doors, items,
 take/drop/examine/use, and the point-and-click `interactions_for` query)
 works. Puzzle logic is data-driven interactions in YAML world data (verbs,
@@ -46,7 +46,7 @@ tackled:
    (`DialogueNode`/`DialogueChoice`, branching via `choose`), and
    `examine`/`talk`/`use` are target-oriented (`WorldState::resolve_target`
    resolves a name to `Target::Npc` or `Target::Object`), so `use <item> on
-   <npc>` works the same way as `use <item> on <object>`. NPCs are still
+<npc>` works the same way as `use <item> on <object>`. NPCs are still
    room-bound, not carryable (no inventory-companion NPC). See
    `crates/core/tests/npcs.rs`.
 3. **Room-event / trigger system** — done. Non-item-triggered beats (entering
@@ -56,7 +56,7 @@ tackled:
    reuses the existing `DataCondition`/`DataEffect` vocabulary; runtime
    dispatch lives in `crates/core/src/trigger.rs`
    (`check_triggers(&mut WorldState)`), called from the tail of
-   `GameEngine::execute_action` so it runs after *every* action, not just a
+   `GameEngine::execute_action` so it runs after _every_ action, not just a
    specific verb. Dispatch contract: on each call, every not-yet-fired
    trigger's condition is checked against a readiness snapshot taken before
    any trigger in that pass runs its effects, so one trigger's effect cannot
@@ -68,20 +68,20 @@ tackled:
    contract) and `crates/core/src/trigger.rs`'s module doc comment.
 4. **Point-and-click verb-coin UI primitives** (`GameEngine::verbs_for`,
    `Rules::default_verbs`) and **combine-two-carried-items** (`use <item> on
-   <other carried item>`, `TargetKind::Carried`) — in progress. `verbs_for`
+<other carried item>`, `TargetKind::Carried`) — in progress. `verbs_for`
    answers "what verbs apply to this target" as a pure function of the
    target and world state alone (item-agnostic interactions unioned with
    `default_verbs`, deduplicated) — it deliberately does **not** vary by what
    the player happens to be carrying, matching how a point-and-click UI's
    verb coin and "reveal hotspots" affordance actually behave: static per
    room state, never inventory-reactive. Whether a specific carried item does
-   something to a target is a *separate* question, answered by
+   something to a target is a _separate_ question, answered by
    `interactions_for(Some(item), Some(target))` at the moment that item is
    actually used against the target (a drag-and-drop, a click with an item
    selected) — never surfaced through the coin itself. See
    `crates/core/tests/verb_coin.rs` and `crates/core/tests/combine.rs`.
 5. **Persistable world state (save/load)** — in progress.
-   `GameEngine::save`/`GameEngine::load` are a *progress snapshot*, not a
+   `GameEngine::save`/`GameEngine::load` are a _progress snapshot_, not a
    `WorldState` dump: `WorldState` also carries a full copy of the static
    authored content (`data_interactions`, `triggers`, `object_templates`,
    every NPC's dialogue tree), so serializing it wholesale would duplicate
@@ -97,14 +97,6 @@ tackled:
    dialogue as an immediate `Action` off the player's last input, none of
    them need `load` to land back inside a conversation turn. See
    `crates/core/tests/save_load.rs`.
-6. **Multiple playable/controllable characters** — not started.
-   `WorldState` has exactly one `Player`
-   (`crates/core/src/world/player.rs`); there is no second controllable
-   character, let alone switching control between two mid-scene.
-   Character-switch puzzles (two characters in different rooms cooperating on
-   one puzzle) are a recurring modern-genre shape (*Chaos on Deponia*, *Day
-   of the Tentacle*, *Broken Age*); scoping this is future work, not
-   committed yet, but it's a real gap, not a stretch feature to wave away.
 
 Feature work should be judged against these; when a step maps to one of them,
 say so explicitly when handing off a spec.
@@ -121,9 +113,9 @@ adventure game, not just something shaped like Deponia. In particular:
   generalizes to any adventure (dialogue trees, flags, triggers, verb-coin
   queries, ...).
 - **Preserve the consumer's freedom to pick between the three front-end
-  modalities.** A consumer always chooses exactly *one* modality for their
+  modalities.** A consumer always chooses exactly _one_ modality for their
   actual game — this is not a claim that every game must ship as all three
-  at once. The obligation is on the *engine*: it must never implement
+  at once. The obligation is on the _engine_: it must never implement
   anything that would foreclose any of the three as a possible choice for
   some future consumer. The three:
   1. **text-in / text-out** (pure terminal parser + prose view),
@@ -131,14 +123,14 @@ adventure game, not just something shaped like Deponia. In particular:
   3. **full point-and-click** (no parser needed at all: a GUI synthesizes
      `Action`s from clicks, using `interactions_for`/`verbs_for`, and renders
      via `RenderCommand` or by reading `Event`s/`WorldState` directly).
-  No design choice may assume one modality or silently close the door on
-  another — that includes convenience queries like the verb-coin primitives
-  above: `verbs_for` exists *in addition to* the parser path, an option a
-  point-and-click consumer can lean on, never a replacement the other two
-  modalities are forced through. Anything that would force a specific input
-  source or output rendering is a defect. Guard this when adding verbs, the
-  `interactions_for`/`verbs_for` queries, `Event`/`RenderCommand` shapes, and
-  the `View`/`Rules` traits.
+     No design choice may assume one modality or silently close the door on
+     another — that includes convenience queries like the verb-coin primitives
+     above: `verbs_for` exists _in addition to_ the parser path, an option a
+     point-and-click consumer can lean on, never a replacement the other two
+     modalities are forced through. Anything that would force a specific input
+     source or output rendering is a defect. Guard this when adding verbs, the
+     `interactions_for`/`verbs_for` queries, `Event`/`RenderCommand` shapes, and
+     the `View`/`Rules` traits.
 - **Core parses exactly one YAML document.** `WorldData::from_yaml`/`load`
   take a single string/path, not a fixed set of named files — how a
   consumer organizes authored content across files (one file, five files,
@@ -158,10 +150,10 @@ adventure game, not just something shaped like Deponia. In particular:
   clear explanation and options — do not jump into editing code until I confirm which approach I want.
 - **I sometimes delegate specific fixes, cleanups, or codebase-wide passes directly** (e.g. "fix my `hidden_exit_directions`", "implement
   these 10 findings", "optimize the codebase for idiom X"). In those cases it is fine to edit `src/` directly, including production logic —
-  the TDD split above governs *new feature* work, not explicitly-scoped fixes/refactors. Still don't wander beyond the scope given.
+  the TDD split above governs _new feature_ work, not explicitly-scoped fixes/refactors. Still don't wander beyond the scope given.
 - **I work in this same tree concurrently.** Before editing a file you haven't touched yet this turn, assume it may have changed — re-read
   it fresh rather than trusting an earlier read in the conversation, especially anything under active feature work (check `git status`/`git
-  diff` if unsure what's mid-flight). Never touch `crates/core/tests/triggers.rs` or its fixtures without checking whether it's currently a
+diff` if unsure what's mid-flight). Never touch `crates/core/tests/triggers.rs` or its fixtures without checking whether it's currently a
   deliberate red-phase spec I'm implementing against.
 - **When the right next step or approach is ambiguous, ask me** (use the `question` tool). I prefer confirming direction over guessing.
 - After implementing/updating, run the verification order (below) and report pass/fail concisely so I can react.
@@ -190,16 +182,16 @@ adventure game, not just something shaped like Deponia. In particular:
 
 ## Commands
 
-| Task                | Command                                                   |
-| -------------------- | ---------------------------------------------------------- |
-| Build                | `cargo build`                                             |
-| Run                  | `cargo run`                                                |
-| Test (all)           | `cargo test`                                              |
-| Test (unit tier only)| `cargo test -p core --lib`                                |
-| Test (single suite)  | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `save_load`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
-| Lint                 | `cargo clippy --workspace --all-targets`                  |
-| Format               | `cargo fmt`                                               |
-| Format check         | `cargo fmt --check`                                       |
+| Task                  | Command                                                                                                                                                                                                                                                            |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Build                 | `cargo build`                                                                                                                                                                                                                                                      |
+| Run                   | `cargo run`                                                                                                                                                                                                                                                        |
+| Test (all)            | `cargo test`                                                                                                                                                                                                                                                       |
+| Test (unit tier only) | `cargo test -p core --lib`                                                                                                                                                                                                                                         |
+| Test (single suite)   | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `save_load`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
+| Lint                  | `cargo clippy --workspace --all-targets`                                                                                                                                                                                                                           |
+| Format                | `cargo fmt`                                                                                                                                                                                                                                                        |
+| Format check          | `cargo fmt --check`                                                                                                                                                                                                                                                |
 
 Recommended verification order: `cargo fmt --check && cargo clippy --workspace --all-targets && cargo test`
 
