@@ -1,5 +1,5 @@
 use crate::Npc;
-use crate::input::direction::Direction;
+use crate::input::GoTarget;
 use crate::interaction::Target;
 use crate::keys::dialogue_node_id::DialogueNodeId;
 use crate::keys::dialogue_option_id::DialogueOptionId;
@@ -30,13 +30,29 @@ pub enum Event {
     Looked,
 
     /// The player moved in a direction.
-    Went(Direction),
-    WentExitHidden(Direction),
-    WentExitLocked(Direction),
-    WentInvalidDirection(Direction),
+    Went(GoTarget),
+    WentExitHidden(GoTarget),
+    WentExitLocked(GoTarget),
+    WentExitNotFound(GoTarget),
+    UnlockedExit(GoTarget),
 
-    UnlockedExit {
-        direction: Direction,
+    Entered {
+        object_id: ObjectId,
+        object: String,
+    },
+    EnteredExitLocked {
+        object_id: ObjectId,
+        object: String,
+    },
+    EnteredTargetNotFound {
+        target: String,
+    },
+    EnteredTargetAmbiguous {
+        target_ids: Vec<Target>,
+        target: String,
+    },
+    CantEnter {
+        target: String,
     },
 
     /// The player took an object into inventory.
@@ -211,25 +227,24 @@ impl From<&NpcDialogueChoice> for DialogueChoice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::room_id::RoomId;
     use crate::world::npc::DialogueGraph;
     use std::collections::HashMap;
 
     fn npc_with_node(node_id: &str, text: &str, choices: Vec<NpcDialogueChoice>) -> Npc {
         let mut dialogue: DialogueGraph = HashMap::new();
         dialogue.insert(
-            DialogueNodeId::new(node_id),
+            crate::dialogueNodeId!(node_id),
             crate::world::npc::DialogueNode {
                 text: text.to_string(),
                 choices,
             },
         );
         Npc {
-            id: NpcId::new("guard"),
+            id: crate::npcId!("guard"),
             primary_name: "Guard".to_string(),
             aliases: Vec::new(),
-            room: RoomId::new("corridor"),
-            root: DialogueNodeId::new(node_id),
+            room: crate::roomId!("corridor"),
+            root: crate::dialogueNodeId!(node_id),
             dialogue,
         }
     }
@@ -237,13 +252,13 @@ mod tests {
     #[test]
     fn talked_builds_an_event_for_a_known_node() {
         let npc = npc_with_node("start", "Halt!", Vec::new());
-        let event = Event::talked(&npc, &DialogueNodeId::new("start")).expect("node exists");
+        let event = Event::talked(&npc, &crate::dialogueNodeId!("start")).expect("node exists");
         assert_eq!(
             event,
             Event::Talked {
-                npc_id: NpcId::new("guard"),
+                npc_id: crate::npcId!("guard"),
                 npc: "Guard".to_string(),
-                node_id: DialogueNodeId::new("start"),
+                node_id: crate::dialogueNodeId!("start"),
                 text: "Halt!".to_string(),
                 choices: Vec::new(),
             }
@@ -253,7 +268,10 @@ mod tests {
     #[test]
     fn talked_returns_none_for_an_unknown_node() {
         let npc = npc_with_node("start", "Halt!", Vec::new());
-        assert_eq!(Event::talked(&npc, &DialogueNodeId::new("missing")), None);
+        assert_eq!(
+            Event::talked(&npc, &crate::dialogueNodeId!("missing")),
+            None
+        );
     }
 
     #[test]
@@ -262,7 +280,7 @@ mod tests {
         assert_eq!(
             Event::dialogue_ended(&npc),
             Event::DialogueEnded {
-                npc_id: NpcId::new("guard"),
+                npc_id: crate::npcId!("guard"),
                 npc: "Guard".to_string(),
             }
         );

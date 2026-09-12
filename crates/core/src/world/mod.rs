@@ -16,6 +16,7 @@ use crate::data;
 use crate::data::interactions_data::InteractionData;
 use crate::data::object_data;
 use crate::data::trigger_data::TriggerData;
+use crate::input;
 use crate::input::action;
 use crate::input::direction;
 use crate::keys::dialogue_node_id::DialogueNodeId;
@@ -85,11 +86,8 @@ impl WorldState {
     /// Hidden and locked exits are not traversable, so they resolve to `None`
     /// just like a direction with no exit at all.
     #[must_use]
-    pub fn get_room_id_by_exit_direction(
-        &self,
-        direction: direction::Direction,
-    ) -> Option<room::RoomId> {
-        self.current_room().get_room_id_by_exit_direction(direction)
+    pub fn get_room_id_by_go_target(&self, go_target: &input::GoTarget) -> Option<room::RoomId> {
+        self.current_room().get_room_id_by_exit_direction(go_target)
     }
 
     /// Change the current room to `room_id`, if it is known to the world.
@@ -108,25 +106,25 @@ impl WorldState {
 
     /// Whether the exit in `direction` is locked (blocks traversal).
     #[must_use]
-    pub fn is_exit_locked(&self, direction: direction::Direction) -> bool {
-        self.current_room().is_exit_locked(direction)
+    pub fn is_exit_locked(&self, go_target: &input::GoTarget) -> bool {
+        self.current_room().is_exit_locked(go_target)
     }
 
     /// Whether the exit in `direction` is hidden (not yet discovered by the player).
     #[must_use]
-    pub fn is_exit_hidden(&self, direction: direction::Direction) -> bool {
-        self.current_room().is_exit_hidden(direction)
+    pub fn is_exit_hidden(&self, go_target: &input::GoTarget) -> bool {
+        self.current_room().is_exit_hidden(go_target)
     }
 
     /// Public details about the exit in `direction`, if there is one.
     #[must_use]
-    pub fn exit_info(&self, direction: direction::Direction) -> Option<ObjectInfo> {
-        self.current_room().door_in_direction_info(direction)
+    pub fn exit_info(&self, go_target: &input::GoTarget) -> Option<ObjectInfo> {
+        self.current_room().door_info(go_target)
     }
 
     /// Directions with an open (passable) exit from the current room.
     ///
-    /// Locked and hidden exits are excluded. Note: order is unspecified.
+    /// Hidden exits are excluded. Note: order is unspecified.
     #[must_use]
     pub fn exit_directions(&self) -> Vec<direction::Direction> {
         self.current_room().exit_directions()
@@ -136,39 +134,33 @@ impl WorldState {
     #[must_use]
     pub fn exit_extra(
         &self,
-        direction: direction::Direction,
+        go_target: &input::GoTarget,
     ) -> Option<HashMap<String, data::ExtraValue>> {
-        self.current_room().exit_extra(direction)
+        self.current_room().exit_extra(go_target)
     }
 
     /// Unlock the exit in `direction` (no-op if there is none, or it is
     /// already unlocked).
-    pub fn unlock_exit(
-        &mut self,
-        direction: direction::Direction,
-    ) -> direction::DirectionResolution {
-        self.current_room_mut().unlock_exit(direction)
+    pub fn unlock_exit(&mut self, go_target: input::GoTarget) -> direction::GoTargetResolution {
+        self.current_room_mut().unlock_exit(go_target)
     }
 
     /// Lock the exit in `direction` (no-op if there is none, or it is already
     /// locked).
-    pub fn lock_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
-        self.current_room_mut().lock_exit(direction)
+    pub fn lock_exit(&mut self, go_target: input::GoTarget) -> direction::GoTargetResolution {
+        self.current_room_mut().lock_exit(go_target)
     }
 
     /// Reveal the hidden exit in `direction` (no-op if there is none, or it
     /// is not hidden).
-    pub fn reveal_exit(
-        &mut self,
-        direction: direction::Direction,
-    ) -> direction::DirectionResolution {
-        self.current_room_mut().reveal_exit(direction)
+    pub fn reveal_exit(&mut self, go_target: input::GoTarget) -> direction::GoTargetResolution {
+        self.current_room_mut().reveal_exit(go_target)
     }
 
     /// Hide the exit in `direction` (no-op if there is none, or it is already
     /// hidden).
-    pub fn hide_exit(&mut self, direction: direction::Direction) -> direction::DirectionResolution {
-        self.current_room_mut().hide_exit(direction)
+    pub fn hide_exit(&mut self, go_target: input::GoTarget) -> direction::GoTargetResolution {
+        self.current_room_mut().hide_exit(go_target)
     }
 }
 
@@ -323,9 +315,7 @@ impl WorldState {
     /// world); hidden doors still do not resolve as targets.
     #[must_use]
     pub fn exit_direction_of(&self, id: &ObjectId) -> Option<direction::Direction> {
-        self.any_object(id)
-            .and_then(|object| object.door.as_ref())
-            .map(|door| door.direction)
+        self.any_object(id)?.door.as_ref()?.direction
     }
 
     /// Resolve a noun against everything currently in the player's scope:
@@ -366,12 +356,149 @@ impl WorldState {
         self.current_room().holds(target) || self.player.holds(target)
     }
 
+    /// Whether a use-with target (object or NPC) is currently in scope: an
+    /// object in the room or inventory, or an NPC in the current room.
+    fn target_is_in_scope(&self, target: &Target) -> bool {
+        match target {
+            Target::Object(id) => self.target_in_scope(id),
+            Target::Npc(id) => self
+                .npcs_in_room(&self.current_room_id)
+                .iter()
+                .any(|npc| npc.id() == id),
+        }
+    }
+
     fn get_available_objects(&self) -> Vec<object::Object> {
         [
             self.current_room().objects().as_slice(),
             self.player.objects().as_slice(),
         ]
         .concat()
+    }
+
+    /// The best-known display name for a target: its authored name if it is
+    /// currently reachable, otherwise a fallback built from the raw id (an
+    /// id a caller passes in should normally resolve, but this never panics
+    /// if it doesn't).
+    #[must_use]
+    pub fn target_display_name(&self, target: &Target) -> String {
+        match target {
+            Target::Object(id) => self.object_display_name(id),
+            Target::Npc(id) => self.npc_display_name(id),
+        }
+    }
+
+    /// The best-known display name for an object id: its authored name if
+    /// reachable, otherwise the raw id.
+    #[must_use]
+    pub fn object_display_name(&self, id: &ObjectId) -> String {
+        self.object_info(id)
+            .map_or_else(|| id.to_string(), |info| info.name)
+    }
+
+    /// The best-known display name for an NPC id: its authored name if it
+    /// exists in the world, otherwise the raw id.
+    #[must_use]
+    pub fn npc_display_name(&self, id: &npc::NpcId) -> String {
+        self.npcs
+            .iter()
+            .find(|npc| npc.id() == id)
+            .map_or_else(|| id.to_string(), |npc| npc.primary_name().to_string())
+    }
+
+    /// Resolve a use-with target [`Locator`](input::Locator): a raw name (full
+    /// name resolution, with ambiguity) or a concrete id (resolved directly,
+    /// no ambiguity possible). Returns the display name to attribute to the
+    /// resulting event alongside the resolution.
+    #[must_use]
+    pub fn resolve_target_locator(
+        &self,
+        locator: input::Locator<Target>,
+    ) -> (String, TargetResolution) {
+        match locator {
+            input::Locator::Name(name) => {
+                let resolution = self.resolve_target(&name);
+                (name, resolution)
+            }
+            input::Locator::Id(target) => {
+                let name = self.target_display_name(&target);
+                let resolution = if self.target_is_in_scope(&target) {
+                    TargetResolution::Found(target)
+                } else {
+                    TargetResolution::NotFound
+                };
+                (name, resolution)
+            }
+        }
+    }
+
+    /// Resolve a room-object [`Locator`](input::Locator) (used by `take`):
+    /// a raw name or a concrete id, scoped to the current room only.
+    #[must_use]
+    pub fn resolve_room_object_locator(
+        &self,
+        locator: input::Locator<ObjectId>,
+    ) -> (String, ObjectResolution) {
+        match locator {
+            input::Locator::Name(name) => {
+                let resolution = self.resolve_room_object(&name);
+                (name, resolution)
+            }
+            input::Locator::Id(id) => {
+                let name = self.object_display_name(&id);
+                let resolution = if self.current_room().holds(&id) {
+                    ObjectResolution::Found(id)
+                } else {
+                    ObjectResolution::NotFound
+                };
+                (name, resolution)
+            }
+        }
+    }
+
+    /// Resolve a carried-object [`Locator`](input::Locator) (used by `drop`):
+    /// a raw name or a concrete id, scoped to the player's inventory only.
+    #[must_use]
+    pub fn resolve_player_object_locator(
+        &self,
+        locator: input::Locator<ObjectId>,
+    ) -> (String, ObjectResolution) {
+        match locator {
+            input::Locator::Name(name) => {
+                let resolution = self.resolve_player_object(&name);
+                (name, resolution)
+            }
+            input::Locator::Id(id) => {
+                let name = self.object_display_name(&id);
+                let resolution = if self.player_holds(&id) {
+                    ObjectResolution::Found(id)
+                } else {
+                    ObjectResolution::NotFound
+                };
+                (name, resolution)
+            }
+        }
+    }
+
+    /// Resolve an NPC [`Locator`](input::Locator) (used by `talk`): a raw
+    /// name or a concrete id, scoped to the current room only. Returns the
+    /// display name alongside the NPC id, if resolved.
+    #[must_use]
+    pub fn resolve_npc_locator(
+        &self,
+        locator: input::Locator<npc::NpcId>,
+    ) -> (String, Option<npc::NpcId>) {
+        match locator {
+            input::Locator::Name(name) => {
+                let npc_id = self.resolve_npc(&name).map(|npc| npc.id().clone());
+                (name, npc_id)
+            }
+            input::Locator::Id(id) => {
+                let name = self.npc_display_name(&id);
+                let npc_id = self.npc_in_room_by_id(&id).map(|npc| npc.id().clone());
+                (name, npc_id)
+            }
+        }
     }
 }
 
@@ -410,6 +537,15 @@ impl WorldState {
         self.npcs_in_room(&self.current_room_id)
             .into_iter()
             .find(|npc| npc.has_name(name))
+    }
+
+    /// Find an NPC by id in the current room only (the id-locator
+    /// counterpart to [`WorldState::resolve_npc`]).
+    #[must_use]
+    pub fn npc_in_room_by_id(&self, id: &npc::NpcId) -> Option<&npc::Npc> {
+        self.npcs_in_room(&self.current_room_id)
+            .into_iter()
+            .find(|npc| npc.id() == id)
     }
 
     /// The current dialogue node id for the given NPC, if in conversation.

@@ -8,7 +8,7 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, Event, ObjectId, RoomId, Target};
+use core::{Direction, Event, Target};
 
 // --- on_look ---
 
@@ -31,6 +31,8 @@ mod on_look {
 // --- on_go ---
 
 mod on_go {
+    use core::input::GoTarget;
+
     use super::*;
 
     #[test]
@@ -38,9 +40,9 @@ mod on_go {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
     }
 
     #[test]
@@ -49,9 +51,9 @@ mod on_go {
         // Room 1 only has a north exit; a bare direction word is accepted.
         assert_eq!(
             engine.handle_input("north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
     }
 
     #[test]
@@ -60,9 +62,11 @@ mod on_go {
         // Room 1 only has a north exit.
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::WentInvalidDirection(Direction::East)]
+            vec![Event::WentExitNotFound(GoTarget::Direction(
+                Direction::East
+            ))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("cellar"));
     }
 
     #[test]
@@ -72,7 +76,9 @@ mod on_go {
         // Room 2 has south and east exits, not west.
         assert_eq!(
             engine.handle_input("go west"),
-            vec![Event::WentInvalidDirection(Direction::West)]
+            vec![Event::WentExitNotFound(GoTarget::Direction(
+                Direction::West
+            ))]
         );
     }
 }
@@ -88,20 +94,20 @@ mod on_take {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string()
             }]
         );
         assert_eq!(
             engine
                 .world()
-                .get_object_from_room(&core::ObjectId::new("iron-key")),
+                .get_object_from_room(&core::objectId!("iron-key")),
             core::ObjectResolution::NotFound
         );
         assert_ne!(
             engine
                 .world()
-                .get_object_from_player(&core::ObjectId::new("iron-key")),
+                .get_object_from_player(&core::objectId!("iron-key")),
             core::ObjectResolution::NotFound
         );
     }
@@ -124,7 +130,7 @@ mod on_take {
         assert_eq!(
             engine.handle_input("take key"),
             vec![Event::TookObjectAmbiguous {
-                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+                object_ids: vec![core::objectId!("iron-key"), core::objectId!("brass-key")],
                 object: "key".to_string()
             }]
         );
@@ -156,20 +162,20 @@ mod on_drop {
         assert_eq!(
             engine.handle_input("drop iron key"),
             vec![Event::Dropped {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string()
             }]
         );
         assert_eq!(
             engine
                 .world()
-                .get_object_from_player(&core::ObjectId::new("iron-key")),
+                .get_object_from_player(&core::objectId!("iron-key")),
             core::ObjectResolution::NotFound
         );
         assert_ne!(
             engine
                 .world()
-                .get_object_from_room(&core::ObjectId::new("iron-key")),
+                .get_object_from_room(&core::objectId!("iron-key")),
             core::ObjectResolution::NotFound
         );
     }
@@ -193,7 +199,7 @@ mod on_drop {
         assert_eq!(
             engine.handle_input("drop key"),
             vec![Event::DroppedObjectAmbiguous {
-                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+                object_ids: vec![core::objectId!("iron-key"), core::objectId!("brass-key")],
                 object: "key".to_string()
             }]
         );
@@ -211,7 +217,7 @@ mod on_examine {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -235,8 +241,8 @@ mod on_examine {
             engine.handle_input("examine key"),
             vec![Event::ExaminedTargetAmbiguous {
                 target_ids: vec![
-                    Target::Object(ObjectId::new("iron-key")),
-                    Target::Object(ObjectId::new("brass-key"))
+                    Target::Object(core::objectId!("iron-key")),
+                    Target::Object(core::objectId!("brass-key"))
                 ],
                 target: "key".to_string()
             }]
@@ -267,7 +273,7 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key"),
             vec![Event::UsedTargetNeeded {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string()
             }]
         );
@@ -280,9 +286,9 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use iron key on chest"),
             vec![Event::Used {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
-                target_id: Some(Target::Object(ObjectId::new("locked-chest"))),
+                target_id: Some(Target::Object(core::objectId!("locked-chest"))),
                 target: Some("chest".to_string()),
             }]
         );
@@ -297,7 +303,7 @@ mod on_use {
         assert_eq!(
             engine.handle_input("use key on chest"),
             vec![Event::UsedObjectAmbiguous {
-                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+                object_ids: vec![core::objectId!("iron-key"), core::objectId!("brass-key")],
                 object: "key".to_string()
             }]
         );

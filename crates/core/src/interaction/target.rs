@@ -78,9 +78,6 @@ mod tests {
     use crate::data::WorldData;
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
-    use crate::keys::object_id::ObjectId;
-    use crate::keys::room_id::RoomId;
-    use crate::world::npc::NpcId;
     use std::collections::HashMap;
 
     /// A one-room world with one `Item` and one `Scene` object, both visible.
@@ -89,7 +86,7 @@ mod tests {
             flags: Vec::new(),
             objects: vec![
                 ObjectData {
-                    id: ObjectId::new("sword"),
+                    id: crate::objectId!("sword"),
                     primary_name: "sword".to_string(),
                     aliases: Vec::new(),
                     kind: ObjectKind::Item,
@@ -97,7 +94,7 @@ mod tests {
                     extra: HashMap::new(),
                 },
                 ObjectData {
-                    id: ObjectId::new("cabinet"),
+                    id: crate::objectId!("cabinet"),
                     primary_name: "cabinet".to_string(),
                     aliases: Vec::new(),
                     kind: ObjectKind::Scene,
@@ -106,8 +103,8 @@ mod tests {
                 },
             ],
             rooms: vec![RoomData {
-                id: RoomId::new("room"),
-                visible_objects: vec![ObjectId::new("sword"), ObjectId::new("cabinet")],
+                id: crate::roomId!("room"),
+                visible_objects: vec![crate::objectId!("sword"), crate::objectId!("cabinet")],
                 hidden_objects: Vec::new(),
                 extra: HashMap::new(),
             }],
@@ -122,7 +119,9 @@ mod tests {
     fn any_matches_regardless_of_target() {
         let world = world();
         assert!(TargetFilter::Any.matches(&world, None));
-        assert!(TargetFilter::Any.matches(&world, Some(&Target::Object(ObjectId::new("sword")))));
+        assert!(
+            TargetFilter::Any.matches(&world, Some(&Target::Object(crate::objectId!("sword"))))
+        );
     }
 
     #[test]
@@ -130,9 +129,10 @@ mod tests {
         let world = world();
         assert!(!TargetFilter::Targeted.matches(&world, None));
         assert!(
-            TargetFilter::Targeted.matches(&world, Some(&Target::Object(ObjectId::new("sword"))))
+            TargetFilter::Targeted
+                .matches(&world, Some(&Target::Object(crate::objectId!("sword"))))
         );
-        assert!(TargetFilter::Targeted.matches(&world, Some(&Target::Npc(NpcId::new("guard")))));
+        assert!(TargetFilter::Targeted.matches(&world, Some(&Target::Npc(crate::npcId!("guard")))));
     }
 
     #[test]
@@ -140,8 +140,8 @@ mod tests {
         let world = world();
         let scene = TargetFilter::Kind(TargetKind::Scene);
         assert!(!scene.matches(&world, None));
-        assert!(scene.matches(&world, Some(&Target::Object(ObjectId::new("cabinet")))));
-        assert!(!scene.matches(&world, Some(&Target::Object(ObjectId::new("sword")))));
+        assert!(scene.matches(&world, Some(&Target::Object(crate::objectId!("cabinet")))));
+        assert!(!scene.matches(&world, Some(&Target::Object(crate::objectId!("sword")))));
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod tests {
         let world = world();
         assert!(
             !TargetFilter::Kind(TargetKind::Scene)
-                .matches(&world, Some(&Target::Npc(NpcId::new("guard"))))
+                .matches(&world, Some(&Target::Npc(crate::npcId!("guard"))))
         );
     }
 }

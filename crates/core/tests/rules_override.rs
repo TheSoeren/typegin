@@ -13,7 +13,7 @@ mod common;
 
 use common::{setup_engine, setup_engine_with_rules};
 use core::{
-    Direction, Event, GameEngine, Interaction, ObjectId, Rules, TargetFilter, Verb,
+    Action, Direction, Event, GameEngine, GoTarget, Interaction, Rules, TargetFilter, Verb,
     world::{
         WorldState,
         object::{self, TargetResolution},
@@ -37,7 +37,7 @@ impl Rules for TestRules {
         Self::override_event("look")
     }
 
-    fn on_go(&mut self, _world: &mut WorldState, _direction: Direction) -> Vec<Event> {
+    fn on_go(&mut self, _world: &mut WorldState, _target: GoTarget) -> Vec<Event> {
         Self::override_event("go")
     }
 
@@ -107,8 +107,20 @@ mod everything_overridden {
         let mut default = setup_engine();
         assert_eq!(marker("go"), custom.handle_input("go north"));
         assert_eq!(
-            vec![Event::Went(Direction::North)],
+            vec![Event::Went(GoTarget::Direction(Direction::North))],
             default.handle_input("go north")
+        );
+    }
+
+    #[test]
+    fn on_go_override_wins_for_a_named_target_too() {
+        // `on_go` is one hook regardless of how the destination was
+        // specified (`GoTarget::Direction` or `GoTarget::Named`) — an
+        // override intercepts both the same way.
+        let mut custom = setup_engine_with_rules(TestRules);
+        assert_eq!(
+            marker("go"),
+            custom.execute_action(Action::Go(GoTarget::Named("anything".to_string())))
         );
     }
 
@@ -119,7 +131,7 @@ mod everything_overridden {
         assert_eq!(marker("take"), custom.handle_input("take iron key"));
         assert_eq!(
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string()
             }],
             default.handle_input("take iron key")
@@ -139,7 +151,7 @@ mod everything_overridden {
         assert_eq!(marker("examine"), custom.handle_input("examine iron key"));
         assert_eq!(
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }],
             default.handle_input("examine iron key")
@@ -154,7 +166,7 @@ mod everything_overridden {
         default.handle_input("take iron key");
         assert_eq!(
             vec![Event::UsedTargetNeeded {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string()
             }],
             default.handle_input("use iron key")
@@ -188,7 +200,7 @@ mod everything_overridden {
 
         let interactions = vec![Interaction::build(
             Verb::Use,
-            Some(ObjectId::new("iron-key")),
+            Some(core::objectId!("iron-key")),
             TargetFilter::Any,
             None,
             Box::new(|_world, _context| {

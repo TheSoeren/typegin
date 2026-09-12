@@ -13,8 +13,9 @@
 mod common;
 
 use core::Direction;
-use core::DirectionResolution;
-use core::{Event, ObjectId, RoomId};
+use core::Event;
+use core::GoTargetResolution;
+use core::input::GoTarget;
 
 /// Navigate from the cellar (start) to the study, whose doors are:
 /// west (open), north (hidden), east (locked), south (hidden + locked).
@@ -22,13 +23,13 @@ fn engine_at_room_3() -> core::GameEngine {
     let mut engine = common::setup_engine();
     assert_eq!(
         engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
+        vec![Event::Went(GoTarget::Direction(Direction::North))]
     );
     assert_eq!(
         engine.handle_input("go east"),
-        vec![Event::Went(Direction::East)]
+        vec![Event::Went(GoTarget::Direction(Direction::East))]
     );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+    assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     engine
 }
 
@@ -43,11 +44,11 @@ mod data_parsing {
     fn door_object_parses_destination() {
         let data = common::multi_room_world_data();
         let stairs = data
-            .find_object(&ObjectId::new("cellar-stairs"))
+            .find_object(&core::objectId!("cellar-stairs"))
             .expect("cellar stairs object exists");
         let door = stairs.door.as_ref().expect("door data");
         assert_eq!(door.to, "corridor".to_string());
-        assert_eq!(door.direction, "north".to_string());
+        assert_eq!(door.direction, Some("north".to_string()));
         assert!(!door.locked);
         assert_eq!(stairs.kind, ObjectKind::Scene);
     }
@@ -56,14 +57,14 @@ mod data_parsing {
     fn door_object_parses_locked_flags() {
         let data = common::multi_room_world_data();
         let oak = data
-            .find_object(&ObjectId::new("oak-door"))
+            .find_object(&core::objectId!("oak-door"))
             .expect("oak door");
         let oak_door = oak.door.as_ref().expect("door data");
         assert_eq!(oak_door.to, "corridor".to_string());
         assert!(oak_door.locked);
 
         let vault = data
-            .find_object(&ObjectId::new("hidden-vault"))
+            .find_object(&core::objectId!("hidden-vault"))
             .expect("hidden vault");
         assert!(vault.door.as_ref().expect("door data").locked);
     }
@@ -71,13 +72,21 @@ mod data_parsing {
     #[test]
     fn hidden_door_is_listed_as_hidden_in_its_room() {
         let data = common::multi_room_world_data();
-        let room = data.find_room(&RoomId::new("study")).expect("study exists");
+        let room = data
+            .find_room(&core::roomId!("study"))
+            .expect("study exists");
         assert!(
             room.hidden_objects
-                .contains(&ObjectId::new("secret-passage"))
+                .contains(&core::objectId!("secret-passage"))
         );
-        assert!(room.hidden_objects.contains(&ObjectId::new("hidden-vault")));
-        assert!(room.visible_objects.contains(&ObjectId::new("wooden-door")));
+        assert!(
+            room.hidden_objects
+                .contains(&core::objectId!("hidden-vault"))
+        );
+        assert!(
+            room.visible_objects
+                .contains(&core::objectId!("wooden-door"))
+        );
     }
 
     #[test]
@@ -90,7 +99,7 @@ mod data_parsing {
             "wooden-door",
         ] {
             let object = data
-                .find_object(&ObjectId::new(key))
+                .find_object(&core::objectId!(key))
                 .expect("door object exists");
             let door = object.door.as_ref().expect("door data");
             assert!(!door.locked, "door {key} must default to unlocked");
@@ -108,19 +117,23 @@ mod world_state_doors {
         let mut engine = engine_at_room_3();
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::WentExitLocked(Direction::East)]
+            vec![Event::WentExitLocked(GoTarget::Direction(Direction::East))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
     fn locked_direction_is_listed_but_not_an_exit() {
         let engine = engine_at_room_3();
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::East),
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::East)),
             None
         );
     }
@@ -129,23 +142,31 @@ mod world_state_doors {
     fn unlock_exit_makes_it_traversable() {
         let mut engine = engine_at_room_3();
         assert_eq!(
-            engine.world_mut().unlock_exit(Direction::East),
-            DirectionResolution::Found(Direction::East)
+            engine
+                .world_mut()
+                .unlock_exit(GoTarget::Direction(Direction::East)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::East))
         );
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
     }
 
     #[test]
     fn unlock_absent_direction_returns_not_found() {
         let mut engine = common::setup_engine();
         assert_eq!(
-            engine.world_mut().unlock_exit(Direction::East),
-            DirectionResolution::NotFound
+            engine
+                .world_mut()
+                .unlock_exit(GoTarget::Direction(Direction::East)),
+            GoTargetResolution::NotFound
         );
     }
 
@@ -153,92 +174,134 @@ mod world_state_doors {
     fn lock_visible_exit_blocks_it() {
         let mut engine = common::setup_engine();
         assert_eq!(
-            engine.world_mut().lock_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .lock_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
-        assert!(engine.world().is_exit_locked(Direction::North));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::North))
+        );
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentExitLocked(Direction::North)]
+            vec![Event::WentExitLocked(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("cellar"));
     }
 
     #[test]
     fn lock_unknown_direction_returns_not_found() {
         let mut engine = common::setup_engine();
         assert_eq!(
-            engine.world_mut().lock_exit(Direction::East),
-            DirectionResolution::NotFound
+            engine
+                .world_mut()
+                .lock_exit(GoTarget::Direction(Direction::East)),
+            GoTargetResolution::NotFound
         );
     }
 
     #[test]
     fn lock_unlock_round_trip_restores_exit() {
         let mut engine = common::setup_engine();
-        engine.world_mut().lock_exit(Direction::North);
+        engine
+            .world_mut()
+            .lock_exit(GoTarget::Direction(Direction::North));
         assert_eq!(
-            engine.world_mut().unlock_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .unlock_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
-        assert!(!engine.world().is_exit_locked(Direction::North));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::North))
+        );
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
     }
 
     #[test]
     fn unlock_lock_round_trip_restores_locked() {
         let mut engine = engine_at_room_3();
-        engine.world_mut().unlock_exit(Direction::East);
+        engine
+            .world_mut()
+            .unlock_exit(GoTarget::Direction(Direction::East));
         assert_eq!(
-            engine.world_mut().lock_exit(Direction::East),
-            DirectionResolution::Found(Direction::East)
+            engine
+                .world_mut()
+                .lock_exit(GoTarget::Direction(Direction::East)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::East))
         );
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::WentExitLocked(Direction::East)]
+            vec![Event::WentExitLocked(GoTarget::Direction(Direction::East))]
         );
     }
 
     #[test]
     fn hidden_exit_stays_unlisted_and_untraversable() {
         let mut engine = engine_at_room_3();
-        assert!(engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentExitHidden(Direction::North)]
+            vec![Event::WentExitHidden(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
     fn hidden_and_locked_exit_hides_its_lock_status() {
         let mut engine = engine_at_room_3();
-        assert!(engine.world().is_exit_hidden(Direction::South));
-        assert!(engine.world().is_exit_locked(Direction::South));
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::South))
+        );
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::South))
+        );
         assert_eq!(
             engine.handle_input("go south"),
-            vec![Event::WentExitHidden(Direction::South)]
+            vec![Event::WentExitHidden(GoTarget::Direction(Direction::South))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
     fn revealing_hidden_and_locked_exit_exposes_the_door() {
         let mut engine = engine_at_room_3();
         assert_eq!(
-            engine.world_mut().reveal_exit(Direction::South),
-            DirectionResolution::Found(Direction::South)
+            engine
+                .world_mut()
+                .reveal_exit(GoTarget::Direction(Direction::South)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::South))
         );
-        assert!(!engine.world().is_exit_hidden(Direction::South));
-        assert!(engine.world().is_exit_locked(Direction::South));
+        assert!(
+            !engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::South))
+        );
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::South))
+        );
         assert_eq!(
             engine.handle_input("go south"),
-            vec![Event::WentExitLocked(Direction::South)]
+            vec![Event::WentExitLocked(GoTarget::Direction(Direction::South))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
@@ -246,7 +309,9 @@ mod world_state_doors {
         let mut engine = common::setup_engine();
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::WentInvalidDirection(Direction::East)]
+            vec![Event::WentExitNotFound(GoTarget::Direction(
+                Direction::East
+            ))]
         );
     }
 }

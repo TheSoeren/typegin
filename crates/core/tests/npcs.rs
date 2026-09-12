@@ -36,8 +36,9 @@
 //!
 //! ### Actions
 //!
-//! * `Action::Talk(String)` — `talk to <npc>` / `talk <npc>` (stop-word
-//!   "to" is stripped by the tokenizer).
+//! * `Action::Talk(Locator<NpcId>)` — `talk to <npc>` / `talk <npc>` (stop-word
+//!   "to" is stripped by the tokenizer) resolves to `Locator::Name`; a
+//!   point-and-click front-end may instead supply `Locator::Id` directly.
 //! * `Action::Choose(String)` — `choose <label>` / `choose <index>` where
 //!   index is 1-based.
 //!
@@ -52,7 +53,7 @@
 //!
 //! ## Dispatch flow
 //!
-//! 1. `GameEngine::handle_input("talk guard")` → `Action::Talk("guard")`.
+//! 1. `GameEngine::handle_input("talk guard")` → `Action::Talk(Locator::Name("guard"))`.
 //! 2. Engine resolves the NPC by name in the current room.
 //! 3. If found: marks it `active`, sets `dialogue_state[npc_id] = root`,
 //!    returns `Talked`.
@@ -86,8 +87,7 @@
 mod common;
 
 use core::{
-    DataEffect, DialogueChoice, DialogueNodeId, Direction, Event, GameEngine, NpcId, ObjectId,
-    RoomId, WorldData, WorldDataError,
+    DataEffect, DialogueChoice, Direction, Event, GameEngine, GoTarget, WorldData, WorldDataError,
 };
 
 use common::{
@@ -235,7 +235,7 @@ mod world_state_api {
     fn npcs_are_loaded_from_data() {
         let engine = engine_with(NPCS_GUARD_YAML);
         assert_eq!(engine.world().npcs().len(), 1);
-        assert_eq!(engine.world().npcs()[0].id(), &NpcId::new("guard"));
+        assert_eq!(engine.world().npcs()[0].id(), &core::npcId!("guard"));
     }
 
     #[test]
@@ -254,7 +254,10 @@ mod world_state_api {
     #[test]
     fn npc_room_is_loaded() {
         let engine = engine_with(NPCS_GUARD_YAML);
-        assert_eq!(engine.world().npcs()[0].room_id(), &RoomId::new("corridor"));
+        assert_eq!(
+            engine.world().npcs()[0].room_id(),
+            &core::roomId!("corridor")
+        );
     }
 
     #[test]
@@ -262,7 +265,7 @@ mod world_state_api {
         let engine = engine_with(NPCS_GUARD_YAML);
         assert_eq!(
             engine.world().npcs()[0].root(),
-            &DialogueNodeId::new("greeting")
+            &core::dialogueNodeId!("greeting")
         );
     }
 
@@ -272,7 +275,7 @@ mod world_state_api {
         let npc = &engine.world().npcs()[0];
         assert!(
             npc.dialogue()
-                .contains_key(&DialogueNodeId::new("greeting"))
+                .contains_key(&core::dialogueNodeId!("greeting"))
         );
     }
 
@@ -282,7 +285,7 @@ mod world_state_api {
         let npc = &engine.world().npcs()[0];
         let node = npc
             .dialogue()
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("root node exists");
         assert_eq!(node.text(), "The guard nods at you.");
     }
@@ -293,11 +296,14 @@ mod world_state_api {
         let npc = &engine.world().npcs()[0];
         let node = npc
             .dialogue()
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("root node exists");
         let choices = node.choices();
         assert_eq!(choices[0].label(), "Ask about the exit");
-        assert_eq!(choices[0].next(), Some(&DialogueNodeId::new("about-exit")));
+        assert_eq!(
+            choices[0].next(),
+            Some(&core::dialogueNodeId!("about-exit"))
+        );
         // `.end` marker maps to `None`
         assert_eq!(choices[1].next(), None);
     }
@@ -317,15 +323,15 @@ mod world_state_api {
     #[test]
     fn find_npc_by_name_in_room() {
         let engine = engine_with(NPCS_GUARD_YAML);
-        let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
+        let corridor_npcs = engine.world().npcs_in_room(&core::roomId!("corridor"));
         assert_eq!(corridor_npcs.len(), 1);
-        assert_eq!(corridor_npcs[0].id(), &NpcId::new("guard"));
+        assert_eq!(corridor_npcs[0].id(), &core::npcId!("guard"));
     }
 
     #[test]
     fn find_npc_by_alias_in_room() {
         let engine = engine_with(NPCS_GUARD_YAML);
-        let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
+        let corridor_npcs = engine.world().npcs_in_room(&core::roomId!("corridor"));
         let found = corridor_npcs.iter().find(|npc| npc.has_name("sentry"));
         assert!(found.is_some());
     }
@@ -336,7 +342,7 @@ mod world_state_api {
         enter_corridor(&mut engine);
         let found = engine.world().resolve_npc("sentry");
         assert!(found.is_some());
-        assert_eq!(found.unwrap().id(), &NpcId::new("guard"));
+        assert_eq!(found.unwrap().id(), &core::npcId!("guard"));
     }
 
     #[test]
@@ -348,14 +354,14 @@ mod world_state_api {
     #[test]
     fn npc_not_in_other_room() {
         let engine = engine_with(NPCS_GUARD_YAML);
-        let cellar_npcs = engine.world().npcs_in_room(&RoomId::new("cellar"));
+        let cellar_npcs = engine.world().npcs_in_room(&core::roomId!("cellar"));
         assert!(cellar_npcs.is_empty());
     }
 
     #[test]
     fn two_npcs_in_same_room() {
         let engine = engine_with(NPCS_TWO_NPCS_YAML);
-        let corridor_npcs = engine.world().npcs_in_room(&RoomId::new("corridor"));
+        let corridor_npcs = engine.world().npcs_in_room(&core::roomId!("corridor"));
         assert_eq!(corridor_npcs.len(), 2);
     }
 }
@@ -376,7 +382,7 @@ mod parse {
     #[test]
     fn npc_key_is_parsed_as_npc_id() {
         let world = world_with(NPCS_GUARD_YAML);
-        assert_eq!(world.npcs[0].id, NpcId::new("guard"));
+        assert_eq!(world.npcs[0].id, core::npcId!("guard"));
     }
 
     #[test]
@@ -394,13 +400,16 @@ mod parse {
     #[test]
     fn npc_room_is_parsed() {
         let world = world_with(NPCS_GUARD_YAML);
-        assert_eq!(world.npcs[0].room, RoomId::new("corridor"));
+        assert_eq!(world.npcs[0].room, core::roomId!("corridor"));
     }
 
     #[test]
     fn dialogue_root_is_parsed() {
         let world = world_with(NPCS_GUARD_YAML);
-        assert_eq!(world.npcs[0].dialogue.root, DialogueNodeId::new("greeting"));
+        assert_eq!(
+            world.npcs[0].dialogue.root,
+            core::dialogueNodeId!("greeting")
+        );
     }
 
     #[test]
@@ -409,7 +418,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert_eq!(node.text, "The guard nods at you.");
     }
@@ -420,7 +429,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert!(node.choices.is_empty());
     }
@@ -431,7 +440,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert_eq!(node.choices.len(), 2);
     }
@@ -442,7 +451,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert_eq!(node.choices[0].label, "Ask about the exit");
     }
@@ -453,9 +462,9 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
-        assert_eq!(node.choices[0].next, DialogueNodeId::new("about-exit"));
+        assert_eq!(node.choices[0].next, core::dialogueNodeId!("about-exit"));
     }
 
     #[test]
@@ -464,9 +473,9 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
-        assert_eq!(node.choices[1].next, DialogueNodeId::new(".end"));
+        assert_eq!(node.choices[1].next, core::dialogueNodeId!(".end"));
     }
 
     #[test]
@@ -475,7 +484,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert_eq!(node.choices[0].option_id, None);
     }
@@ -486,7 +495,7 @@ mod parse {
         let node = world.npcs[0]
             .dialogue
             .nodes
-            .get(&DialogueNodeId::new("greeting"))
+            .get(&core::dialogueNodeId!("greeting"))
             .expect("node exists");
         assert_eq!(node.choices[0].effect.len(), 2);
         assert!(node.choices[0].effect.contains(&DataEffect::SetFlag {
@@ -498,8 +507,8 @@ mod parse {
     fn two_npcs_parse() {
         let world = world_with(NPCS_TWO_NPCS_YAML);
         assert_eq!(world.npcs.len(), 2);
-        assert_eq!(world.npcs[0].id, NpcId::new("guard"));
-        assert_eq!(world.npcs[1].id, NpcId::new("warden"));
+        assert_eq!(world.npcs[0].id, core::npcId!("guard"));
+        assert_eq!(world.npcs[1].id, core::npcId!("warden"));
     }
 
     #[test]
@@ -559,14 +568,14 @@ mod talk_dispatch {
             engine.handle_input("talk to guard"),
             vec![
                 Event::Talked {
-                    npc_id: NpcId::new("guard"),
+                    npc_id: core::npcId!("guard"),
                     npc: "guard".to_string(),
-                    node_id: DialogueNodeId::new("greeting"),
+                    node_id: core::dialogueNodeId!("greeting"),
                     text: "The guard nods at you.".to_string(),
                     choices: vec![],
                 },
                 Event::DialogueEnded {
-                    npc_id: NpcId::new("guard"),
+                    npc_id: core::npcId!("guard"),
                     npc: "guard".to_string(),
                 },
             ]
@@ -603,10 +612,10 @@ mod talk_dispatch {
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
         assert_eq!(
-            engine.world().npc_dialogue_node(&NpcId::new("guard")),
-            Some(&DialogueNodeId::new("greeting"))
+            engine.world().npc_dialogue_node(&core::npcId!("guard")),
+            Some(&core::dialogueNodeId!("greeting"))
         );
-        assert_eq!(engine.world().active_npc(), &Some(NpcId::new("guard")));
+        assert_eq!(engine.world().active_npc(), &Some(core::npcId!("guard")));
     }
 
     #[test]
@@ -618,7 +627,7 @@ mod talk_dispatch {
             Event::Talked { choices, .. } => {
                 assert_eq!(choices.len(), 2);
                 assert_eq!(choices[0].label, "Ask about the exit");
-                assert_eq!(choices[0].next, Some(DialogueNodeId::new("about-exit")));
+                assert_eq!(choices[0].next, Some(core::dialogueNodeId!("about-exit")));
                 assert_eq!(choices[1].label, "Say nothing");
                 assert_eq!(choices[1].next, None);
             }
@@ -644,14 +653,14 @@ mod choose_dispatch {
             engine.handle_input("choose 1"),
             vec![
                 Event::Talked {
-                    npc_id: NpcId::new("guard"),
+                    npc_id: core::npcId!("guard"),
                     npc: "guard".to_string(),
-                    node_id: DialogueNodeId::new("about-exit"),
+                    node_id: core::dialogueNodeId!("about-exit"),
                     text: "The exit is to the north.".to_string(),
                     choices: vec![],
                 },
                 Event::DialogueEnded {
-                    npc_id: NpcId::new("guard"),
+                    npc_id: core::npcId!("guard"),
                     npc: "guard".to_string(),
                 },
             ]
@@ -666,7 +675,7 @@ mod choose_dispatch {
         assert_eq!(
             engine.handle_input("choose 2"),
             vec![Event::DialogueEnded {
-                npc_id: NpcId::new("guard"),
+                npc_id: core::npcId!("guard"),
                 npc: "guard".to_string(),
             }]
         );
@@ -681,7 +690,7 @@ mod choose_dispatch {
         assert!(
             engine
                 .world()
-                .npc_dialogue_node(&NpcId::new("guard"))
+                .npc_dialogue_node(&core::npcId!("guard"))
                 .is_none()
         );
         assert!(engine.world().active_npc().is_none());
@@ -695,7 +704,7 @@ mod choose_dispatch {
         assert_eq!(
             engine.handle_input("choose say nothing"),
             vec![Event::DialogueEnded {
-                npc_id: NpcId::new("guard"),
+                npc_id: core::npcId!("guard"),
                 npc: "guard".to_string(),
             }]
         );
@@ -763,9 +772,9 @@ mod choose_dispatch {
         );
         assert!(
             events.contains(&Event::Talked {
-                npc_id: NpcId::new("guard"),
+                npc_id: core::npcId!("guard"),
                 npc: "guard".to_string(),
-                node_id: DialogueNodeId::new("about-escape"),
+                node_id: core::dialogueNodeId!("about-escape"),
                 text: "Don't try it.".to_string(),
                 choices: vec![],
             }),
@@ -787,7 +796,7 @@ mod choose_dispatch {
                 choices,
                 ..
             } => {
-                assert_eq!(node_id, &DialogueNodeId::new("greeting"));
+                assert_eq!(node_id, &core::dialogueNodeId!("greeting"));
                 assert_eq!(text, "The guard looks at you.");
                 assert_eq!(choices.len(), 1);
             }
@@ -798,14 +807,14 @@ mod choose_dispatch {
         let events = engine.handle_input("choose 1");
         match &events[0] {
             Event::Talked { node_id, text, .. } => {
-                assert_eq!(node_id, &DialogueNodeId::new("ask-key"));
+                assert_eq!(node_id, &core::dialogueNodeId!("ask-key"));
                 assert_eq!(text, "What key?");
             }
             other => panic!("expected Talked, got {other:?}"),
         }
         assert_eq!(
-            engine.world().npc_dialogue_node(&NpcId::new("guard")),
-            Some(&DialogueNodeId::new("ask-key"))
+            engine.world().npc_dialogue_node(&core::npcId!("guard")),
+            Some(&core::dialogueNodeId!("ask-key"))
         );
 
         // Node 3: answer-key (leaf → line + end)
@@ -817,7 +826,7 @@ mod choose_dispatch {
                 choices,
                 ..
             } => {
-                assert_eq!(node_id, &DialogueNodeId::new("answer-key"));
+                assert_eq!(node_id, &core::dialogueNodeId!("answer-key"));
                 assert_eq!(text, "Oh, that key. It's in the cellar.");
                 assert!(choices.is_empty());
             }
@@ -848,13 +857,13 @@ mod state_management {
         // Move back to cellar
         assert_eq!(
             engine.handle_input("go south"),
-            vec![Event::Went(Direction::South)]
+            vec![Event::Went(GoTarget::Direction(Direction::South))]
         );
         assert!(engine.world().active_npc().is_none());
         assert!(
             engine
                 .world()
-                .npc_dialogue_node(&NpcId::new("guard"))
+                .npc_dialogue_node(&core::npcId!("guard"))
                 .is_none()
         );
     }
@@ -864,16 +873,16 @@ mod state_management {
         let mut engine = engine_with(NPCS_TWO_NPCS_YAML);
         enter_corridor(&mut engine);
         engine.handle_input("talk to guard");
-        assert_eq!(engine.world().active_npc(), &Some(NpcId::new("guard")));
+        assert_eq!(engine.world().active_npc(), &Some(core::npcId!("guard")));
         assert_eq!(
-            engine.world().npc_dialogue_node(&NpcId::new("guard")),
-            Some(&DialogueNodeId::new("greeting"))
+            engine.world().npc_dialogue_node(&core::npcId!("guard")),
+            Some(&core::dialogueNodeId!("greeting"))
         );
         engine.handle_input("talk to warden");
-        assert_eq!(engine.world().active_npc(), &Some(NpcId::new("warden")));
+        assert_eq!(engine.world().active_npc(), &Some(core::npcId!("warden")));
         assert_eq!(
-            engine.world().npc_dialogue_node(&NpcId::new("warden")),
-            Some(&DialogueNodeId::new("greeting"))
+            engine.world().npc_dialogue_node(&core::npcId!("warden")),
+            Some(&core::dialogueNodeId!("greeting"))
         );
     }
 
@@ -887,7 +896,7 @@ mod state_management {
         let events = engine.handle_input("talk to guard");
         match &events[0] {
             Event::Talked { node_id, .. } => {
-                assert_eq!(node_id, &DialogueNodeId::new("greeting"));
+                assert_eq!(node_id, &core::dialogueNodeId!("greeting"));
             }
             other => panic!("expected Talked, got {other:?}"),
         }
@@ -940,15 +949,15 @@ mod view_hooks {
         let engine = GameEngine::get(&base_world());
         let world = engine.world();
         let events = vec![Event::Talked {
-            npc_id: NpcId::new("guard"),
+            npc_id: core::npcId!("guard"),
             npc: "guard".to_string(),
-            node_id: DialogueNodeId::new("greeting"),
+            node_id: core::dialogueNodeId!("greeting"),
             text: "The guard looks at you.".to_string(),
             choices: vec![
                 DialogueChoice {
                     option_id: None,
                     label: "Ask about the exit".to_string(),
-                    next: Some(DialogueNodeId::new("about-exit")),
+                    next: Some(core::dialogueNodeId!("about-exit")),
                 },
                 DialogueChoice {
                     option_id: None,
@@ -979,14 +988,14 @@ mod view_hooks {
         let engine = GameEngine::get(&base_world());
         let world = engine.world();
         let events = vec![Event::Talked {
-            npc_id: NpcId::new("guard"),
+            npc_id: core::npcId!("guard"),
             npc: "guard".to_string(),
-            node_id: DialogueNodeId::new("greeting"),
+            node_id: core::dialogueNodeId!("greeting"),
             text: "The guard looks at you.".to_string(),
             choices: vec![DialogueChoice {
-                option_id: Some(core::DialogueOptionId::new("ask-exit")),
+                option_id: Some(core::dialogueOptionId!("ask-exit")),
                 label: "Ask about the exit".to_string(),
-                next: Some(DialogueNodeId::new("about-exit")),
+                next: Some(core::dialogueNodeId!("about-exit")),
             }],
         }];
         let mut view = TestView;
@@ -999,7 +1008,7 @@ mod view_hooks {
         let engine = GameEngine::get(&base_world());
         let world = engine.world();
         let events = vec![Event::DialogueEnded {
-            npc_id: NpcId::new("guard"),
+            npc_id: core::npcId!("guard"),
             npc: "guard".to_string(),
         }];
         let mut view = TestView;
@@ -1076,7 +1085,7 @@ mod integration {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -1085,7 +1094,7 @@ mod integration {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -1111,7 +1120,7 @@ mod integration {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -1119,7 +1128,7 @@ mod integration {
         // Flag not set → query returns nothing
         assert!(
             engine
-                .interactions_for(Some(ObjectId::new("iron-key")), None)
+                .interactions_for(Some(core::objectId!("iron-key")), None)
                 .is_empty()
         );
         // Talk, set the flag
@@ -1128,7 +1137,7 @@ mod integration {
         // Query now returns the interaction
         assert_eq!(
             engine
-                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
+                .interactions_for(None, Some(Target::Object(core::objectId!("iron-key"))))
                 .len(),
             1
         );
@@ -1156,7 +1165,7 @@ mod interactions_for_talk {
         let listed = engine.interactions_for(None, None);
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].verb(), Verb::Talk);
-        assert_eq!(listed[0].npc(), Some(&NpcId::new("guard")));
+        assert_eq!(listed[0].npc(), Some(&core::npcId!("guard")));
         // An NPC hotspot is not an object verb: no item, any target.
         assert_eq!(listed[0].item(), None);
         assert_eq!(listed[0].target(), TargetFilter::Any);
@@ -1181,12 +1190,12 @@ mod interactions_for_talk {
         assert!(
             listed
                 .iter()
-                .any(|interaction| interaction.npc() == Some(&NpcId::new("guard")))
+                .any(|interaction| interaction.npc() == Some(&core::npcId!("guard")))
         );
         assert!(
             listed
                 .iter()
-                .any(|interaction| interaction.npc() == Some(&NpcId::new("warden")))
+                .any(|interaction| interaction.npc() == Some(&core::npcId!("warden")))
         );
     }
 
@@ -1194,15 +1203,15 @@ mod interactions_for_talk {
     fn targeted_queries_never_list_npc_hotspots() {
         let mut engine = engine_with(NPCS_GUARD_YAML);
         enter_corridor(&mut engine);
-        let with_item = engine.interactions_for(Some(ObjectId::new("iron-key")), None);
+        let with_item = engine.interactions_for(Some(core::objectId!("iron-key")), None);
         assert!(
             with_item
                 .iter()
                 .all(|interaction| interaction.verb() != Verb::Talk)
         );
         let with_target = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert!(
             with_target
@@ -1245,7 +1254,7 @@ mod use_on_npc {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -1255,9 +1264,9 @@ mod use_on_npc {
         assert_eq!(
             engine.handle_input("use iron key on guard"),
             vec![Event::Used {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
-                target_id: Some(Target::Npc(NpcId::new("guard"))),
+                target_id: Some(Target::Npc(core::npcId!("guard"))),
                 target: Some("guard".to_string()),
             }]
         );
@@ -1272,7 +1281,7 @@ mod use_on_npc {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -1300,8 +1309,8 @@ mod use_on_npc {
         ));
         enter_corridor(&mut engine);
         let listed = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Npc(NpcId::new("guard"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Npc(core::npcId!("guard"))),
         );
         // A query targeted straight at an NPC reports both the authored Use
         // interaction and the Talk hotspot: talking to a present NPC is
@@ -1311,7 +1320,7 @@ mod use_on_npc {
             listed
                 .iter()
                 .any(|interaction| interaction.verb() == Verb::Use
-                    && interaction.item() == Some(ObjectId::new("iron-key")))
+                    && interaction.item() == Some(core::objectId!("iron-key")))
         );
         assert!(
             listed
@@ -1326,7 +1335,7 @@ mod use_on_npc {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -1335,7 +1344,7 @@ mod use_on_npc {
         assert_eq!(
             engine.handle_input("use iron key on warden"),
             vec![Event::UsedTargetNotFound {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
                 target: "warden".to_string(),
             }]

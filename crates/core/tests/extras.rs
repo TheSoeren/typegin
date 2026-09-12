@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 use core::data::ExtraValue;
 use core::event::Event;
-use core::{Direction, GameEngine, ObjectId, RoomId, Rules, WorldState};
+use core::{Direction, GameEngine, GoTarget, ObjectId, Rules, WorldState};
 
 fn item_2_extra() -> HashMap<String, ExtraValue> {
     let mut extra = HashMap::new();
@@ -64,7 +64,7 @@ mod data_parsing {
     fn item_extra_parses_all_types() {
         let data = common::multi_room_world_data();
         let key = data
-            .find_object(&ObjectId::new("iron-key"))
+            .find_object(&core::objectId!("iron-key"))
             .expect("item 2 exists");
         assert_eq!(key.extra, item_2_extra());
     }
@@ -73,7 +73,7 @@ mod data_parsing {
     fn room_extra_parses() {
         let data = common::multi_room_world_data();
         let room = data
-            .find_room(&RoomId::new("cellar"))
+            .find_room(&core::roomId!("cellar"))
             .expect("room 1 exists");
         assert_eq!(room.extra, room_1_extra());
     }
@@ -82,7 +82,7 @@ mod data_parsing {
     fn door_extra_parses() {
         let data = common::multi_room_world_data();
         let oak = data
-            .find_object(&ObjectId::new("oak-door"))
+            .find_object(&core::objectId!("oak-door"))
             .expect("oak door exists");
         assert_eq!(oak.extra, exit_east_extra());
     }
@@ -91,11 +91,11 @@ mod data_parsing {
     fn door_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
         let north_stairs = data
-            .find_object(&ObjectId::new("cellar-stairs"))
+            .find_object(&core::objectId!("cellar-stairs"))
             .expect("cellar stairs north exists");
         assert!(north_stairs.extra.is_empty());
         let south_stairs = data
-            .find_object(&ObjectId::new("corridor-stairs"))
+            .find_object(&core::objectId!("corridor-stairs"))
             .expect("cellar stairs south exists");
         assert!(south_stairs.extra.is_empty());
     }
@@ -104,7 +104,7 @@ mod data_parsing {
     fn item_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
         let sword = data
-            .find_object(&ObjectId::new("glowing-sword"))
+            .find_object(&core::objectId!("glowing-sword"))
             .expect("item 1 exists");
         assert!(sword.extra.is_empty());
     }
@@ -113,7 +113,7 @@ mod data_parsing {
     fn room_without_extra_parses_as_empty() {
         let data = common::multi_room_world_data();
         let corridor = data
-            .find_room(&RoomId::new("corridor"))
+            .find_room(&core::roomId!("corridor"))
             .expect("room 2 exists");
         assert!(corridor.extra.is_empty());
     }
@@ -129,7 +129,7 @@ mod world_exposure {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .object_info(&ObjectId::new("iron-key"))
+            .object_info(&core::objectId!("iron-key"))
             .expect("item 2 in room");
         assert_eq!(info.extra, item_2_extra());
     }
@@ -139,7 +139,7 @@ mod world_exposure {
         let engine = common::setup_engine();
         let info = engine
             .world()
-            .object_info(&ObjectId::new("locked-chest"))
+            .object_info(&core::objectId!("locked-chest"))
             .expect("item 3 in room");
         assert!(info.extra.is_empty());
     }
@@ -163,7 +163,9 @@ mod world_exposure {
         engine.handle_input("go north");
         engine.handle_input("go east");
         assert_eq!(
-            engine.world().exit_extra(Direction::East),
+            engine
+                .world()
+                .exit_extra(&GoTarget::Direction(Direction::East)),
             Some(exit_east_extra())
         );
     }
@@ -172,7 +174,9 @@ mod world_exposure {
     fn exit_without_extra_exposes_empty_map() {
         let engine = common::setup_engine();
         assert_eq!(
-            engine.world().exit_extra(Direction::North),
+            engine
+                .world()
+                .exit_extra(&GoTarget::Direction(Direction::North)),
             Some(HashMap::new())
         );
     }
@@ -180,7 +184,12 @@ mod world_exposure {
     #[test]
     fn absent_exit_has_no_extra() {
         let engine = common::setup_engine();
-        assert_eq!(engine.world().exit_extra(Direction::East), None);
+        assert_eq!(
+            engine
+                .world()
+                .exit_extra(&GoTarget::Direction(Direction::East)),
+            None
+        );
     }
 }
 
@@ -268,7 +277,7 @@ mod rules_read_extra {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string()
             }]
         );

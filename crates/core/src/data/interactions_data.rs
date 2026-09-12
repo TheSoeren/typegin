@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use crate::data::{WorldData, WorldDataError};
-use crate::input::direction::Direction;
+use crate::input::GoTarget;
 use crate::interaction::{TargetKind, Verb};
 use crate::keys::npc_id::NpcId;
 use crate::keys::object_id::ObjectId;
@@ -97,9 +97,9 @@ pub enum DataCondition {
     /// The player is carrying this object.
     PlayerHolds { player_holds: ObjectId },
     /// The exit in `direction` from the current room is locked.
-    ExitLocked { exit_locked: Direction },
+    ExitLocked { exit_locked: GoTarget },
     /// The exit in `direction` from the current room is hidden.
-    ExitHidden { exit_hidden: Direction },
+    ExitHidden { exit_hidden: GoTarget },
     /// The (present) target's door-ness equals the value.
     IsDoor { is_door: bool },
     /// The global flag is enabled.
@@ -161,15 +161,15 @@ pub enum DataEffect {
     Discard { discard: ObjectId },
     /// Unlock the exit in `direction` from the current room:
     /// `Event::UnlockedExit` (no-op if no such exit).
-    UnlockExit { unlock_exit: Direction },
+    UnlockExit { unlock_exit: GoTarget },
     /// Lock the exit in `direction` from the current room (silent).
-    LockExit { lock_exit: Direction },
+    LockExit { lock_exit: GoTarget },
     /// Reveal the hidden-door object standing in `direction` from the current
     /// room (silent).
-    RevealExit { reveal_exit: Direction },
+    RevealExit { reveal_exit: GoTarget },
     /// Hide the door object standing in `direction` from the current room;
     /// the object becomes a hidden exit (silent).
-    HideExit { hide_exit: Direction },
+    HideExit { hide_exit: GoTarget },
     /// Move an object from the current room's hidden set to visible (silent).
     RevealObject { reveal_object: ObjectId },
     /// Move an object from the current room's visible set to hidden (silent).

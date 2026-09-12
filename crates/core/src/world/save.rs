@@ -78,10 +78,6 @@ struct WorldSnapshot {
     /// every authored object back into its default room, and the room/
     /// inventory loops below only ever *add* objects they're told about, so
     /// a discarded object would silently reappear in its original room.
-    /// `#[serde(default)]` so a save written before this field existed still
-    /// loads (as "nothing was discarded", the correct reading of its
-    /// absence).
-    #[serde(default)]
     discarded: BTreeSet<ObjectId>,
     fired_triggers: BTreeSet<TriggerId>,
 }

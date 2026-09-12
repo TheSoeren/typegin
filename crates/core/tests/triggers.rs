@@ -15,7 +15,7 @@
 
 mod common;
 
-use core::{Direction, Event, RoomId, TriggerData, TriggerId, WorldData, WorldDataError};
+use core::{Direction, Event, GoTarget, TriggerData, WorldData, WorldDataError};
 
 use common::{engine_with_triggers as engine_with, merge_yaml, world_with_triggers as world_with};
 
@@ -43,10 +43,10 @@ mod parse {
             world.triggers,
             vec![
                 TriggerData {
-                    id: TriggerId::new("guard-alert"),
+                    id: core::triggerId!("guard-alert"),
                     condition: vec![
                         DataCondition::Room {
-                            room: RoomId::new("study")
+                            room: core::roomId!("study")
                         },
                         DataCondition::Flag {
                             flag: "alarm-armed".to_string()
@@ -62,7 +62,7 @@ mod parse {
                     ],
                 },
                 TriggerData {
-                    id: TriggerId::new("door-sensor"),
+                    id: core::triggerId!("door-sensor"),
                     condition: vec![],
                     effect: vec![DataEffect::Emit {
                         emit: "sensor-tick".to_string()
@@ -126,7 +126,7 @@ mod dispatch {
         // Walking into the corridor does not satisfy `room: study`.
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
 
         // The final step into the study fires the trigger, appended after
@@ -134,7 +134,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("go east"),
             vec![
-                Event::Went(Direction::East),
+                Event::Went(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "study-entered".to_string()
                 },
@@ -144,19 +144,19 @@ mod dispatch {
         // Leaving and re-entering does not re-fire: one-shot only.
         assert_eq!(
             engine.handle_input("go west"),
-            vec![Event::Went(Direction::West)]
+            vec![Event::Went(GoTarget::Direction(Direction::West))]
         );
         assert_eq!(
             engine.handle_input("go south"),
-            vec![Event::Went(Direction::South)]
+            vec![Event::Went(GoTarget::Direction(Direction::South))]
         );
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
     }
 
@@ -200,7 +200,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("go east"),
             vec![
-                Event::Went(Direction::East),
+                Event::Went(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "first-effect".to_string()
                 },
@@ -262,7 +262,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("go east"),
             vec![
-                Event::Went(Direction::East),
+                Event::Went(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "first-beat".to_string()
                 },
@@ -296,7 +296,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("go east"),
             vec![
-                Event::Went(Direction::East),
+                Event::Went(GoTarget::Direction(Direction::East)),
                 Event::FlagSet {
                     flag: "chain-flag".to_string()
                 },

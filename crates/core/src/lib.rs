@@ -21,7 +21,7 @@ pub use data::{ExtraValue, WorldData, WorldDataError};
 pub use engine::GameEngine;
 pub use event::{DialogueChoice, Event};
 pub use input::parse_input;
-pub use input::{Action, Direction, DirectionResolution, Outcome};
+pub use input::{Action, Direction, GoTarget, GoTargetResolution, Locator, Outcome};
 pub use interaction::{
     ActionContext, Interaction, Target, TargetFilter, TargetKind, TargetResolution, Verb,
 };

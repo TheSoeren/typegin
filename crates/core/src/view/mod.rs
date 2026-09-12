@@ -1,5 +1,5 @@
 use crate::event::Event;
-use crate::input::direction::Direction;
+use crate::input::GoTarget;
 use crate::world::WorldState;
 
 mod render_command;
@@ -35,12 +35,10 @@ pub trait View {
             .flat_map(|event| match event {
                 Event::Looked => self.render_looked(world),
                 Event::Went(direction) => self.render_went(direction),
-                Event::WentExitHidden(direction) => self.render_went_exit_hidden(direction),
-                Event::WentExitLocked(direction) => self.render_went_exit_locked(direction),
-                Event::WentInvalidDirection(direction) => {
-                    self.render_went_invalid_direction(direction)
-                }
-                Event::UnlockedExit { direction } => self.render_unlocked_exit(direction),
+                Event::WentExitHidden(go_target) => self.render_went_exit_hidden(go_target),
+                Event::WentExitLocked(go_target) => self.render_went_exit_locked(go_target),
+                Event::WentExitNotFound(go_target) => self.render_went_invalid_direction(go_target),
+                Event::UnlockedExit(go_target) => self.render_unlocked_exit(go_target),
                 Event::CannotUse { item, target } => self.render_cannot_use(item, target),
                 Event::Custom { name } => self.render_custom(name),
                 Event::Took { object, .. } => self.render_took(object),
@@ -110,27 +108,27 @@ pub trait View {
     }
 
     /// The player moved through a passable exit.
-    fn render_went(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
+    fn render_went(&mut self, _go_target: &GoTarget) -> Vec<RenderCommand> {
         Vec::new()
     }
 
     /// The player tried to go through a hidden exit.
-    fn render_went_exit_hidden(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
+    fn render_went_exit_hidden(&mut self, _go_target: &GoTarget) -> Vec<RenderCommand> {
         Vec::new()
     }
 
     /// The player tried to go through a locked exit.
-    fn render_went_exit_locked(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
+    fn render_went_exit_locked(&mut self, _go_target: &GoTarget) -> Vec<RenderCommand> {
         Vec::new()
     }
 
     /// The player tried to go through an exit that does not exist.
-    fn render_went_invalid_direction(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
+    fn render_went_invalid_direction(&mut self, _go_target: &GoTarget) -> Vec<RenderCommand> {
         Vec::new()
     }
 
     /// A locked exit was unlocked.
-    fn render_unlocked_exit(&mut self, _direction: &Direction) -> Vec<RenderCommand> {
+    fn render_unlocked_exit(&mut self, _go_target: &GoTarget) -> Vec<RenderCommand> {
         Vec::new()
     }
 

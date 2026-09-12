@@ -5,7 +5,7 @@
 mod common;
 
 use common::single_room_engine;
-use core::{GameEngine, ObjectId, ObjectResolution, Outcome, RoomId, world::WorldState};
+use core::{GameEngine, ObjectId, ObjectResolution, Outcome, world::WorldState};
 
 /// A fresh engine over the single-room world, whose room `cellar` holds the
 /// sword, iron key, locked chest and brass key visibly, and the stale bread
@@ -36,7 +36,7 @@ mod resolution {
     #[test]
     fn exact_full_name() {
         assert_eq!(
-            TargetResolution::Found(Target::Object(ObjectId::new("glowing-sword"))),
+            TargetResolution::Found(Target::Object(core::objectId!("glowing-sword"))),
             resolves("glowing mysterious sword")
         );
     }
@@ -44,7 +44,7 @@ mod resolution {
     #[test]
     fn partial_alias_match() {
         assert_eq!(
-            TargetResolution::Found(Target::Object(ObjectId::new("glowing-sword"))),
+            TargetResolution::Found(Target::Object(core::objectId!("glowing-sword"))),
             resolves("glowing sword")
         );
     }
@@ -52,7 +52,7 @@ mod resolution {
     #[test]
     fn alias_match() {
         assert_eq!(
-            TargetResolution::Found(Target::Object(ObjectId::new("iron-key"))),
+            TargetResolution::Found(Target::Object(core::objectId!("iron-key"))),
             resolves("iron key")
         );
     }
@@ -62,8 +62,8 @@ mod resolution {
         assert_eq!(
             TargetResolution::Ambiguous {
                 ids: vec![
-                    Target::Object(ObjectId::new("iron-key")),
-                    Target::Object(ObjectId::new("brass-key"))
+                    Target::Object(core::objectId!("iron-key")),
+                    Target::Object(core::objectId!("brass-key"))
                 ],
                 alias: "key".to_string()
             },
@@ -85,12 +85,12 @@ mod worlds_inventory {
         let engine = engine();
         assert!(room_has_item(
             engine.world(),
-            &ObjectId::new("glowing-sword")
+            &core::objectId!("glowing-sword")
         ));
-        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &core::objectId!("iron-key")));
         assert!(!room_has_item(
             engine.world(),
-            &ObjectId::new("stale-bread")
+            &core::objectId!("stale-bread")
         ));
         assert!(engine.world().player_object_names().is_empty());
     }
@@ -100,10 +100,13 @@ mod worlds_inventory {
         let mut engine = engine();
         let result = engine
             .world_mut()
-            .player_take_object(&ObjectId::new("iron-key"));
+            .player_take_object(&core::objectId!("iron-key"));
         assert_eq!(result, Outcome::Success);
-        assert!(!room_has_item(engine.world(), &ObjectId::new("iron-key")));
-        assert!(player_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(!room_has_item(engine.world(), &core::objectId!("iron-key")));
+        assert!(player_has_item(
+            engine.world(),
+            &core::objectId!("iron-key")
+        ));
     }
 
     #[test]
@@ -113,15 +116,15 @@ mod worlds_inventory {
         // not possible.
         let result = engine
             .world_mut()
-            .player_take_object(&ObjectId::new("stale-bread"));
+            .player_take_object(&core::objectId!("stale-bread"));
         assert_eq!(result, Outcome::Fail);
         assert!(!room_has_item(
             engine.world(),
-            &ObjectId::new("stale-bread")
+            &core::objectId!("stale-bread")
         ));
         assert!(!player_has_item(
             engine.world(),
-            &ObjectId::new("stale-bread")
+            &core::objectId!("stale-bread")
         ));
     }
 
@@ -130,13 +133,16 @@ mod worlds_inventory {
         let mut engine = engine();
         engine
             .world_mut()
-            .player_take_object(&ObjectId::new("iron-key"));
+            .player_take_object(&core::objectId!("iron-key"));
         let result = engine
             .world_mut()
-            .player_drop_object(&ObjectId::new("iron-key"));
+            .player_drop_object(&core::objectId!("iron-key"));
         assert_eq!(result, Outcome::Success);
-        assert!(!player_has_item(engine.world(), &ObjectId::new("iron-key")));
-        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(!player_has_item(
+            engine.world(),
+            &core::objectId!("iron-key")
+        ));
+        assert!(room_has_item(engine.world(), &core::objectId!("iron-key")));
     }
 
     #[test]
@@ -144,9 +150,9 @@ mod worlds_inventory {
         let mut engine = engine();
         let result = engine
             .world_mut()
-            .player_drop_object(&ObjectId::new("iron-key"));
+            .player_drop_object(&core::objectId!("iron-key"));
         assert_eq!(result, Outcome::Fail);
-        assert!(room_has_item(engine.world(), &ObjectId::new("iron-key")));
+        assert!(room_has_item(engine.world(), &core::objectId!("iron-key")));
     }
 
     #[test]
@@ -154,9 +160,11 @@ mod worlds_inventory {
         let mut engine = engine();
         // The single-room world has no other room.
         assert_eq!(
-            engine.world_mut().move_to_room(RoomId::new("nonexistent")),
+            engine
+                .world_mut()
+                .move_to_room(core::roomId!("nonexistent")),
             Outcome::Fail
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("cellar"));
     }
 }

@@ -164,7 +164,6 @@ mod tests {
     use crate::data::npc_data::{DialogueData, NpcData};
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
-    use crate::keys::room_id::RoomId;
     use crate::{Target, TargetKind};
     use std::collections::HashMap;
 
@@ -173,12 +172,12 @@ mod tests {
     fn world_with(npc_in_room: bool) -> WorldState {
         let npcs = if npc_in_room {
             vec![NpcData {
-                id: NpcId::new("guard"),
+                id: crate::npcId!("guard"),
                 primary_name: "guard".to_string(),
                 aliases: Vec::new(),
-                room: RoomId::new("room"),
+                room: crate::roomId!("room"),
                 dialogue: DialogueData {
-                    root: crate::keys::dialogue_node_id::DialogueNodeId::new("start"),
+                    root: crate::dialogueNodeId!("start"),
                     nodes: HashMap::new(),
                 },
             }]
@@ -188,7 +187,7 @@ mod tests {
         let data = WorldData {
             flags: Vec::new(),
             objects: vec![ObjectData {
-                id: ObjectId::new("sword"),
+                id: crate::objectId!("sword"),
                 primary_name: "sword".to_string(),
                 aliases: Vec::new(),
                 kind: ObjectKind::Item,
@@ -196,8 +195,8 @@ mod tests {
                 extra: HashMap::new(),
             }],
             rooms: vec![RoomData {
-                id: RoomId::new("room"),
-                visible_objects: vec![ObjectId::new("sword")],
+                id: crate::roomId!("room"),
+                visible_objects: vec![crate::objectId!("sword")],
                 hidden_objects: Vec::new(),
                 extra: HashMap::new(),
             }],
@@ -236,14 +235,15 @@ mod tests {
     fn matches_requires_the_exact_item_when_one_is_set() {
         let interaction = Interaction::build(
             Verb::Take,
-            Some(ObjectId::new("sword")),
+            Some(crate::objectId!("sword")),
             TargetFilter::Any,
             None,
             no_op_effect(),
         );
         let world = world_with(false);
-        let matching = ActionContext::new(Some(Verb::Take), Some(ObjectId::new("sword")), None);
-        let other_item = ActionContext::new(Some(Verb::Take), Some(ObjectId::new("shield")), None);
+        let matching = ActionContext::new(Some(Verb::Take), Some(crate::objectId!("sword")), None);
+        let other_item =
+            ActionContext::new(Some(Verb::Take), Some(crate::objectId!("shield")), None);
         let no_item = ActionContext::new(Some(Verb::Take), None, None);
         assert!(interaction.matches(&world, &matching));
         assert!(!interaction.matches(&world, &other_item));
@@ -255,7 +255,7 @@ mod tests {
         let interaction =
             Interaction::build(Verb::Take, None, TargetFilter::Any, None, no_op_effect());
         let world = world_with(false);
-        let with_item = ActionContext::new(Some(Verb::Take), Some(ObjectId::new("sword")), None);
+        let with_item = ActionContext::new(Some(Verb::Take), Some(crate::objectId!("sword")), None);
         let no_item = ActionContext::new(Some(Verb::Take), None, None);
         assert!(interaction.matches(&world, &with_item));
         assert!(interaction.matches(&world, &no_item));
@@ -275,7 +275,7 @@ mod tests {
         let with_target = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(!interaction.matches(&world, &no_target));
         assert!(interaction.matches(&world, &with_target));
@@ -333,22 +333,22 @@ mod tests {
     fn accessors_expose_the_built_parts() {
         let interaction = Interaction::build(
             Verb::Use,
-            Some(ObjectId::new("sword")),
+            Some(crate::objectId!("sword")),
             TargetFilter::Kind(TargetKind::Scene),
             None,
             no_op_effect(),
         );
         assert_eq!(interaction.verb(), Verb::Use);
-        assert_eq!(interaction.item(), Some(ObjectId::new("sword")));
+        assert_eq!(interaction.item(), Some(crate::objectId!("sword")));
         assert_eq!(interaction.target(), TargetFilter::Kind(TargetKind::Scene));
         assert_eq!(interaction.npc(), None);
     }
 
     #[test]
     fn talk_npc_matches_only_while_the_npc_is_in_the_current_room() {
-        let interaction = Interaction::talk_npc(NpcId::new("guard"));
+        let interaction = Interaction::talk_npc(crate::npcId!("guard"));
         assert_eq!(interaction.verb(), Verb::Talk);
-        assert_eq!(interaction.npc(), Some(&NpcId::new("guard")));
+        assert_eq!(interaction.npc(), Some(&crate::npcId!("guard")));
 
         let present = world_with(true);
         let context = ActionContext::new(Some(Verb::Talk), None, None);
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn talk_npc_effect_is_inert() {
-        let interaction = Interaction::talk_npc(NpcId::new("guard"));
+        let interaction = Interaction::talk_npc(crate::npcId!("guard"));
         let mut world = world_with(true);
         let context = ActionContext::new(Some(Verb::Talk), None, None);
         assert_eq!(interaction.run(&mut world, &context), Vec::new());
