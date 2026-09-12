@@ -50,7 +50,7 @@ use common::{
     base_world, enter_corridor, enter_study, world_with_interactions as world_with,
     world_with_npcs, world_with_triggers,
 };
-use core::{BasicRules, Direction, Event, GameEngine, ObjectId, RoomId, WorldData};
+use core::{BasicRules, Direction, Event, GameEngine, GoTarget, WorldData};
 
 // ---------------------------------------------------------------------------
 // Round-tripping the dynamic slice of the game
@@ -74,15 +74,18 @@ mod round_trip {
         engine.handle_input("go north");
 
         assert!(engine.world().has_flag("seen-lamp"));
-        assert!(engine.world().player_holds(&ObjectId::new("brass-key")));
-        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+        assert!(engine.world().player_holds(&core::objectId!("brass-key")));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
 
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
         assert!(reloaded.world().has_flag("seen-lamp"));
-        assert!(reloaded.world().player_holds(&ObjectId::new("brass-key")));
-        assert_eq!(reloaded.world().current_room_id(), RoomId::new("corridor"));
+        assert!(reloaded.world().player_holds(&core::objectId!("brass-key")));
+        assert_eq!(
+            reloaded.world().current_room_id(),
+            core::roomId!("corridor")
+        );
         assert!(
             !reloaded
                 .world()
@@ -107,12 +110,16 @@ mod round_trip {
         let mut engine = GameEngine::get(&data);
         engine.handle_input("take rusty lamp");
         engine.handle_input("use rusty lamp on rusty lamp");
-        assert!(engine.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(engine.world().player_holds(&core::objectId!("rusty-nail")));
 
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        assert!(reloaded.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(
+            reloaded
+                .world()
+                .player_holds(&core::objectId!("rusty-nail"))
+        );
     }
 
     #[test]
@@ -135,7 +142,7 @@ mod round_trip {
         let mut engine = GameEngine::get(&data);
         engine.handle_input("take brass key");
         engine.handle_input("use brass key on brass key");
-        assert!(!engine.world().player_holds(&ObjectId::new("brass-key")));
+        assert!(!engine.world().player_holds(&core::objectId!("brass-key")));
         assert!(
             !engine
                 .world()
@@ -146,7 +153,7 @@ mod round_trip {
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        assert!(!reloaded.world().player_holds(&ObjectId::new("brass-key")));
+        assert!(!reloaded.world().player_holds(&core::objectId!("brass-key")));
         assert!(
             !reloaded
                 .world()
@@ -179,12 +186,16 @@ mod round_trip {
         engine.handle_input("take rusty lamp");
         engine.handle_input("use rusty lamp on rusty lamp");
         engine.handle_input("use rusty nail on rusty nail");
-        assert!(!engine.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(!engine.world().player_holds(&core::objectId!("rusty-nail")));
 
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        assert!(!reloaded.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(
+            !reloaded
+                .world()
+                .player_holds(&core::objectId!("rusty-nail"))
+        );
     }
 
     #[test]
@@ -200,15 +211,27 @@ mod round_trip {
         let mut engine = GameEngine::get(&data);
         engine.handle_input("take iron key");
         enter_study(&mut engine);
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
         engine.handle_input("use iron key on oak door");
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
 
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        assert_eq!(reloaded.world().current_room_id(), RoomId::new("study"));
-        assert!(!reloaded.world().is_exit_locked(Direction::East));
+        assert_eq!(reloaded.world().current_room_id(), core::roomId!("study"));
+        assert!(
+            !reloaded
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
     }
 
     #[test]
@@ -224,14 +247,26 @@ mod round_trip {
         let mut engine = GameEngine::get(&data);
         engine.handle_input("take iron key");
         enter_study(&mut engine);
-        assert!(engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
         engine.handle_input("use iron key on wooden door");
-        assert!(!engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            !engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
 
         let saved = engine.save().expect("save succeeds");
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        assert!(!reloaded.world().is_exit_hidden(Direction::North));
+        assert!(
+            !reloaded
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
     }
 
     #[test]
@@ -333,7 +368,7 @@ mod content_patch_robustness {
         let mut reloaded = GameEngine::load(&patched, BasicRules, &saved).expect("load succeeds");
 
         // Dynamic progress from the old save still applies...
-        assert!(reloaded.world().player_holds(&ObjectId::new("brass-key")));
+        assert!(reloaded.world().player_holds(&core::objectId!("brass-key")));
         // ...but the interaction that fires is `patched`'s, proving the
         // engine isn't running a copy of `original`'s (nonexistent) content
         // frozen at save time.

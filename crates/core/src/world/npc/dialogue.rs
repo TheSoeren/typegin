@@ -90,7 +90,7 @@ impl DialogueChoice {
     }
 
     pub(crate) fn from_data(data: &DialogueChoiceData) -> Self {
-        let next = if data.next == DialogueNodeId::new(".end") {
+        let next = if data.next == crate::dialogueNodeId!(".end") {
             None
         } else {
             Some(data.next.clone())
@@ -108,7 +108,6 @@ impl DialogueChoice {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys::dialogue_option_id::DialogueOptionId;
 
     #[test]
     fn find_choice_matches_a_one_based_index() {
@@ -183,14 +182,14 @@ mod tests {
     #[test]
     fn dialogue_choice_from_data_treats_dot_end_as_conversation_end() {
         let data = DialogueChoiceData {
-            option_id: Some(DialogueOptionId::new("opt-1")),
+            option_id: Some(crate::dialogueOptionId!("opt-1")),
             label: "Bye".to_string(),
-            next: DialogueNodeId::new(".end"),
+            next: crate::dialogueNodeId!(".end"),
             effect: Vec::new(),
         };
         let choice = DialogueChoice::from_data(&data);
         assert_eq!(choice.next(), None);
-        assert_eq!(choice.option_id(), Some(&DialogueOptionId::new("opt-1")));
+        assert_eq!(choice.option_id(), Some(&crate::dialogueOptionId!("opt-1")));
         assert_eq!(choice.label(), "Bye");
     }
 
@@ -199,11 +198,11 @@ mod tests {
         let data = DialogueChoiceData {
             option_id: None,
             label: "Continue".to_string(),
-            next: DialogueNodeId::new("node-2"),
+            next: crate::dialogueNodeId!("node-2"),
             effect: Vec::new(),
         };
         let choice = DialogueChoice::from_data(&data);
-        assert_eq!(choice.next(), Some(&DialogueNodeId::new("node-2")));
+        assert_eq!(choice.next(), Some(&crate::dialogueNodeId!("node-2")));
     }
 
     #[test]
@@ -214,13 +213,13 @@ mod tests {
                 DialogueChoiceData {
                     option_id: None,
                     label: "Hi".to_string(),
-                    next: DialogueNodeId::new(".end"),
+                    next: crate::dialogueNodeId!(".end"),
                     effect: Vec::new(),
                 },
                 DialogueChoiceData {
                     option_id: None,
                     label: "Bye".to_string(),
-                    next: DialogueNodeId::new(".end"),
+                    next: crate::dialogueNodeId!(".end"),
                     effect: Vec::new(),
                 },
             ],

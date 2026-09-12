@@ -9,7 +9,7 @@
 use crate::data::interactions_data::{DataCondition, DataEffect, DataTarget, InteractionData};
 use crate::event::Event;
 use crate::input::action::Outcome;
-use crate::input::direction::DirectionResolution;
+use crate::input::direction::GoTargetResolution;
 use crate::interaction::{ActionContext, Interaction, Target, TargetFilter};
 use crate::keys::object_id::ObjectId;
 use crate::world::WorldState;
@@ -107,8 +107,8 @@ impl DataCondition {
         match self {
             DataCondition::Room { room } => *room == world.current_room_id(),
             DataCondition::PlayerHolds { player_holds } => world.player_holds(player_holds),
-            DataCondition::ExitLocked { exit_locked } => world.is_exit_locked(*exit_locked),
-            DataCondition::ExitHidden { exit_hidden } => world.is_exit_hidden(*exit_hidden),
+            DataCondition::ExitLocked { exit_locked } => world.is_exit_locked(&exit_locked),
+            DataCondition::ExitHidden { exit_hidden } => world.is_exit_hidden(&exit_hidden),
             DataCondition::IsDoor { is_door } => {
                 context.target_object().map(|id| world.object_is_door(id)) == Some(*is_door)
             }
@@ -137,22 +137,22 @@ impl DataEffect {
             DataEffect::Grant { grant } => add_to_inventory(world, grant.clone()),
             DataEffect::Drop { drop } => drop_into_room(world, drop.clone()),
             DataEffect::Discard { discard } => remove_from_inventory(world, discard.clone()),
-            DataEffect::UnlockExit { unlock_exit } => match world.unlock_exit(*unlock_exit) {
-                DirectionResolution::Found(_) => Some(Event::UnlockedExit {
-                    direction: *unlock_exit,
-                }),
-                DirectionResolution::NotFound => None,
-            },
+            DataEffect::UnlockExit { unlock_exit } => {
+                match world.unlock_exit(unlock_exit.clone()) {
+                    GoTargetResolution::Found(_) => Some(Event::UnlockedExit(unlock_exit.clone())),
+                    GoTargetResolution::NotFound => None,
+                }
+            }
             DataEffect::LockExit { lock_exit } => {
-                world.lock_exit(*lock_exit);
+                world.lock_exit(lock_exit.clone());
                 None
             }
             DataEffect::RevealExit { reveal_exit } => {
-                world.reveal_exit(*reveal_exit);
+                world.reveal_exit(reveal_exit.clone());
                 None
             }
             DataEffect::HideExit { hide_exit } => {
-                world.hide_exit(*hide_exit);
+                world.hide_exit(hide_exit.clone());
                 None
             }
             DataEffect::RevealObject { reveal_object } => {
@@ -242,14 +242,14 @@ mod tests {
     use crate::data::door_data::DoorData;
     use crate::data::object_data::{ObjectData, ObjectKind};
     use crate::data::room_data::RoomData;
+    use crate::input::GoTarget;
     use crate::input::direction::Direction;
     use crate::interaction::{TargetKind, Verb};
-    use crate::keys::room_id::RoomId;
     use std::collections::HashMap;
 
     fn item(id: &str) -> ObjectData {
         ObjectData {
-            id: ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: Vec::new(),
             kind: ObjectKind::Item,
@@ -260,12 +260,12 @@ mod tests {
 
     fn door(id: &str, direction: &str, to: &str, locked: bool) -> ObjectData {
         ObjectData {
-            id: ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: Vec::new(),
             kind: ObjectKind::Scene,
             door: Some(DoorData {
-                direction: direction.to_string(),
+                direction: Some(direction.to_string()),
                 to: to.to_string(),
                 locked,
             }),
@@ -275,7 +275,7 @@ mod tests {
 
     fn scene(id: &str) -> ObjectData {
         ObjectData {
-            id: ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: Vec::new(),
             kind: ObjectKind::Scene,
@@ -306,20 +306,20 @@ mod tests {
             ],
             rooms: vec![
                 RoomData {
-                    id: RoomId::new("room"),
+                    id: crate::roomId!("room"),
                     visible_objects: vec![
-                        ObjectId::new("sword"),
-                        ObjectId::new("lamp"),
-                        ObjectId::new("torch"),
-                        ObjectId::new("cabinet"),
-                        ObjectId::new("north-door"),
-                        ObjectId::new("east-door"),
+                        crate::objectId!("sword"),
+                        crate::objectId!("lamp"),
+                        crate::objectId!("torch"),
+                        crate::objectId!("cabinet"),
+                        crate::objectId!("north-door"),
+                        crate::objectId!("east-door"),
                     ],
-                    hidden_objects: vec![ObjectId::new("chest"), ObjectId::new("south-door")],
+                    hidden_objects: vec![crate::objectId!("chest"), crate::objectId!("south-door")],
                     extra: HashMap::new(),
                 },
                 RoomData {
-                    id: RoomId::new("other"),
+                    id: crate::roomId!("other"),
                     visible_objects: Vec::new(),
                     hidden_objects: Vec::new(),
                     extra: HashMap::new(),
@@ -348,13 +348,13 @@ mod tests {
         let context = no_target_context(Verb::Examine);
         assert!(
             DataCondition::Room {
-                room: RoomId::new("room")
+                room: crate::roomId!("room")
             }
             .matches(&world, &context)
         );
         assert!(
             !DataCondition::Room {
-                room: RoomId::new("other")
+                room: crate::roomId!("other")
             }
             .matches(&world, &context)
         );
@@ -365,10 +365,10 @@ mod tests {
         let mut world = world();
         let context = no_target_context(Verb::Examine);
         let condition = DataCondition::PlayerHolds {
-            player_holds: ObjectId::new("sword"),
+            player_holds: crate::objectId!("sword"),
         };
         assert!(!condition.matches(&world, &context));
-        world.player_take_object(&ObjectId::new("sword"));
+        world.player_take_object(&crate::objectId!("sword"));
         assert!(condition.matches(&world, &context));
     }
 
@@ -378,13 +378,13 @@ mod tests {
         let context = no_target_context(Verb::Examine);
         assert!(
             DataCondition::ExitLocked {
-                exit_locked: Direction::North
+                exit_locked: GoTarget::Direction(Direction::North)
             }
             .matches(&world, &context)
         );
         assert!(
             !DataCondition::ExitLocked {
-                exit_locked: Direction::East
+                exit_locked: GoTarget::Direction(Direction::East)
             }
             .matches(&world, &context)
         );
@@ -396,13 +396,13 @@ mod tests {
         let context = no_target_context(Verb::Examine);
         assert!(
             DataCondition::ExitHidden {
-                exit_hidden: Direction::South
+                exit_hidden: GoTarget::Direction(Direction::South)
             }
             .matches(&world, &context)
         );
         assert!(
             !DataCondition::ExitHidden {
-                exit_hidden: Direction::North
+                exit_hidden: GoTarget::Direction(Direction::North)
             }
             .matches(&world, &context)
         );
@@ -414,12 +414,12 @@ mod tests {
         let door_context = ActionContext::new(
             Some(Verb::Examine),
             None,
-            Some(Target::Object(ObjectId::new("north-door"))),
+            Some(Target::Object(crate::objectId!("north-door"))),
         );
         let non_door_context = ActionContext::new(
             Some(Verb::Examine),
             None,
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(DataCondition::IsDoor { is_door: true }.matches(&world, &door_context));
         assert!(!DataCondition::IsDoor { is_door: false }.matches(&world, &door_context));
@@ -454,7 +454,7 @@ mod tests {
         let context = no_target_context(Verb::Examine);
         let condition = DataCondition::Not {
             not: Box::new(DataCondition::Room {
-                room: RoomId::new("other"),
+                room: crate::roomId!("other"),
             }),
         };
         assert!(condition.matches(&world, &context));
@@ -484,18 +484,18 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::Take {
-                take: ObjectId::new("sword"),
+                take: crate::objectId!("sword"),
             }],
             &mut world,
         );
         assert_eq!(
             events,
             vec![Event::Took {
-                object_id: ObjectId::new("sword"),
+                object_id: crate::objectId!("sword"),
                 object: "sword".to_string()
             }]
         );
-        assert!(world.player_holds(&ObjectId::new("sword")));
+        assert!(world.player_holds(&crate::objectId!("sword")));
     }
 
     #[test]
@@ -503,12 +503,12 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::Take {
-                take: ObjectId::new("chest"),
+                take: crate::objectId!("chest"),
             }],
             &mut world,
         );
         assert!(events.is_empty());
-        assert!(!world.player_holds(&ObjectId::new("chest")));
+        assert!(!world.player_holds(&crate::objectId!("chest")));
     }
 
     #[test]
@@ -516,27 +516,27 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::Grant {
-                grant: ObjectId::new("shield"),
+                grant: crate::objectId!("shield"),
             }],
             &mut world,
         );
         assert_eq!(
             events,
             vec![Event::Granted {
-                object_id: ObjectId::new("shield"),
+                object_id: crate::objectId!("shield"),
                 object: "shield".to_string()
             }]
         );
-        assert!(world.player_holds(&ObjectId::new("shield")));
+        assert!(world.player_holds(&crate::objectId!("shield")));
     }
 
     #[test]
     fn grant_effect_is_a_no_op_when_already_held() {
         let mut world = world();
-        world.player_grant_object(&ObjectId::new("shield"));
+        world.player_grant_object(&crate::objectId!("shield"));
         let events = DataEffect::apply_all(
             &[DataEffect::Grant {
-                grant: ObjectId::new("shield"),
+                grant: crate::objectId!("shield"),
             }],
             &mut world,
         );
@@ -546,21 +546,21 @@ mod tests {
     #[test]
     fn drop_effect_moves_a_carried_object_into_the_room() {
         let mut world = world();
-        world.player_take_object(&ObjectId::new("sword"));
+        world.player_take_object(&crate::objectId!("sword"));
         let events = DataEffect::apply_all(
             &[DataEffect::Drop {
-                drop: ObjectId::new("sword"),
+                drop: crate::objectId!("sword"),
             }],
             &mut world,
         );
         assert_eq!(
             events,
             vec![Event::Dropped {
-                object_id: ObjectId::new("sword"),
+                object_id: crate::objectId!("sword"),
                 object: "sword".to_string()
             }]
         );
-        assert!(!world.player_holds(&ObjectId::new("sword")));
+        assert!(!world.player_holds(&crate::objectId!("sword")));
     }
 
     #[test]
@@ -568,7 +568,7 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::Drop {
-                drop: ObjectId::new("sword"),
+                drop: crate::objectId!("sword"),
             }],
             &mut world,
         );
@@ -578,21 +578,21 @@ mod tests {
     #[test]
     fn discard_effect_removes_a_carried_object_without_placing_it() {
         let mut world = world();
-        world.player_take_object(&ObjectId::new("sword"));
+        world.player_take_object(&crate::objectId!("sword"));
         let events = DataEffect::apply_all(
             &[DataEffect::Discard {
-                discard: ObjectId::new("sword"),
+                discard: crate::objectId!("sword"),
             }],
             &mut world,
         );
         assert_eq!(
             events,
             vec![Event::Discarded {
-                object_id: ObjectId::new("sword"),
+                object_id: crate::objectId!("sword"),
                 object: "sword".to_string()
             }]
         );
-        assert!(!world.player_holds(&ObjectId::new("sword")));
+        assert!(!world.player_holds(&crate::objectId!("sword")));
         assert!(!world.room_object_names().contains(&"sword".to_string()));
     }
 
@@ -601,7 +601,7 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::Discard {
-                discard: ObjectId::new("sword"),
+                discard: crate::objectId!("sword"),
             }],
             &mut world,
         );
@@ -613,21 +613,19 @@ mod tests {
         let mut world = world();
         let events = DataEffect::apply_all(
             &[DataEffect::UnlockExit {
-                unlock_exit: Direction::North,
+                unlock_exit: GoTarget::Direction(Direction::North),
             }],
             &mut world,
         );
         assert_eq!(
             events,
-            vec![Event::UnlockedExit {
-                direction: Direction::North
-            }]
+            vec![Event::UnlockedExit(GoTarget::Direction(Direction::North))]
         );
-        assert!(!world.is_exit_locked(Direction::North));
+        assert!(!world.is_exit_locked(&GoTarget::Direction(Direction::North)));
 
         let events = DataEffect::apply_all(
             &[DataEffect::UnlockExit {
-                unlock_exit: Direction::North,
+                unlock_exit: GoTarget::Direction(Direction::North),
             }],
             &mut world,
         );
@@ -637,43 +635,43 @@ mod tests {
     #[test]
     fn lock_exit_effect_is_silent_and_locks_the_door() {
         let mut world = world();
-        assert!(!world.is_exit_locked(Direction::East));
+        assert!(!world.is_exit_locked(&GoTarget::Direction(Direction::East)));
         let events = DataEffect::apply_all(
             &[DataEffect::LockExit {
-                lock_exit: Direction::East,
+                lock_exit: GoTarget::Direction(Direction::East),
             }],
             &mut world,
         );
         assert!(events.is_empty());
-        assert!(world.is_exit_locked(Direction::East));
+        assert!(world.is_exit_locked(&GoTarget::Direction(Direction::East)));
     }
 
     #[test]
     fn reveal_exit_effect_is_silent_and_unhides_the_door() {
         let mut world = world();
-        assert!(world.is_exit_hidden(Direction::South));
+        assert!(world.is_exit_hidden(&GoTarget::Direction(Direction::South)));
         let events = DataEffect::apply_all(
             &[DataEffect::RevealExit {
-                reveal_exit: Direction::South,
+                reveal_exit: GoTarget::Direction(Direction::South),
             }],
             &mut world,
         );
         assert!(events.is_empty());
-        assert!(!world.is_exit_hidden(Direction::South));
+        assert!(!world.is_exit_hidden(&GoTarget::Direction(Direction::South)));
     }
 
     #[test]
     fn hide_exit_effect_is_silent_and_hides_the_door() {
         let mut world = world();
-        assert!(!world.is_exit_hidden(Direction::North));
+        assert!(!world.is_exit_hidden(&GoTarget::Direction(Direction::North)));
         let events = DataEffect::apply_all(
             &[DataEffect::HideExit {
-                hide_exit: Direction::North,
+                hide_exit: GoTarget::Direction(Direction::North),
             }],
             &mut world,
         );
         assert!(events.is_empty());
-        assert!(world.is_exit_hidden(Direction::North));
+        assert!(world.is_exit_hidden(&GoTarget::Direction(Direction::North)));
     }
 
     #[test]
@@ -682,7 +680,7 @@ mod tests {
         assert!(!world.room_object_names().contains(&"chest".to_string()));
         let events = DataEffect::apply_all(
             &[DataEffect::RevealObject {
-                reveal_object: ObjectId::new("chest"),
+                reveal_object: crate::objectId!("chest"),
             }],
             &mut world,
         );
@@ -696,7 +694,7 @@ mod tests {
         assert!(world.room_object_names().contains(&"torch".to_string()));
         let events = DataEffect::apply_all(
             &[DataEffect::HideObject {
-                hide_object: ObjectId::new("torch"),
+                hide_object: crate::objectId!("torch"),
             }],
             &mut world,
         );
@@ -747,9 +745,9 @@ mod tests {
     #[test]
     fn interaction_data_matches_requires_verb_item_and_target() {
         let interaction = InteractionData {
-            item: Some(ObjectId::new("sword")),
+            item: Some(crate::objectId!("sword")),
             target: Some(DataTarget::Object {
-                object: ObjectId::new("cabinet"),
+                object: crate::objectId!("cabinet"),
             }),
             ..base_interaction(Verb::Use)
         };
@@ -757,29 +755,29 @@ mod tests {
 
         let matching = ActionContext::new(
             Some(Verb::Use),
-            Some(ObjectId::new("sword")),
-            Some(Target::Object(ObjectId::new("cabinet"))),
+            Some(crate::objectId!("sword")),
+            Some(Target::Object(crate::objectId!("cabinet"))),
         );
         assert!(interaction.matches(&world, &matching));
 
         let wrong_verb = ActionContext::new(
             Some(Verb::Examine),
-            Some(ObjectId::new("sword")),
-            Some(Target::Object(ObjectId::new("cabinet"))),
+            Some(crate::objectId!("sword")),
+            Some(Target::Object(crate::objectId!("cabinet"))),
         );
         assert!(!interaction.matches(&world, &wrong_verb));
 
         let wrong_item = ActionContext::new(
             Some(Verb::Use),
-            Some(ObjectId::new("lamp")),
-            Some(Target::Object(ObjectId::new("cabinet"))),
+            Some(crate::objectId!("lamp")),
+            Some(Target::Object(crate::objectId!("cabinet"))),
         );
         assert!(!interaction.matches(&world, &wrong_item));
 
         let wrong_target = ActionContext::new(
             Some(Verb::Use),
-            Some(ObjectId::new("sword")),
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(crate::objectId!("sword")),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(!interaction.matches(&world, &wrong_target));
     }
@@ -788,7 +786,7 @@ mod tests {
     fn interaction_data_without_item_matches_any_item() {
         let interaction = base_interaction(Verb::Take);
         let world = world();
-        let context = ActionContext::new(Some(Verb::Take), Some(ObjectId::new("sword")), None);
+        let context = ActionContext::new(Some(Verb::Take), Some(crate::objectId!("sword")), None);
         assert!(interaction.matches(&world, &context));
     }
 
@@ -800,7 +798,7 @@ mod tests {
         let targeted = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(interaction.matches(&world, &self_use));
         assert!(!interaction.matches(&world, &targeted));
@@ -810,7 +808,7 @@ mod tests {
     fn interaction_data_npc_target_requires_exact_npc() {
         let interaction = InteractionData {
             target: Some(DataTarget::Npc {
-                npc: crate::keys::npc_id::NpcId::new("guard"),
+                npc: crate::npcId!("guard"),
             }),
             ..base_interaction(Verb::Use)
         };
@@ -818,12 +816,12 @@ mod tests {
         let matching = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Npc(crate::keys::npc_id::NpcId::new("guard"))),
+            Some(Target::Npc(crate::npcId!("guard"))),
         );
         let other = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Npc(crate::keys::npc_id::NpcId::new("clerk"))),
+            Some(Target::Npc(crate::npcId!("clerk"))),
         );
         assert!(interaction.matches(&world, &matching));
         assert!(!interaction.matches(&world, &other));
@@ -841,12 +839,12 @@ mod tests {
         let scene_target = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Object(ObjectId::new("cabinet"))),
+            Some(Target::Object(crate::objectId!("cabinet"))),
         );
         let item_target = ActionContext::new(
             Some(Verb::Use),
             None,
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(interaction.matches(&world, &scene_target));
         assert!(!interaction.matches(&world, &item_target));
@@ -857,7 +855,7 @@ mod tests {
         let interaction = InteractionData {
             condition: vec![
                 DataCondition::Room {
-                    room: RoomId::new("room"),
+                    room: crate::roomId!("room"),
                 },
                 DataCondition::Flag {
                     flag: "ready".to_string(),
@@ -878,7 +876,7 @@ mod tests {
     fn interaction_data_run_applies_its_effects_in_order() {
         let interaction = InteractionData {
             effect: vec![DataEffect::Take {
-                take: ObjectId::new("sword"),
+                take: crate::objectId!("sword"),
             }],
             ..base_interaction(Verb::Take)
         };
@@ -887,19 +885,19 @@ mod tests {
         assert_eq!(
             events,
             vec![Event::Took {
-                object_id: ObjectId::new("sword"),
+                object_id: crate::objectId!("sword"),
                 object: "sword".to_string()
             }]
         );
-        assert!(world.player_holds(&ObjectId::new("sword")));
+        assert!(world.player_holds(&crate::objectId!("sword")));
     }
 
     #[test]
     fn compile_reproduces_matches_and_runs_the_same_effects() {
         let data = InteractionData {
-            item: Some(ObjectId::new("sword")),
+            item: Some(crate::objectId!("sword")),
             target: Some(DataTarget::Object {
-                object: ObjectId::new("cabinet"),
+                object: crate::objectId!("cabinet"),
             }),
             effect: vec![DataEffect::SetFlag {
                 flag: "used-sword-on-cabinet".to_string(),
@@ -910,15 +908,15 @@ mod tests {
         let mut world = world();
         let context = ActionContext::new(
             Some(Verb::Use),
-            Some(ObjectId::new("sword")),
-            Some(Target::Object(ObjectId::new("cabinet"))),
+            Some(crate::objectId!("sword")),
+            Some(Target::Object(crate::objectId!("cabinet"))),
         );
         assert!(compiled.matches(&world, &context));
 
         let non_matching_target = ActionContext::new(
             Some(Verb::Use),
-            Some(ObjectId::new("sword")),
-            Some(Target::Object(ObjectId::new("sword"))),
+            Some(crate::objectId!("sword")),
+            Some(Target::Object(crate::objectId!("sword"))),
         );
         assert!(!compiled.matches(&world, &non_matching_target));
 
@@ -961,7 +959,7 @@ mod tests {
     #[test]
     fn dispatch_data_returns_none_when_nothing_matches() {
         let interaction = InteractionData {
-            item: Some(ObjectId::new("sword")),
+            item: Some(crate::objectId!("sword")),
             ..base_interaction(Verb::Take)
         };
         let mut world = world_with_interactions(vec![interaction]);

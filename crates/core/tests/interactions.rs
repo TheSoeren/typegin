@@ -3,7 +3,7 @@ mod common;
 use common::setup_engine;
 use core::object_data::ObjectKind;
 use core::{
-    ActionContext, Direction, Event, GameEngine, Interaction, ObjectId, Rules, Target,
+    ActionContext, Direction, Event, GameEngine, GoTarget, Interaction, Rules, Target,
     TargetFilter, Verb, WorldState,
 };
 
@@ -26,12 +26,9 @@ mod unlock {
         engine.handle_input("use iron key on oak door");
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
-        assert_eq!(
-            engine.world().current_room_id(),
-            core::RoomId::new("corridor")
-        );
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
     }
 
     #[test]
@@ -42,12 +39,16 @@ mod unlock {
         assert_eq!(
             engine.handle_input("use iron key on hidden vault"),
             vec![Event::UsedTargetNotFound {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
                 target: "hidden vault".to_string(),
             }]
         );
-        assert!(engine.world().is_exit_locked(Direction::South));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::South))
+        );
     }
 }
 
@@ -61,11 +62,11 @@ mod resolve_target {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
             engine.world().resolve_target("oak door"),
-            TargetResolution::Found(Target::Object(ObjectId::new("oak-door")))
+            TargetResolution::Found(Target::Object(core::objectId!("oak-door")))
         );
         assert_eq!(
             engine.world().resolve_target("wooden door"),
-            TargetResolution::Found(Target::Object(ObjectId::new("wooden-door")))
+            TargetResolution::Found(Target::Object(core::objectId!("wooden-door")))
         );
     }
 
@@ -74,11 +75,11 @@ mod resolve_target {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
             engine.world().resolve_target("iron key"),
-            TargetResolution::Found(Target::Object(ObjectId::new("iron-key")))
+            TargetResolution::Found(Target::Object(core::objectId!("iron-key")))
         );
         assert_eq!(
             engine.world().resolve_target("oak door"),
-            TargetResolution::Found(Target::Object(ObjectId::new("oak-door")))
+            TargetResolution::Found(Target::Object(core::objectId!("oak-door")))
         );
     }
 
@@ -104,8 +105,8 @@ mod resolve_target {
             engine.world().resolve_target("key"),
             TargetResolution::Ambiguous {
                 ids: vec![
-                    Target::Object(ObjectId::new("iron-key")),
-                    Target::Object(ObjectId::new("brass-key"))
+                    Target::Object(core::objectId!("iron-key")),
+                    Target::Object(core::objectId!("brass-key"))
                 ],
                 alias: "key".to_string(),
             }
@@ -138,31 +139,37 @@ mod scene_vs_inventory {
                 .player_object_names()
                 .contains(&"oak door".to_string())
         );
-        assert!(!engine.world().is_exit_locked(Direction::West));
-        assert_eq!(engine.world().current_room_id(), core::RoomId::new("study"));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::West))
+        );
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
     fn carryable_items_are_the_default_kind() {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
-            engine.world().object_kind(&ObjectId::new("iron-key")),
+            engine.world().object_kind(&core::objectId!("iron-key")),
             Some(ObjectKind::Item)
         );
-        assert!(engine.world().player_holds(&ObjectId::new("iron-key")));
+        assert!(engine.world().player_holds(&core::objectId!("iron-key")));
     }
 
     #[test]
     fn doors_are_scene_objects_with_door_data() {
         let engine = setup_engine_in_study_with_iron_key();
         assert_eq!(
-            engine.world().object_kind(&ObjectId::new("oak-door")),
+            engine.world().object_kind(&core::objectId!("oak-door")),
             Some(ObjectKind::Scene)
         );
-        assert!(engine.world().object_is_door(&ObjectId::new("oak-door")));
-        assert!(!engine.world().object_is_scene(&ObjectId::new("iron-key")));
+        assert!(engine.world().object_is_door(&core::objectId!("oak-door")));
+        assert!(!engine.world().object_is_scene(&core::objectId!("iron-key")));
         assert_eq!(
-            engine.world().exit_direction_of(&ObjectId::new("oak-door")),
+            engine
+                .world()
+                .exit_direction_of(&core::objectId!("oak-door")),
             Some(Direction::East)
         );
     }
@@ -173,7 +180,7 @@ mod scene_vs_inventory {
         assert_eq!(
             engine.handle_input("examine stairs"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("cellar-stairs")),
+                target: Target::Object(core::objectId!("cellar-stairs")),
                 target_name: "stairs".to_string(),
             }]
         );
@@ -186,8 +193,8 @@ mod target_in_scope {
     #[test]
     fn carried_item_and_visible_door_are_in_scope() {
         let engine = setup_engine_in_study_with_iron_key();
-        assert!(engine.world().target_in_scope(&ObjectId::new("iron-key")));
-        assert!(engine.world().target_in_scope(&ObjectId::new("oak-door")));
+        assert!(engine.world().target_in_scope(&core::objectId!("iron-key")));
+        assert!(engine.world().target_in_scope(&core::objectId!("oak-door")));
     }
 
     #[test]
@@ -196,7 +203,7 @@ mod target_in_scope {
         assert!(
             !engine
                 .world()
-                .target_in_scope(&ObjectId::new("hidden-vault"))
+                .target_in_scope(&core::objectId!("hidden-vault"))
         );
     }
 }
@@ -217,8 +224,8 @@ mod interactions_for {
         assert_eq!(
             engine
                 .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
+                    Some(core::objectId!("iron-key")),
+                    Some(Target::Object(core::objectId!("oak-door")))
                 )
                 .len(),
             2
@@ -226,22 +233,24 @@ mod interactions_for {
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
             vec![
-                Event::UnlockedExit {
-                    direction: Direction::East
-                },
+                Event::UnlockedExit(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "unlock-authored".to_string(),
                 }
             ]
         );
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
 
         // Now unlocked: the `use` interaction's condition no longer holds, so
         // the query drops it — but the unconditional `examine` interaction
         // still matches.
         let after_unlock = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(after_unlock.len(), 1);
         assert_eq!(after_unlock[0].verb(), Verb::Examine);
@@ -255,8 +264,8 @@ mod interactions_for {
         engine.handle_input("go east");
 
         let with_iron_key = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(with_iron_key.len(), 2);
         assert!(with_iron_key.iter().any(|i| i.verb() == Verb::Use));
@@ -265,8 +274,8 @@ mod interactions_for {
         // item-specific `use` interaction no longer matches, but the
         // item-agnostic `examine` interaction (no `item` field) still does.
         let with_brass_key = engine.interactions_for(
-            Some(ObjectId::new("brass-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("brass-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(with_brass_key.len(), 1);
         assert_eq!(with_brass_key[0].verb(), Verb::Examine);
@@ -322,16 +331,20 @@ mod non_use_verbs {
         // ...and its world mutation took effect: the hidden door is now visible.
         assert_eq!(
             engine.world().resolve_target("secret passage"),
-            TargetResolution::Found(Target::Object(ObjectId::new("secret-passage")))
+            TargetResolution::Found(Target::Object(core::objectId!("secret-passage")))
         );
-        assert!(!engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            !engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
     }
 
     #[test]
     fn stock_examine_runs_for_objects_with_no_interaction() {
         let interactions = vec![Interaction::build(
             Verb::Examine,
-            Some(ObjectId::new("oak-door")),
+            Some(core::objectId!("oak-door")),
             TargetFilter::Any,
             None,
             Box::new(|_world: &mut WorldState, _context: &ActionContext| Vec::new()),
@@ -343,7 +356,7 @@ mod non_use_verbs {
         assert_eq!(
             engine.handle_input("examine wooden door"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("wooden-door")),
+                target: Target::Object(core::objectId!("wooden-door")),
                 target_name: "wooden door".to_string(),
             }]
         );
@@ -363,7 +376,7 @@ mod non_use_verbs {
                 name: "map-returned".to_string(),
             }]
         );
-        assert!(engine.world().player_holds(&ObjectId::new("old-map")));
+        assert!(engine.world().player_holds(&core::objectId!("old-map")));
         assert!(
             !engine
                 .world()
@@ -381,7 +394,7 @@ mod non_use_verbs {
         assert_eq!(
             engine.handle_input("drop iron key"),
             vec![Event::Dropped {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -404,7 +417,11 @@ mod non_use_verbs {
                 name: "intercepted".to_string(),
             }]
         );
-        assert!(!engine.world().player_holds(&ObjectId::new("glowing-sword")));
+        assert!(
+            !engine
+                .world()
+                .player_holds(&core::objectId!("glowing-sword"))
+        );
     }
 
     #[test]
@@ -415,23 +432,23 @@ mod non_use_verbs {
 
         // Each item returns its matching interaction — verb-independent.
         let examine =
-            engine.interactions_for(None, Some(Target::Object(ObjectId::new("oak-door"))));
+            engine.interactions_for(None, Some(Target::Object(core::objectId!("oak-door"))));
         assert_eq!(examine.len(), 1);
         assert_eq!(examine[0].verb(), Verb::Examine);
 
-        let take = engine.interactions_for(Some(ObjectId::new("glowing-sword")), None);
+        let take = engine.interactions_for(Some(core::objectId!("glowing-sword")), None);
         assert_eq!(take.len(), 1);
         assert_eq!(take[0].verb(), Verb::Take);
 
-        let drop = engine.interactions_for(Some(ObjectId::new("old-map")), None);
+        let drop = engine.interactions_for(Some(core::objectId!("old-map")), None);
         assert_eq!(drop.len(), 1);
         assert_eq!(drop[0].verb(), Verb::Drop);
 
         // This target also carries the item-agnostic `examine` interaction
         // from the fixture, so both are reported for any carried item.
         let use_it = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(use_it.len(), 2);
         assert_eq!(use_it[0].verb(), Verb::Use);

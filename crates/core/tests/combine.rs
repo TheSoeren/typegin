@@ -58,21 +58,21 @@
 mod common;
 
 use common::{engine_with_interactions as engine_with, world_with_interactions as world_with};
-use core::{DataTarget, Event, GameEngine, ObjectId, Target, TargetKind, Verb};
+use core::{DataTarget, Event, GameEngine, Target, TargetKind, Verb};
 
 /// Takes the brass key and rusty lamp, leaving the player in The Cellar.
 fn carry_brass_key_and_rusty_lamp(engine: &mut GameEngine) {
     assert_eq!(
         engine.handle_input("take brass key"),
         vec![Event::Took {
-            object_id: ObjectId::new("brass-key"),
+            object_id: core::objectId!("brass-key"),
             object: "brass key".to_string(),
         }]
     );
     assert_eq!(
         engine.handle_input("take rusty lamp"),
         vec![Event::Took {
-            object_id: ObjectId::new("rusty-lamp"),
+            object_id: core::objectId!("rusty-lamp"),
             object: "rusty lamp".to_string(),
         }]
     );
@@ -162,15 +162,15 @@ mod combine_dispatch {
             engine.handle_input("use brass key on rusty lamp"),
             vec![
                 Event::Discarded {
-                    object_id: ObjectId::new("brass-key"),
+                    object_id: core::objectId!("brass-key"),
                     object: "brass key".to_string(),
                 },
                 Event::Discarded {
-                    object_id: ObjectId::new("rusty-lamp"),
+                    object_id: core::objectId!("rusty-lamp"),
                     object: "rusty lamp".to_string(),
                 },
                 Event::Granted {
-                    object_id: ObjectId::new("rusty-nail"),
+                    object_id: core::objectId!("rusty-nail"),
                     object: "rusty nail".to_string(),
                 },
                 Event::Custom {
@@ -178,9 +178,9 @@ mod combine_dispatch {
                 },
             ]
         );
-        assert!(engine.world().player_holds(&ObjectId::new("rusty-nail")));
-        assert!(!engine.world().player_holds(&ObjectId::new("brass-key")));
-        assert!(!engine.world().player_holds(&ObjectId::new("rusty-lamp")));
+        assert!(engine.world().player_holds(&core::objectId!("rusty-nail")));
+        assert!(!engine.world().player_holds(&core::objectId!("brass-key")));
+        assert!(!engine.world().player_holds(&core::objectId!("rusty-lamp")));
     }
 }
 
@@ -224,7 +224,7 @@ mod carried_kind_scope {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -250,7 +250,7 @@ mod carried_kind_scope {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
@@ -259,9 +259,9 @@ mod carried_kind_scope {
         assert_eq!(
             engine.handle_input("use brass key on cellar stairs"),
             vec![Event::Used {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
-                target_id: Some(Target::Object(ObjectId::new("cellar-stairs"))),
+                target_id: Some(Target::Object(core::objectId!("cellar-stairs"))),
                 target: Some("cellar stairs".to_string()),
             }]
         );
@@ -276,9 +276,9 @@ mod carried_kind_scope {
         assert_eq!(
             engine.handle_input("use brass key on rusty lamp"),
             vec![Event::Used {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
-                target_id: Some(Target::Object(ObjectId::new("rusty-lamp"))),
+                target_id: Some(Target::Object(core::objectId!("rusty-lamp"))),
                 target: Some("rusty lamp".to_string()),
             }]
         );
@@ -309,15 +309,15 @@ mod carried_kind_scope {
         carry_brass_key_and_rusty_lamp(&mut engine);
 
         let for_carried = engine.interactions_for(
-            Some(ObjectId::new("brass-key")),
-            Some(Target::Object(ObjectId::new("rusty-lamp"))),
+            Some(core::objectId!("brass-key")),
+            Some(Target::Object(core::objectId!("rusty-lamp"))),
         );
         assert_eq!(for_carried.len(), 1);
         assert_eq!(for_carried[0].verb(), Verb::Use);
 
         let for_scene = engine.interactions_for(
-            Some(ObjectId::new("brass-key")),
-            Some(Target::Object(ObjectId::new("cellar-stairs"))),
+            Some(core::objectId!("brass-key")),
+            Some(Target::Object(core::objectId!("cellar-stairs"))),
         );
         assert!(for_scene.is_empty());
     }
@@ -344,7 +344,7 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
@@ -362,14 +362,14 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("use brass key on phantom"),
             vec![Event::UsedTargetNotFound {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
                 target: "phantom".to_string(),
             }]
@@ -382,21 +382,21 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
@@ -404,7 +404,7 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("use key on rusty lamp"),
             vec![Event::UsedObjectAmbiguous {
-                object_ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+                object_ids: vec![core::objectId!("iron-key"), core::objectId!("brass-key")],
                 object: "key".to_string(),
             }]
         );
@@ -416,21 +416,21 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
@@ -440,11 +440,11 @@ mod not_found_and_ambiguous {
         assert_eq!(
             engine.handle_input("use rusty lamp on key"),
             vec![Event::UsedTargetAmbiguous {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
                 target_ids: vec![
-                    Target::Object(ObjectId::new("iron-key")),
-                    Target::Object(ObjectId::new("brass-key")),
+                    Target::Object(core::objectId!("iron-key")),
+                    Target::Object(core::objectId!("brass-key")),
                 ],
                 target: "key".to_string(),
             }]

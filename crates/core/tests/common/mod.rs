@@ -4,7 +4,7 @@
 
 #![allow(dead_code)]
 
-use core::{Direction, Event, GameEngine, RoomId, Rules, WorldData};
+use core::{Direction, Event, GameEngine, Rules, WorldData, input::GoTarget};
 
 /// Concatenates YAML sections into the single document
 /// [`WorldData::from_yaml`] parses. Each section already contributes its own
@@ -118,20 +118,20 @@ pub(crate) fn engine_with_triggers(triggers: &str) -> GameEngine {
 pub(crate) fn enter_study(engine: &mut GameEngine) {
     assert_eq!(
         engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
+        vec![Event::Went(GoTarget::Direction(Direction::North))]
     );
     assert_eq!(
         engine.handle_input("go east"),
-        vec![Event::Went(Direction::East)]
+        vec![Event::Went(GoTarget::Direction(Direction::East))]
     );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+    assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
 }
 
 /// Walks the keyed world's player from The Cellar into the corridor.
 pub(crate) fn enter_corridor(engine: &mut GameEngine) {
     assert_eq!(
         engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
+        vec![Event::Went(GoTarget::Direction(Direction::North))]
     );
-    assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+    assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
 }

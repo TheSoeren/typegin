@@ -1,4 +1,4 @@
-use super::action::Action;
+use super::action::{Action, Locator};
 use super::direction::Direction;
 
 const USE_WORDS: &[&str] = &["on", "with"];
@@ -16,21 +16,21 @@ pub fn lex(tokens: &[&str]) -> Action {
             if rest.is_empty() {
                 Action::Unknown(tokens.join(" "))
             } else {
-                Action::Examine(rest.join(" "))
+                Action::Examine(Locator::Name(rest.join(" ")))
             }
         }
         ["take" | "get", rest @ ..] => {
             if rest.is_empty() {
                 Action::Unknown(tokens.join(" "))
             } else {
-                Action::Take(rest.join(" "))
+                Action::Take(Locator::Name(rest.join(" ")))
             }
         }
         ["drop" | "d", rest @ ..] => {
             if rest.is_empty() {
                 Action::Unknown(tokens.join(" "))
             } else {
-                Action::Drop(rest.join(" "))
+                Action::Drop(Locator::Name(rest.join(" ")))
             }
         }
         ["use", rest @ ..] => match get_use(rest) {
@@ -39,11 +39,18 @@ pub fn lex(tokens: &[&str]) -> Action {
         },
         ["go", direction] => direction_to_action(direction, tokens),
         [direction] => direction_to_action(direction, tokens),
+        ["enter", rest @ ..] => {
+            if rest.is_empty() {
+                Action::Unknown(tokens.join(" "))
+            } else {
+                Action::Go(super::GoTarget::Named(rest.join(" ")))
+            }
+        }
         ["talk", rest @ ..] => {
             if rest.is_empty() {
                 Action::Unknown(tokens.join(" "))
             } else {
-                Action::Talk(rest.join(" "))
+                Action::Talk(Locator::Name(rest.join(" ")))
             }
         }
         ["choose", rest @ ..] => {
@@ -74,11 +81,11 @@ fn get_use(rest: &[&str]) -> Option<Action> {
 
     match split_use_target(rest) {
         Some((item, target)) => Some(Action::Use {
-            item: item.join(" "),
-            target: Some(target.join(" ")),
+            item: Locator::Name(item.join(" ")),
+            target: Some(Locator::Name(target.join(" "))),
         }),
         None => Some(Action::Use {
-            item: rest.join(" "),
+            item: Locator::Name(rest.join(" ")),
             target: None,
         }),
     }
@@ -86,13 +93,15 @@ fn get_use(rest: &[&str]) -> Option<Action> {
 
 fn direction_to_action(direction: &str, tokens: &[&str]) -> Action {
     match Direction::parse(direction) {
-        Some(d) => Action::Go(d),
+        Some(d) => Action::Go(super::GoTarget::Direction(d)),
         None => Action::Unknown(tokens.join(" ")),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::input::GoTarget;
+
     use super::*;
 
     #[test]
@@ -105,9 +114,12 @@ mod tests {
     fn examine_joins_remaining_tokens() {
         assert_eq!(
             lex(&["examine", "glowing", "sword"]),
-            Action::Examine("glowing sword".to_string())
+            Action::Examine(Locator::Name("glowing sword".to_string()))
         );
-        assert_eq!(lex(&["x", "chest"]), Action::Examine("chest".to_string()));
+        assert_eq!(
+            lex(&["x", "chest"]),
+            Action::Examine(Locator::Name("chest".to_string()))
+        );
     }
 
     #[test]
@@ -118,10 +130,13 @@ mod tests {
 
     #[test]
     fn take_and_get_alias() {
-        assert_eq!(lex(&["take", "key"]), Action::Take("key".to_string()));
+        assert_eq!(
+            lex(&["take", "key"]),
+            Action::Take(Locator::Name("key".to_string()))
+        );
         assert_eq!(
             lex(&["get", "lantern"]),
-            Action::Take("lantern".to_string())
+            Action::Take(Locator::Name("lantern".to_string()))
         );
     }
 
@@ -132,8 +147,14 @@ mod tests {
 
     #[test]
     fn drop_and_shortcut() {
-        assert_eq!(lex(&["drop", "sword"]), Action::Drop("sword".to_string()));
-        assert_eq!(lex(&["d", "sword"]), Action::Drop("sword".to_string()));
+        assert_eq!(
+            lex(&["drop", "sword"]),
+            Action::Drop(Locator::Name("sword".to_string()))
+        );
+        assert_eq!(
+            lex(&["d", "sword"]),
+            Action::Drop(Locator::Name("sword".to_string()))
+        );
     }
 
     #[test]
@@ -146,8 +167,8 @@ mod tests {
         assert_eq!(
             lex(&["use", "brass", "key", "on", "wooden", "door"]),
             Action::Use {
-                item: "brass key".to_string(),
-                target: Some("wooden door".to_string()),
+                item: Locator::Name("brass key".to_string()),
+                target: Some(Locator::Name("wooden door".to_string())),
             }
         );
     }
@@ -157,8 +178,8 @@ mod tests {
         assert_eq!(
             lex(&["use", "wrench", "with", "bolt"]),
             Action::Use {
-                item: "wrench".to_string(),
-                target: Some("bolt".to_string()),
+                item: Locator::Name("wrench".to_string()),
+                target: Some(Locator::Name("bolt".to_string())),
             }
         );
     }
@@ -169,8 +190,8 @@ mod tests {
         assert_eq!(
             lex(&["use", "key", "on", "chest", "with", "lock"]),
             Action::Use {
-                item: "key".to_string(),
-                target: Some("chest with lock".to_string()),
+                item: Locator::Name("key".to_string()),
+                target: Some(Locator::Name("chest with lock".to_string())),
             }
         );
     }
@@ -180,7 +201,7 @@ mod tests {
         assert_eq!(
             lex(&["use", "potion"]),
             Action::Use {
-                item: "potion".to_string(),
+                item: Locator::Name("potion".to_string()),
                 target: None,
             }
         );
@@ -193,8 +214,14 @@ mod tests {
 
     #[test]
     fn go_direction_full_word_and_abbreviation() {
-        assert_eq!(lex(&["go", "north"]), Action::Go(Direction::North));
-        assert_eq!(lex(&["go", "n"]), Action::Go(Direction::North));
+        assert_eq!(
+            lex(&["go", "north"]),
+            Action::Go(GoTarget::Direction(Direction::North))
+        );
+        assert_eq!(
+            lex(&["go", "n"]),
+            Action::Go(GoTarget::Direction(Direction::North))
+        );
     }
 
     #[test]
@@ -207,15 +234,40 @@ mod tests {
 
     #[test]
     fn bare_direction_word() {
-        assert_eq!(lex(&["north"]), Action::Go(Direction::North));
-        assert_eq!(lex(&["e"]), Action::Go(Direction::East));
+        assert_eq!(
+            lex(&["north"]),
+            Action::Go(GoTarget::Direction(Direction::North))
+        );
+        assert_eq!(
+            lex(&["e"]),
+            Action::Go(GoTarget::Direction(Direction::East))
+        );
+    }
+
+    // `enter <name>` is the named-target counterpart to `go <direction>`: it
+    // reaches doors that have no compass direction at all (point-and-click-
+    // only exits), by name, exactly like `examine`/`take`/`drop` reach any
+    // other object. See `crates/core/tests/navigation.rs`'s `named_exits`
+    // module for the end-to-end (resolution, locked, not-a-door, not-found,
+    // ambiguous) behavior — this only pins the parse.
+    #[test]
+    fn enter_joins_remaining_tokens() {
+        assert_eq!(
+            lex(&["enter", "wooden", "hatch"]),
+            Action::Go(GoTarget::Named("wooden hatch".to_string()))
+        );
+    }
+
+    #[test]
+    fn enter_with_no_object_is_unknown() {
+        assert_eq!(lex(&["enter"]), Action::Unknown("enter".to_string()));
     }
 
     #[test]
     fn talk_joins_remaining_tokens() {
         assert_eq!(
             lex(&["talk", "old", "man"]),
-            Action::Talk("old man".to_string())
+            Action::Talk(Locator::Name("old man".to_string()))
         );
     }
 

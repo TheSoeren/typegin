@@ -13,7 +13,9 @@
 mod common;
 
 use common::setup_engine;
-use core::{Direction, DirectionResolution, Event, ObjectId, ObjectResolution, RoomId, WorldState};
+use core::{
+    Direction, Event, GoTarget, GoTargetResolution, ObjectId, ObjectResolution, WorldState,
+};
 
 /// Whether the current room lists `name` among its visible items.
 fn room_shows(world: &WorldState, name: &str) -> bool {
@@ -33,7 +35,7 @@ mod hidden_items {
     fn hidden_item_is_not_listed_among_room_items() {
         let engine = setup_engine();
         assert!(!room_shows(engine.world(), "stale bread"));
-        assert!(room_hides(engine.world(), &ObjectId::new("stale-bread")));
+        assert!(room_hides(engine.world(), &core::objectId!("stale-bread")));
     }
 
     #[test]
@@ -53,11 +55,11 @@ mod hidden_items {
         assert_eq!(
             engine
                 .world_mut()
-                .reveal_object(&ObjectId::new("stale-bread")),
-            ObjectResolution::Found(ObjectId::new("stale-bread"))
+                .reveal_object(&core::objectId!("stale-bread")),
+            ObjectResolution::Found(core::objectId!("stale-bread"))
         );
         assert!(room_shows(engine.world(), "stale bread"));
-        assert!(!room_hides(engine.world(), &ObjectId::new("stale-bread")));
+        assert!(!room_hides(engine.world(), &core::objectId!("stale-bread")));
     }
 
     #[test]
@@ -66,7 +68,7 @@ mod hidden_items {
         assert_eq!(
             engine
                 .world_mut()
-                .reveal_object(&ObjectId::new("nonexistent")),
+                .reveal_object(&core::objectId!("nonexistent")),
             ObjectResolution::NotFound
         );
     }
@@ -76,11 +78,11 @@ mod hidden_items {
         let mut engine = setup_engine();
         engine
             .world_mut()
-            .reveal_object(&ObjectId::new("stale-bread"));
+            .reveal_object(&core::objectId!("stale-bread"));
         assert_eq!(
             engine.handle_input("take stale bread"),
             vec![Event::Took {
-                object_id: ObjectId::new("stale-bread"),
+                object_id: core::objectId!("stale-bread"),
                 object: "stale bread".to_string()
             }]
         );
@@ -92,17 +94,20 @@ mod hidden_items {
         assert_eq!(
             engine
                 .world_mut()
-                .hide_object(&ObjectId::new("glowing-sword")),
-            ObjectResolution::Found(ObjectId::new("glowing-sword"))
+                .hide_object(&core::objectId!("glowing-sword")),
+            ObjectResolution::Found(core::objectId!("glowing-sword"))
         );
         assert!(!room_shows(engine.world(), "glowing mysterious sword"));
-        assert!(room_hides(engine.world(), &ObjectId::new("glowing-sword")));
+        assert!(room_hides(
+            engine.world(),
+            &core::objectId!("glowing-sword")
+        ));
     }
 
     #[test]
     fn hidden_item_cannot_be_taken_after_hide() {
         let mut engine = setup_engine();
-        engine.world_mut().hide_object(&ObjectId::new("iron-key"));
+        engine.world_mut().hide_object(&core::objectId!("iron-key"));
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::TookObjectNotFound {
@@ -117,7 +122,7 @@ mod hidden_items {
         assert_eq!(
             engine
                 .world_mut()
-                .hide_object(&ObjectId::new("nonexistent")),
+                .hide_object(&core::objectId!("nonexistent")),
             ObjectResolution::NotFound
         );
     }
@@ -127,15 +132,18 @@ mod hidden_items {
         let mut engine = setup_engine();
         engine
             .world_mut()
-            .hide_object(&ObjectId::new("glowing-sword"));
+            .hide_object(&core::objectId!("glowing-sword"));
         assert_eq!(
             engine
                 .world_mut()
-                .reveal_object(&ObjectId::new("glowing-sword")),
-            ObjectResolution::Found(ObjectId::new("glowing-sword"))
+                .reveal_object(&core::objectId!("glowing-sword")),
+            ObjectResolution::Found(core::objectId!("glowing-sword"))
         );
         assert!(room_shows(engine.world(), "glowing mysterious sword"));
-        assert!(!room_hides(engine.world(), &ObjectId::new("glowing-sword")));
+        assert!(!room_hides(
+            engine.world(),
+            &core::objectId!("glowing-sword")
+        ));
     }
 
     #[test]
@@ -143,15 +151,15 @@ mod hidden_items {
         let mut engine = setup_engine();
         engine
             .world_mut()
-            .reveal_object(&ObjectId::new("stale-bread"));
+            .reveal_object(&core::objectId!("stale-bread"));
         assert_eq!(
             engine
                 .world_mut()
-                .hide_object(&ObjectId::new("stale-bread")),
-            ObjectResolution::Found(ObjectId::new("stale-bread"))
+                .hide_object(&core::objectId!("stale-bread")),
+            ObjectResolution::Found(core::objectId!("stale-bread"))
         );
         assert!(!room_shows(engine.world(), "stale bread"));
-        assert!(room_hides(engine.world(), &ObjectId::new("stale-bread")));
+        assert!(room_hides(engine.world(), &core::objectId!("stale-bread")));
     }
 }
 
@@ -163,13 +171,13 @@ mod hidden_exits {
         let mut engine = setup_engine();
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
         (engine,)
     }
 
@@ -178,9 +186,9 @@ mod hidden_exits {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentExitHidden(Direction::North)]
+            vec![Event::WentExitHidden(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 
     #[test]
@@ -189,7 +197,7 @@ mod hidden_exits {
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::North),
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::North)),
             None
         );
     }
@@ -198,25 +206,29 @@ mod hidden_exits {
     fn reveal_exit_makes_it_traversable() {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
-            engine.world_mut().reveal_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .reveal_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("cellar"));
     }
 
     #[test]
     fn reveal_exit_moves_it_out_of_hidden() {
         let (mut engine,) = engine_at_room_3();
-        engine.world_mut().reveal_exit(Direction::North);
+        engine
+            .world_mut()
+            .reveal_exit(GoTarget::Direction(Direction::North));
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::North),
-            Some(RoomId::new("cellar"))
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::North)),
+            Some(core::roomId!("cellar"))
         );
     }
 
@@ -224,13 +236,17 @@ mod hidden_exits {
     fn reveal_missing_direction_returns_not_found() {
         let (mut engine,) = engine_at_room_3();
         assert_eq!(
-            engine.world_mut().reveal_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .reveal_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
         // A second reveal of the same direction fails: it is no longer hidden.
         assert_eq!(
-            engine.world_mut().reveal_exit(Direction::North),
-            DirectionResolution::NotFound
+            engine
+                .world_mut()
+                .reveal_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::NotFound
         );
     }
 
@@ -238,13 +254,15 @@ mod hidden_exits {
     fn hide_visible_exit_moves_it_to_hidden() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().hide_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .hide_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::North),
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::North)),
             None
         );
     }
@@ -252,51 +270,63 @@ mod hidden_exits {
     #[test]
     fn hidden_exit_is_not_traversable_after_hide() {
         let mut engine = setup_engine();
-        engine.world_mut().hide_exit(Direction::North);
+        engine
+            .world_mut()
+            .hide_exit(GoTarget::Direction(Direction::North));
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::WentExitHidden(Direction::North)]
+            vec![Event::WentExitHidden(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("cellar"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("cellar"));
     }
 
     #[test]
     fn hiding_unknown_direction_returns_not_found() {
         let mut engine = setup_engine();
         assert_eq!(
-            engine.world_mut().hide_exit(Direction::East),
-            DirectionResolution::NotFound
+            engine
+                .world_mut()
+                .hide_exit(GoTarget::Direction(Direction::East)),
+            GoTargetResolution::NotFound
         );
     }
 
     #[test]
     fn hide_reveal_round_trip_restores_exit() {
         let mut engine = setup_engine();
-        engine.world_mut().hide_exit(Direction::North);
+        engine
+            .world_mut()
+            .hide_exit(GoTarget::Direction(Direction::North));
         assert_eq!(
-            engine.world_mut().reveal_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .reveal_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::North),
-            Some(RoomId::new("corridor"))
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::North)),
+            Some(core::roomId!("corridor"))
         );
     }
 
     #[test]
     fn reveal_then_hide_round_trip_restores_hidden() {
         let (mut engine,) = engine_at_room_3();
-        engine.world_mut().reveal_exit(Direction::North);
+        engine
+            .world_mut()
+            .reveal_exit(GoTarget::Direction(Direction::North));
         assert_eq!(
-            engine.world_mut().hide_exit(Direction::North),
-            DirectionResolution::Found(Direction::North)
+            engine
+                .world_mut()
+                .hide_exit(GoTarget::Direction(Direction::North)),
+            GoTargetResolution::Found(GoTarget::Direction(Direction::North))
         );
         assert_eq!(
             engine
                 .world()
-                .get_room_id_by_exit_direction(Direction::North),
+                .get_room_id_by_go_target(&GoTarget::Direction(Direction::North)),
             None
         );
     }

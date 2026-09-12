@@ -40,30 +40,46 @@ impl Verb {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::action::{GoTarget, Locator};
     use crate::input::direction::Direction;
 
     #[test]
     fn maps_each_actionable_variant_to_its_verb() {
         assert_eq!(Verb::from_action(&Action::Look), Some(Verb::Look));
         assert_eq!(
-            Verb::from_action(&Action::Go(Direction::North)),
+            Verb::from_action(&Action::Go(GoTarget::Direction(Direction::North))),
             Some(Verb::Go)
         );
         assert_eq!(
-            Verb::from_action(&Action::Examine("sword".to_string())),
+            Verb::from_action(&Action::Examine(Locator::Name("sword".to_string()))),
             Some(Verb::Examine)
         );
         assert_eq!(
-            Verb::from_action(&Action::Take("sword".to_string())),
+            Verb::from_action(&Action::Take(Locator::Name("sword".to_string()))),
             Some(Verb::Take)
         );
         assert_eq!(
-            Verb::from_action(&Action::Drop("sword".to_string())),
+            Verb::from_action(&Action::Drop(Locator::Name("sword".to_string()))),
             Some(Verb::Drop)
         );
         assert_eq!(
-            Verb::from_action(&Action::Talk("guard".to_string())),
+            Verb::from_action(&Action::Talk(Locator::Name("guard".to_string()))),
             Some(Verb::Talk)
+        );
+    }
+
+    #[test]
+    fn go_maps_to_the_same_verb_by_direction_or_by_name() {
+        // A compass move and a named-door move are the same verb category —
+        // `Rules::on_go` is one hook for both, matching how `Use` is one
+        // verb regardless of whether a target was given.
+        assert_eq!(
+            Verb::from_action(&Action::Go(GoTarget::Direction(Direction::North))),
+            Some(Verb::Go)
+        );
+        assert_eq!(
+            Verb::from_action(&Action::Go(GoTarget::Named("wooden hatch".to_string()))),
+            Some(Verb::Go)
         );
     }
 
@@ -71,15 +87,15 @@ mod tests {
     fn use_maps_to_the_same_verb_with_or_without_a_target() {
         assert_eq!(
             Verb::from_action(&Action::Use {
-                item: "key".to_string(),
+                item: Locator::Name("key".to_string()),
                 target: None,
             }),
             Some(Verb::Use)
         );
         assert_eq!(
             Verb::from_action(&Action::Use {
-                item: "key".to_string(),
-                target: Some("door".to_string()),
+                item: Locator::Name("key".to_string()),
+                target: Some(Locator::Name("door".to_string())),
             }),
             Some(Verb::Use)
         );

@@ -1,5 +1,5 @@
 //! Spec for the verb-coin UI primitives: `GameEngine::verbs_for` and
-//! `Rules::default_verbs`. A point-and-click front-end (Deponia-style: a
+//! `Rules::verbs_for`. A point-and-click front-end (Deponia-style: a
 //! static per-hotspot verb coin, not a menu that grows and shrinks as
 //! inventory changes) needs one query — "what verbs are possible for this
 //! target, on its own" — to populate that coin.
@@ -10,11 +10,12 @@
 //!
 //! ## New API
 //!
-//! * `GameEngine::verbs_for(&self, target: Target) -> HashSet<Verb>` — the union
-//!   of every `Verb` a currently-live *item-agnostic* interaction reports for
+//! * `GameEngine::verbs_for(&self, target: Target) -> HashSet<Verb>` — computes
+//!   every `Verb` a currently-live *item-agnostic* interaction reports for
 //!   `target` (`interactions_for(None, Some(target))` — including the
-//!   NPC-hotspot's `Verb::Talk` when `target` names a present NPC), unioned
-//!   with `Rules::default_verbs`, deduplicated.
+//!   NPC-hotspot's `Verb::Talk` when `target` names a present NPC), then hands
+//!   that off to `Rules::verbs_for`, which has the final say over what the
+//!   coin actually holds.
 //!
 //!   An interaction that requires a specific carried item (`item: <id>`)
 //!   never contributes here, no matter what the player is holding — whether
@@ -28,12 +29,17 @@
 //!   hotspots" affordance and the verb coin behave in modern point-and-click
 //!   UIs (Deponia included) — both are static per room state, never
 //!   inventory-reactive.
-//! * `Rules::default_verbs(&self, target: Target, world: &WorldState) ->
-//!   Vec<Verb>` — verbs that work on `target` unconditionally, entirely the
-//!   consumer's call (a game might return all its verbs for every hotspot;
-//!   another might return only `Examine`). The trait default returns
-//!   `vec![Verb::Examine]` unconditionally (see `crates/core/src/rules/mod.rs`),
-//!   inherited by `BasicRules` as-is, so `verbs_for` is never empty under
+//! * `Rules::verbs_for(&self, target: Target, interaction_verbs: &HashSet<Verb>,
+//!   world: &WorldState) -> HashSet<Verb>` — decides the coin's final
+//!   contents, entirely the consumer's call: whatever this returns *is* the
+//!   result, so an override that wants to keep `interaction_verbs` around has
+//!   to fold them back in itself (see `default_verbs_hook`'s
+//!   `AllVerbsEverywhere` for one that doesn't, and `door_targets`'s
+//!   `MergeInteractionsOntoExits` for one that does). The trait default
+//!   (see `crates/core/src/rules/mod.rs`) folds `interaction_verbs` in plus
+//!   `Verb::Examine` — except for an open (unlocked) exit, where it
+//!   deliberately discards `interaction_verbs` and returns `Verb::Go` alone.
+//!   Inherited by `BasicRules` as-is, so `verbs_for` is never empty under
 //!   `BasicRules` even with zero authored interactions. Exercised only
 //!   through `verbs_for` here — `default_rules.rs`'s own convention is to
 //!   drive every hook through the public API, never call it directly, and
@@ -49,10 +55,7 @@ use common::{
     base_world, engine_with_interactions as engine_with, engine_with_npcs, enter_corridor,
     world_with_interactions as world_with, world_with_npcs,
 };
-use core::{
-    GameEngine, Interaction, NpcId, ObjectId, Rules, Target, TargetFilter, TargetKind, Verb,
-    WorldState,
-};
+use core::{BasicRules, GameEngine, Interaction, Rules, Target, TargetFilter, Verb, WorldState};
 
 /// Minimal NPC (a guard in the corridor) with a single dialogue node.
 const VERB_COIN_GUARD_YAML: &str = r#"npcs:
@@ -75,14 +78,17 @@ mod data_driven_aggregation {
 
     #[test]
     fn no_interactions_still_includes_basic_rules_default_verbs() {
-        // `BasicRules` inherits `Rules::default_verbs`'s trait default
-        // unmodified, which unconditionally returns `[Verb::Examine]` (see
-        // `crates/core/src/rules/mod.rs`) — so even with zero authored
-        // interactions, `verbs_for` is never empty under `BasicRules`.
+        // `BasicRules` inherits `Rules::verbs_for`'s trait default
+        // unmodified, which always offers `Examine` and mirrors what the
+        // stock `on_take`/`on_drop` hooks would actually do (see
+        // `crates/core/src/rules/mod.rs`) — `rusty-lamp` is a non-`Scene`
+        // item currently in the room, so `on_take` would succeed on it,
+        // and `verbs_for` reflects that with `Take` alongside `Examine`,
+        // even with zero authored interactions.
         let engine = GameEngine::get(&base_world());
         assert_eq!(
-            engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp"))),
-            HashSet::from([Verb::Examine])
+            engine.verbs_for(Target::Object(core::objectId!("rusty-lamp"))),
+            HashSet::from([Verb::Examine, Verb::Take])
         );
     }
 
@@ -95,7 +101,7 @@ mod data_driven_aggregation {
         );
         assert!(
             engine
-                .verbs_for(Target::Object(ObjectId::new("rusty-lamp")))
+                .verbs_for(Target::Object(core::objectId!("rusty-lamp")))
                 .contains(&Verb::Examine)
         );
     }
@@ -111,7 +117,7 @@ mod data_driven_aggregation {
   target:
     object: rusty-lamp",
         );
-        let target = Target::Object(ObjectId::new("rusty-lamp"));
+        let target = Target::Object(core::objectId!("rusty-lamp"));
 
         // Before picking anything up: only the item-agnostic Examine shows.
         let before = engine.verbs_for(target.clone());
@@ -142,7 +148,7 @@ mod data_driven_aggregation {
     - emit: second",
         );
 
-        let verbs = engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp")));
+        let verbs = engine.verbs_for(Target::Object(core::objectId!("rusty-lamp")));
         assert_eq!(verbs.iter().filter(|verb| **verb == Verb::Use).count(), 1);
     }
 }
@@ -163,10 +169,13 @@ mod closure_driven_aggregation {
 
     #[test]
     fn includes_verbs_from_rules_interactions() {
+        // Targets a plain item, not a door: this test is about closure
+        // interactions surfacing through `verbs_for` at all, orthogonal to
+        // the door-exclusivity behaviour covered by `door_targets` below.
         let interaction = Interaction::build(
             Verb::Examine,
             None,
-            TargetFilter::Kind(TargetKind::Scene),
+            TargetFilter::Targeted,
             None,
             Box::new(|_world, _context| Vec::new()),
         );
@@ -175,7 +184,7 @@ mod closure_driven_aggregation {
 
         assert!(
             engine
-                .verbs_for(Target::Object(ObjectId::new("cellar-stairs")))
+                .verbs_for(Target::Object(core::objectId!("iron-key")))
                 .contains(&Verb::Examine)
         );
     }
@@ -190,26 +199,36 @@ mod default_verbs_hook {
 
     struct AllVerbsEverywhere;
     impl Rules for AllVerbsEverywhere {
-        fn default_verbs(&self, _target: Target, _world: &WorldState) -> Vec<Verb> {
-            vec![Verb::Examine, Verb::Look]
+        fn verbs_for(
+            &self,
+            _target: Target,
+            _interaction_verbs: &HashSet<Verb>,
+            _world: &WorldState,
+        ) -> HashSet<Verb> {
+            HashSet::from([Verb::Examine, Verb::Look])
         }
     }
 
     #[test]
     fn custom_default_verbs_are_unioned_into_verbs_for() {
         let engine = GameEngine::get_with_rules(&base_world(), AllVerbsEverywhere);
-        let verbs = engine.verbs_for(Target::Object(ObjectId::new("cellar-stairs")));
+        let verbs = engine.verbs_for(Target::Object(core::objectId!("cellar-stairs")));
         assert!(verbs.contains(&Verb::Examine));
         assert!(verbs.contains(&Verb::Look));
     }
 
     struct SceneAwareDefaults;
     impl Rules for SceneAwareDefaults {
-        fn default_verbs(&self, target: Target, world: &WorldState) -> Vec<Verb> {
+        fn verbs_for(
+            &self,
+            target: Target,
+            _interaction_verbs: &HashSet<Verb>,
+            world: &WorldState,
+        ) -> HashSet<Verb> {
             match target {
-                Target::Object(id) if world.object_is_scene(&id) => vec![Verb::Examine],
-                Target::Object(_) => vec![Verb::Take],
-                Target::Npc(_) => Vec::new(),
+                Target::Object(id) if world.object_is_scene(&id) => HashSet::from([Verb::Examine]),
+                Target::Object(_) => HashSet::from([Verb::Take]),
+                Target::Npc(_) => HashSet::new(),
             }
         }
     }
@@ -218,19 +237,24 @@ mod default_verbs_hook {
     fn default_verbs_receives_the_queried_target_and_world_state() {
         let engine = GameEngine::get_with_rules(&base_world(), SceneAwareDefaults);
 
-        let scene_verbs = engine.verbs_for(Target::Object(ObjectId::new("cellar-stairs")));
+        let scene_verbs = engine.verbs_for(Target::Object(core::objectId!("cellar-stairs")));
         assert!(scene_verbs.contains(&Verb::Examine));
         assert!(!scene_verbs.contains(&Verb::Take));
 
-        let item_verbs = engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp")));
+        let item_verbs = engine.verbs_for(Target::Object(core::objectId!("rusty-lamp")));
         assert!(item_verbs.contains(&Verb::Take));
         assert!(!item_verbs.contains(&Verb::Examine));
     }
 
     struct UseAndTalkEverywhere;
     impl Rules for UseAndTalkEverywhere {
-        fn default_verbs(&self, _target: Target, _world: &WorldState) -> Vec<Verb> {
-            vec![Verb::Use, Verb::Talk]
+        fn verbs_for(
+            &self,
+            _target: Target,
+            _interaction_verbs: &HashSet<Verb>,
+            _world: &WorldState,
+        ) -> HashSet<Verb> {
+            HashSet::from([Verb::Use, Verb::Talk])
         }
     }
 
@@ -245,7 +269,7 @@ mod default_verbs_hook {
             UseAndTalkEverywhere,
         );
 
-        let verbs = engine.verbs_for(Target::Object(ObjectId::new("rusty-lamp")));
+        let verbs = engine.verbs_for(Target::Object(core::objectId!("rusty-lamp")));
         assert_eq!(verbs.iter().filter(|verb| **verb == Verb::Use).count(), 1);
         assert!(verbs.contains(&Verb::Talk));
     }
@@ -265,7 +289,7 @@ mod npc_targets {
         enter_corridor(&mut engine);
         assert!(
             engine
-                .verbs_for(Target::Npc(NpcId::new("guard")))
+                .verbs_for(Target::Npc(core::npcId!("guard")))
                 .contains(&Verb::Talk)
         );
     }
@@ -280,15 +304,26 @@ mod npc_targets {
         let engine = engine_with_npcs(VERB_COIN_GUARD_YAML);
         assert!(
             !engine
-                .verbs_for(Target::Npc(NpcId::new("guard")))
+                .verbs_for(Target::Npc(core::npcId!("guard")))
                 .contains(&Verb::Talk)
         );
     }
 
+    /// An override always offers `Examine`, but — unlike the stock
+    /// default — has to fold `interaction_verbs` back in itself if it wants
+    /// them to survive: `Rules::verbs_for` has the final say, so an override
+    /// that ignores `interaction_verbs` loses them, `Talk` included.
     struct ExamineEverywhere;
     impl Rules for ExamineEverywhere {
-        fn default_verbs(&self, _target: Target, _world: &WorldState) -> Vec<Verb> {
-            vec![Verb::Examine]
+        fn verbs_for(
+            &self,
+            _target: Target,
+            interaction_verbs: &HashSet<Verb>,
+            _world: &WorldState,
+        ) -> HashSet<Verb> {
+            let mut verbs = interaction_verbs.clone();
+            verbs.insert(Verb::Examine);
+            verbs
         }
     }
 
@@ -298,7 +333,7 @@ mod npc_targets {
             GameEngine::get_with_rules(&world_with_npcs(VERB_COIN_GUARD_YAML), ExamineEverywhere);
         enter_corridor(&mut engine);
 
-        let verbs = engine.verbs_for(Target::Npc(NpcId::new("guard")));
+        let verbs = engine.verbs_for(Target::Npc(core::npcId!("guard")));
         assert!(verbs.contains(&Verb::Talk));
         assert!(verbs.contains(&Verb::Examine));
     }
@@ -309,9 +344,102 @@ mod npc_targets {
         enter_corridor(&mut engine);
         assert!(
             !engine
-                .verbs_for(Target::Object(ObjectId::new("rusty-lamp")))
+                .verbs_for(Target::Object(core::objectId!("rusty-lamp")))
                 .contains(&Verb::Talk)
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Door targets: an *open* exit collapses to a single `Verb::Go` affordance
+// by default -- no verb-coin at all, matching the "just a walk cursor"
+// convention modern point-and-click adventures use for an exit that needs
+// no further interaction. A *locked* exit falls back to the ordinary
+// default (`Examine`) instead, since the player can't walk through it yet --
+// `Go` isn't offered until it's actually unlocked. The open-exit case is
+// exclusive on purpose: `Rules::verbs_for` has the final say over what the
+// coin holds, and the stock default discards `interaction_verbs` entirely
+// once it decides an exit is open, rather than merging them in. A consumer
+// who wants an authored interaction to still show up alongside `Go` has to
+// override `verbs_for` and union `interaction_verbs` back in itself -- see
+// `an_authored_interaction_can_still_add_a_verb_to_an_unlocked_door`.
+// ---------------------------------------------------------------------------
+
+mod door_targets {
+    use super::*;
+    use common::enter_study;
+
+    #[test]
+    fn an_unlocked_door_offers_only_go_by_default() {
+        let mut engine = GameEngine::get(&base_world());
+        enter_study(&mut engine);
+        assert_eq!(
+            engine.verbs_for(Target::Object(core::objectId!("wooden-door"))),
+            HashSet::from([Verb::Go])
+        );
+    }
+
+    #[test]
+    fn a_locked_door_falls_back_to_the_ordinary_default() {
+        let mut engine = GameEngine::get(&base_world());
+        enter_study(&mut engine);
+        let verbs = engine.verbs_for(Target::Object(core::objectId!("oak-door")));
+        assert_eq!(verbs, HashSet::from([Verb::Examine]));
+        assert!(!verbs.contains(&Verb::Go));
+    }
+
+    #[test]
+    fn unlocking_a_door_switches_its_default_verb_from_examine_to_go() {
+        let mut engine = engine_with(
+            r"- verb: use
+  item: iron-key
+  target:
+    object: oak-door
+  effect:
+    - unlock_exit: east",
+        );
+        engine.handle_input("take iron key");
+        enter_study(&mut engine);
+        let target = Target::Object(core::objectId!("oak-door"));
+
+        assert_eq!(
+            engine.verbs_for(target.clone()),
+            HashSet::from([Verb::Examine])
+        );
+        engine.handle_input("use iron key on oak door");
+        assert_eq!(engine.verbs_for(target), HashSet::from([Verb::Go]));
+    }
+
+    #[test]
+    fn an_authored_interaction_can_still_add_a_verb_to_an_unlocked_door() {
+        // The stock default would discard the authored `examine` interaction
+        // here (an open exit collapses to `Go` alone) -- getting both back
+        // requires overriding `verbs_for` and unioning `interaction_verbs`
+        // onto the stock behaviour explicitly, as this override does.
+        struct MergeInteractionsOntoExits;
+        impl Rules for MergeInteractionsOntoExits {
+            fn verbs_for(
+                &self,
+                target: Target,
+                interaction_verbs: &HashSet<Verb>,
+                world: &WorldState,
+            ) -> HashSet<Verb> {
+                let mut verbs = BasicRules.verbs_for(target, interaction_verbs, world);
+                verbs.extend(interaction_verbs.clone());
+                verbs
+            }
+        }
+
+        let data = world_with(
+            r"- verb: examine
+  target:
+    object: wooden-door",
+        );
+        let mut engine = GameEngine::get_with_rules(&data, MergeInteractionsOntoExits);
+        enter_study(&mut engine);
+        let verbs = engine.verbs_for(Target::Object(core::objectId!("wooden-door")));
+        assert!(verbs.contains(&Verb::Go));
+        assert!(verbs.contains(&Verb::Examine));
     }
 }
 
@@ -333,10 +461,10 @@ mod read_only_query {
     - grant: rusty-nail",
         );
 
-        let target = Target::Object(ObjectId::new("rusty-lamp"));
+        let target = Target::Object(core::objectId!("rusty-lamp"));
         assert!(engine.verbs_for(target.clone()).contains(&Verb::Use));
         assert!(engine.verbs_for(target).contains(&Verb::Use));
 
-        assert!(!engine.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(!engine.world().player_holds(&core::objectId!("rusty-nail")));
     }
 }

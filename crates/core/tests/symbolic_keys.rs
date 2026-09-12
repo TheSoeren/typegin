@@ -1,6 +1,6 @@
 mod common;
 
-use core::{Direction, Event, GameEngine, ObjectResolution, RoomId, Verb, WorldData};
+use core::{Direction, Event, GameEngine, GoTarget, ObjectResolution, Verb, WorldData};
 
 use common::{base_world, engine_with_interactions as engine_with, merge_yaml};
 
@@ -129,11 +129,11 @@ fn iron_key_in_study(engine: &mut GameEngine) {
     );
     assert_eq!(
         engine.handle_input("go north"),
-        vec![Event::Went(Direction::North)]
+        vec![Event::Went(GoTarget::Direction(Direction::North))]
     );
     assert_eq!(
         engine.handle_input("go east"),
-        vec![Event::Went(Direction::East)]
+        vec![Event::Went(GoTarget::Direction(Direction::East))]
     );
     assert!(
         engine
@@ -163,12 +163,12 @@ mod keys {
         assert_eq!(e.world().room_object_names().len(), 4);
         assert_eq!(
             e.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
         assert_eq!(e.world().room_object_names().len(), 2);
         assert_eq!(
             e.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
         assert_eq!(e.world().room_object_names().len(), 2);
     }
@@ -195,15 +195,15 @@ mod keys {
         // cellar → north → corridor (cellar-stairs door to: corridor)
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("corridor"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("corridor"));
         // corridor → east → study (study-door door to: study)
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::Went(Direction::East)]
+            vec![Event::Went(GoTarget::Direction(Direction::East))]
         );
-        assert_eq!(engine.world().current_room_id(), RoomId::new("study"));
+        assert_eq!(engine.world().current_room_id(), core::roomId!("study"));
     }
 }
 
@@ -212,7 +212,7 @@ mod keys {
 // -----------------------------------------------------------------------
 
 mod dispatch {
-    use core::{ObjectId, Target, world::object::TargetResolution};
+    use core::{Target, world::object::TargetResolution};
 
     use super::*;
 
@@ -220,19 +220,25 @@ mod dispatch {
     fn item_and_target_kind_keys_resolve() {
         let mut engine = engine_with(UNLOCK_AND_EMIT_YAML);
         iron_key_in_study(&mut engine);
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
             vec![
-                Event::UnlockedExit {
-                    direction: Direction::East
-                },
+                Event::UnlockedExit(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "door-unlocked".to_string()
                 },
             ]
         );
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
     }
 
     #[test]
@@ -242,7 +248,7 @@ mod dispatch {
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: match in_cellar.world().resolve_target("iron key") {
                     TargetResolution::Found(_) => "iron key".to_string(),
                     _ => panic!("iron key resolves"),
@@ -271,10 +277,18 @@ mod dispatch {
     - reveal_object: secret-passage",
         );
         iron_key_in_study(&mut engine);
-        assert!(engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
         // The effect runs silently (no Examined, no Custom).
         assert_eq!(engine.handle_input("examine wooden door"), vec![]);
-        assert!(!engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            !engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
         // secret-passage is now resolvable (prove the effect key resolved).
         assert!(matches!(
             engine.world().resolve_target("secret passage"),
@@ -399,7 +413,7 @@ mod integrity {
     name: The Cellar
     visible_objects: [iron-key, nonexistent-object]
     hidden_objects: []";
-        let result = from_yaml(items, bad_rooms, "{}");
+        let result = from_yaml(items, bad_rooms, "");
         assert!(result.is_err());
     }
 
@@ -415,6 +429,17 @@ mod integrity {
 
     #[test]
     fn unknown_room_key_in_door_to_is_an_error() {
+        // Paired with the full canonical `ROOMS_YAML`, this previously
+        // still errored, but for the wrong reason (the `"{}"` placeholder
+        // that used to sit here broke YAML parsing outright, before
+        // validation ever ran; even fixing just that, `ROOMS_YAML`
+        // references objects like `iron-key` that this test's minimal
+        // `items` doesn't declare, so the *room* reference check — which
+        // runs before the object reference check — would fail first
+        // instead of `bad-door`'s `to:`). A minimal, self-contained room
+        // that only ever mentions `bad-door` isolates the actual check:
+        // an object's own door `to:` is validated regardless of whether
+        // the object is placed in any room's `visible_objects` at all.
         let items = r"objects:
   - key: bad-door
     primary_name: bad door
@@ -422,7 +447,12 @@ mod integrity {
     door:
       direction: north
       to: nonexistent-room";
-        let result = from_yaml(items, ROOMS_YAML, "{}");
+        let rooms = r"rooms:
+  - key: cellar
+    name: The Cellar
+    visible_objects: []
+    hidden_objects: []";
+        let result = from_yaml(items, rooms, "");
         assert!(result.is_err());
     }
 
@@ -448,7 +478,7 @@ mod integrity {
   - key: iron-key
     primary_name: duplicate iron key
     kind: Item";
-        let result = from_yaml(items, ROOMS_YAML, "{}");
+        let result = from_yaml(items, ROOMS_YAML, "");
         assert!(result.is_err());
     }
 
@@ -463,7 +493,42 @@ mod integrity {
     name: Duplicate Cellar
     visible_objects: []
     hidden_objects: []";
-        let result = from_yaml(ITEMS_YAML, rooms, "{}");
+        let result = from_yaml(ITEMS_YAML, rooms, "");
+        assert!(result.is_err());
+    }
+
+    // ---- duplicate exit direction within one room ----
+
+    #[test]
+    fn duplicate_exit_direction_in_one_room_is_an_error() {
+        // Two doors both claiming `direction: north` in the same room used
+        // to silently clobber each other in `Room`'s direction index (the
+        // second one insertion-order wins, the first becomes an orphaned
+        // room object with no compass exit at all) — now a room-authoring
+        // mistake, not silent data loss.
+        let items = r"objects:
+  - key: north-door-a
+    primary_name: north door a
+    kind: Scene
+    door:
+      direction: north
+      to: corridor
+  - key: north-door-b
+    primary_name: north door b
+    kind: Scene
+    door:
+      direction: north
+      to: corridor";
+        let rooms = r"rooms:
+  - key: cellar
+    name: The Cellar
+    visible_objects: [north-door-a, north-door-b]
+    hidden_objects: []
+  - key: corridor
+    name: The Corridor
+    visible_objects: []
+    hidden_objects: []";
+        let result = from_yaml(items, rooms, "");
         assert!(result.is_err());
     }
 
@@ -474,7 +539,7 @@ mod integrity {
         let items = r"objects:
   - primary_name: no key item
     kind: Item";
-        let result = from_yaml(items, ROOMS_YAML, "{}");
+        let result = from_yaml(items, ROOMS_YAML, "");
         assert!(result.is_err());
     }
 
@@ -484,7 +549,7 @@ mod integrity {
   - name: No Key Room
     visible_objects: []
     hidden_objects: []";
-        let result = from_yaml(ITEMS_YAML, rooms, "{}");
+        let result = from_yaml(ITEMS_YAML, rooms, "");
         assert!(result.is_err());
     }
 
@@ -492,7 +557,7 @@ mod integrity {
 
     #[test]
     fn world_data_with_no_rooms_is_an_error() {
-        let result = from_yaml(ITEMS_YAML, "rooms: []", "{}");
+        let result = from_yaml(ITEMS_YAML, "rooms: []", "");
         assert!(result.is_err());
     }
 }

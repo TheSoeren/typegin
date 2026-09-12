@@ -33,7 +33,7 @@ pub struct Object {
 /// a hidden door is simply an object living in the room's `hidden_objects`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoorState {
-    pub(crate) direction: Direction,
+    pub(crate) direction: Option<Direction>,
     pub(crate) to: RoomId,
     pub(crate) locked: bool,
 }
@@ -67,12 +67,17 @@ impl Object {
     /// Build a live [`Object`] from authored
     /// [`ObjectData`](crate::data::object_data::ObjectData).
     pub(crate) fn from_data(object: &object_data::ObjectData) -> Self {
-        let door = object.door.as_ref().and_then(|door_data| {
-            Direction::parse(&door_data.direction).map(|direction| DoorState {
+        let door = object.door.as_ref().map(|door_data| {
+            let direction = match &door_data.direction {
+                Some(data_direction) => Direction::parse(data_direction),
+                None => None,
+            };
+
+            DoorState {
                 direction,
                 to: door_data.to.clone().into(),
                 locked: door_data.locked,
-            })
+            }
         });
 
         Object {
@@ -106,7 +111,7 @@ pub struct ObjectInfo {
 /// Public, plain-data view of a door on a scene object.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoorInfo {
-    pub direction: Direction,
+    pub direction: Option<Direction>,
     pub to: RoomId,
     pub locked: bool,
 }
@@ -135,7 +140,7 @@ mod tests {
 
     fn object(id: &str, primary_name: &str, aliases: Vec<&str>) -> Object {
         Object {
-            id: ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: primary_name.to_string(),
             aliases: aliases.into_iter().map(String::from).collect(),
             kind: object_data::ObjectKind::Item,
@@ -180,7 +185,7 @@ mod tests {
         ];
         assert_eq!(
             Object::resolve_by_name(&objects, "shield"),
-            ObjectResolution::Found(ObjectId::new("shield"))
+            ObjectResolution::Found(crate::objectId!("shield"))
         );
     }
 
@@ -193,7 +198,7 @@ mod tests {
         assert_eq!(
             Object::resolve_by_name(&objects, "key"),
             ObjectResolution::Ambiguous {
-                ids: vec![ObjectId::new("iron-key"), ObjectId::new("brass-key")],
+                ids: vec![crate::objectId!("iron-key"), crate::objectId!("brass-key")],
                 alias: "key".to_string(),
             }
         );
@@ -202,12 +207,12 @@ mod tests {
     #[test]
     fn from_data_parses_a_valid_door_direction() {
         let data = object_data::ObjectData {
-            id: ObjectId::new("door"),
+            id: crate::objectId!("door"),
             primary_name: "door".to_string(),
             aliases: Vec::new(),
             kind: object_data::ObjectKind::Scene,
             door: Some(DoorData {
-                direction: "north".to_string(),
+                direction: Some("north".to_string()),
                 to: "corridor".to_string(),
                 locked: true,
             }),
@@ -215,34 +220,67 @@ mod tests {
         };
         let object = Object::from_data(&data);
         let door = object.door.expect("door state");
-        assert_eq!(door.direction, Direction::North);
-        assert_eq!(door.to, RoomId::new("corridor"));
+        assert_eq!(door.direction, Some(Direction::North));
+        assert_eq!(door.to, crate::roomId!("corridor"));
         assert!(door.locked);
     }
 
     #[test]
-    fn from_data_drops_door_state_for_an_unparsable_direction() {
+    fn from_data_with_no_direction_key_is_a_direction_less_door() {
+        // A point-and-click-only exit: no `direction:` in YAML at all, but
+        // still a fully-functional door (`to`/`locked` intact), reached by
+        // name via `Rules::on_go`'s `GoTarget::Named` path rather than
+        // `go <direction>`.
         let data = object_data::ObjectData {
-            id: ObjectId::new("door"),
+            id: crate::objectId!("hatch"),
+            primary_name: "hatch".to_string(),
+            aliases: Vec::new(),
+            kind: object_data::ObjectKind::Scene,
+            door: Some(DoorData {
+                direction: None,
+                to: "garden".to_string(),
+                locked: false,
+            }),
+            extra: HashMap::new(),
+        };
+        let object = Object::from_data(&data);
+        let door = object.door.expect("door state");
+        assert_eq!(door.direction, None);
+        assert_eq!(door.to, crate::roomId!("garden"));
+        assert!(!door.locked);
+    }
+
+    #[test]
+    fn from_data_treats_an_unparsable_direction_as_direction_less_not_as_no_door() {
+        // Previously a typo'd `direction:` string silently dropped the
+        // *entire* door (losing `to`/`locked` along with it, discarding an
+        // authoring mistake into a much more confusing one — an object that
+        // looks like a door in YAML but isn't one at runtime). Now that
+        // `direction` is optional, an unparsable one degrades no further
+        // than "no compass direction" — `to`/`locked` stay intact.
+        let data = object_data::ObjectData {
+            id: crate::objectId!("door"),
             primary_name: "door".to_string(),
             aliases: Vec::new(),
             kind: object_data::ObjectKind::Scene,
             door: Some(DoorData {
-                direction: "sideways".to_string(),
+                direction: Some("sideways".to_string()),
                 to: "corridor".to_string(),
                 locked: false,
             }),
             extra: HashMap::new(),
         };
         let object = Object::from_data(&data);
-        assert!(object.door.is_none());
+        let door = object.door.expect("door state");
+        assert_eq!(door.direction, None);
+        assert_eq!(door.to, crate::roomId!("corridor"));
     }
 
     #[test]
     fn object_info_from_object_mirrors_a_doorless_object() {
         let sword = object("sword", "sword", vec!["blade"]);
         let info = ObjectInfo::from_object(&sword);
-        assert_eq!(info.id, ObjectId::new("sword"));
+        assert_eq!(info.id, crate::objectId!("sword"));
         assert_eq!(info.name, "sword");
         assert_eq!(info.aliases, vec!["blade".to_string()]);
         assert_eq!(info.kind, object_data::ObjectKind::Item);
@@ -254,14 +292,14 @@ mod tests {
         let mut door = object("door", "door", vec![]);
         door.kind = object_data::ObjectKind::Scene;
         door.door = Some(DoorState {
-            direction: Direction::West,
-            to: RoomId::new("cellar"),
+            direction: Some(Direction::West),
+            to: crate::roomId!("cellar"),
             locked: true,
         });
         let info = ObjectInfo::from_object(&door);
         let door_info = info.door.expect("door info");
-        assert_eq!(door_info.direction, Direction::West);
-        assert_eq!(door_info.to, RoomId::new("cellar"));
+        assert_eq!(door_info.direction, Some(Direction::West));
+        assert_eq!(door_info.to, crate::roomId!("cellar"));
         assert!(door_info.locked);
     }
 }

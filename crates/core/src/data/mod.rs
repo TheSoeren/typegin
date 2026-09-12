@@ -84,6 +84,7 @@ impl WorldData {
 
         for room in &self.rooms {
             room.validate_references(self)?;
+            room.validate_unique_directions(self)?;
         }
 
         for object in &self.objects {

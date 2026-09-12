@@ -26,7 +26,7 @@ pub struct Room {
     /// Derived index: door direction → the scene object occupying it. Built
     /// from the room's door objects (visible + hidden) at construction; it is
     /// a cache for O(1) movement and door lookups, not a source of truth.
-    directions: HashMap<input::Direction, object::ObjectId>,
+    exits: HashMap<input::GoTarget, object::ObjectId>,
     extra: HashMap<String, data::ExtraValue>,
 }
 
@@ -38,16 +38,18 @@ impl Room {
         hidden_objects: Vec<object::Object>,
         extra: HashMap<String, data::ExtraValue>,
     ) -> Self {
-        let mut directions = HashMap::new();
+        let mut exits = HashMap::new();
         for object in objects.iter().chain(hidden_objects.iter()) {
-            if let Some(door) = &object.door {
-                directions.insert(door.direction, object.id.clone());
+            if let Some(door) = &object.door
+                && let Some(direction) = door.direction
+            {
+                exits.insert(input::GoTarget::Direction(direction), object.id.clone());
             }
         }
         Room {
             objects,
             hidden_objects,
-            directions,
+            exits,
             extra,
         }
     }
@@ -139,20 +141,17 @@ impl Room {
 /// Door state and exit queries.
 impl Room {
     /// The id of the scene object occupying `direction`, if any.
-    fn door_id(&self, direction: input::Direction) -> Option<object::ObjectId> {
-        self.directions.get(&direction).cloned()
+    fn door_id(&self, go_target: &input::GoTarget) -> Option<object::ObjectId> {
+        self.exits.get(&go_target).cloned()
     }
 
     /// The door object occupying `direction`, if any (visible or hidden).
-    fn door_in_direction(&self, direction: input::Direction) -> Option<&object::Object> {
-        self.door_id(direction).and_then(|id| self.find_any(&id))
+    fn door_by_target(&self, go_target: &input::GoTarget) -> Option<&object::Object> {
+        self.door_id(&go_target).and_then(|id| self.find_any(&id))
     }
 
-    fn door_in_direction_mut(
-        &mut self,
-        direction: input::Direction,
-    ) -> Option<&mut object::Object> {
-        let id = self.door_id(direction)?;
+    fn door_by_target_mut(&mut self, go_target: &input::GoTarget) -> Option<&mut object::Object> {
+        let id = self.door_id(&go_target)?;
         self.find_any_mut(&id)
     }
 
@@ -162,129 +161,121 @@ impl Room {
     /// `None` (exactly as if no exit were present).
     pub(crate) fn get_room_id_by_exit_direction(
         &self,
-        direction: input::Direction,
+        go_target: &input::GoTarget,
     ) -> Option<RoomId> {
-        let door = self.door_in_direction(direction)?;
+        let door = self.door_by_target(&go_target)?;
         let state = door.door.as_ref()?;
-        if state.locked || self.is_exit_hidden(direction) {
+        if state.locked || self.is_exit_hidden(&go_target) {
             None
         } else {
             Some(state.to.clone())
         }
     }
 
-    pub(crate) fn is_exit_locked(&self, direction: input::Direction) -> bool {
-        self.door_in_direction(direction)
+    pub(crate) fn is_exit_locked(&self, go_target: &input::GoTarget) -> bool {
+        self.door_by_target(&go_target)
             .is_some_and(|object| object.door.as_ref().is_some_and(|door| door.locked))
     }
 
     /// Whether the door in `direction` is hidden: it exists, but lives in the
     /// room's `hidden_objects` until revealed.
-    pub(crate) fn is_exit_hidden(&self, direction: input::Direction) -> bool {
-        self.door_id(direction)
+    pub(crate) fn is_exit_hidden(&self, go_target: &input::GoTarget) -> bool {
+        self.door_id(&go_target)
             .is_some_and(|id| self.hidden_objects.iter().any(|object| object.id == id))
     }
 
-    /// Directions leading to an *open* (passable) exit in this room.
+    /// Directions leading to a *visible*, *unlocked* exit in this room.
     pub(crate) fn exit_directions(&self) -> Vec<input::Direction> {
         DIRECTIONS
             .iter()
             .copied()
             .filter(|direction| {
-                self.door_in_direction(*direction).is_some()
-                    && !self.is_exit_locked(*direction)
-                    && !self.is_exit_hidden(*direction)
+                let target = input::GoTarget::Direction(*direction);
+                self.door_by_target(&target).is_some()
+                    && !self.is_exit_hidden(&target)
+                    && !self.is_exit_locked(&target)
             })
             .collect()
     }
 
     pub(crate) fn exit_extra(
         &self,
-        direction: input::Direction,
+        go_target: &input::GoTarget,
     ) -> Option<HashMap<String, data::ExtraValue>> {
-        self.door_in_direction(direction)
+        self.door_by_target(&go_target)
             .map(|object| object.extra.clone())
     }
 
     /// Public view of the door object in `direction`, if any (visible or hidden).
-    pub(crate) fn door_in_direction_info(
-        &self,
-        direction: input::Direction,
-    ) -> Option<object::ObjectInfo> {
-        self.door_in_direction(direction)
+    pub(crate) fn door_info(&self, go_target: &input::GoTarget) -> Option<object::ObjectInfo> {
+        self.door_by_target(&go_target)
             .map(object::ObjectInfo::from_object)
     }
 
     /// Lock the door in `direction` (no-op if there is none, or it is
     /// already locked).
-    pub(crate) fn lock_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
+    pub(crate) fn lock_exit(&mut self, go_target: input::GoTarget) -> input::GoTargetResolution {
         match self
-            .door_in_direction_mut(direction)
+            .door_by_target_mut(&go_target)
             .and_then(|object| object.door.as_mut())
         {
             Some(door) if !door.locked => {
                 door.locked = true;
-                input::DirectionResolution::Found(direction)
+                input::GoTargetResolution::Found(go_target)
             }
-            _ => input::DirectionResolution::NotFound,
+            _ => input::GoTargetResolution::NotFound,
         }
     }
 
     /// Unlock the door in `direction` (no-op if there is none, or it is
     /// already unlocked).
-    pub(crate) fn unlock_exit(
-        &mut self,
-        direction: input::Direction,
-    ) -> input::DirectionResolution {
+    pub(crate) fn unlock_exit(&mut self, go_target: input::GoTarget) -> input::GoTargetResolution {
         match self
-            .door_in_direction_mut(direction)
+            .door_by_target_mut(&go_target)
             .and_then(|object| object.door.as_mut())
         {
             Some(door) if door.locked => {
                 door.locked = false;
-                input::DirectionResolution::Found(direction)
+                input::GoTargetResolution::Found(go_target)
             }
-            _ => input::DirectionResolution::NotFound,
+            _ => input::GoTargetResolution::NotFound,
         }
     }
 
     /// Hide the door in `direction` by moving its object out of the visible
     /// contents. Hidden-ness is list membership; the door object itself keeps
     /// its state.
-    pub(crate) fn hide_exit(&mut self, direction: input::Direction) -> input::DirectionResolution {
-        let Some(id) = self.door_id(direction) else {
-            return input::DirectionResolution::NotFound;
+    pub(crate) fn hide_exit(&mut self, go_target: input::GoTarget) -> input::GoTargetResolution {
+        let Some(id) = self.door_id(&go_target) else {
+            return input::GoTargetResolution::NotFound;
         };
-        if self.is_exit_hidden(direction) {
-            return input::DirectionResolution::NotFound;
+        if self.is_exit_hidden(&go_target) {
+            return input::GoTargetResolution::NotFound;
         }
         match self.remove_object(&id) {
             Some(object) => {
                 self.add_hidden_object(object);
-                input::DirectionResolution::Found(direction)
+                input::GoTargetResolution::Found(go_target)
             }
-            None => input::DirectionResolution::NotFound,
+            None => input::GoTargetResolution::NotFound,
         }
     }
 
     /// Reveal the hidden door in `direction` (no-op if there is none, or it
     /// is not hidden).
-    pub(crate) fn reveal_exit(
-        &mut self,
-        direction: input::Direction,
-    ) -> input::DirectionResolution {
-        let Some(id) = self.door_id(direction) else {
-            return input::DirectionResolution::NotFound;
+    pub(crate) fn reveal_exit(&mut self, go_target: input::GoTarget) -> input::GoTargetResolution {
+        let Some(id) = self.door_id(&go_target) else {
+            return input::GoTargetResolution::NotFound;
         };
-        if !self.is_exit_hidden(direction) {
-            return input::DirectionResolution::NotFound;
+        if !self.is_exit_hidden(&go_target) {
+            return input::GoTargetResolution::NotFound;
         }
         match self.remove_hidden_object(&id) {
             Some(object) => {
                 self.add_object(object);
-                input::DirectionResolution::Found(direction)
+                input::GoTargetResolution::Found(go_target)
             }
-            None => input::DirectionResolution::NotFound,
+            None => input::GoTargetResolution::NotFound,
         }
     }
 }
@@ -297,7 +288,7 @@ mod tests {
 
     fn item(id: &str) -> object::Object {
         Object {
-            id: object::ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: vec![format!("{id}-alias")],
             kind: ObjectKind::Item,
@@ -313,13 +304,31 @@ mod tests {
         locked: bool,
     ) -> object::Object {
         Object {
-            id: object::ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: Vec::new(),
             kind: ObjectKind::Scene,
             door: Some(DoorState {
-                direction,
-                to: RoomId::new(to),
+                direction: Some(direction),
+                to: crate::roomId!(to),
+                locked,
+            }),
+            extra: HashMap::new(),
+        }
+    }
+
+    /// A door with no compass direction at all — a point-and-click-only
+    /// exit, reached by name (`Rules::on_go`'s `GoTarget::Named` path) and
+    /// never by `go <direction>`.
+    fn door_object_no_direction(id: &str, to: &str, locked: bool) -> object::Object {
+        Object {
+            id: crate::objectId!(id),
+            primary_name: id.to_string(),
+            aliases: Vec::new(),
+            kind: ObjectKind::Scene,
+            door: Some(DoorState {
+                direction: None,
+                to: crate::roomId!(to),
                 locked,
             }),
             extra: HashMap::new(),
@@ -332,25 +341,60 @@ mod tests {
         let hidden = door_object("south-door", input::Direction::South, "c", false);
         let room = Room::new(vec![visible], vec![hidden], HashMap::new());
         assert_eq!(
-            room.door_id(input::Direction::North),
-            Some(object::ObjectId::new("north-door"))
+            room.door_id(&input::GoTarget::Direction(input::Direction::North)),
+            Some(crate::objectId!("north-door"))
         );
         assert_eq!(
-            room.door_id(input::Direction::South),
-            Some(object::ObjectId::new("south-door"))
+            room.door_id(&input::GoTarget::Direction(input::Direction::South)),
+            Some(crate::objectId!("south-door"))
         );
-        assert_eq!(room.door_id(input::Direction::East), None);
+        assert_eq!(
+            room.door_id(&input::GoTarget::Direction(input::Direction::East)),
+            None
+        );
+    }
+
+    #[test]
+    fn a_direction_less_door_occupies_no_compass_slot_but_stays_in_the_room() {
+        let hatch = door_object_no_direction("hatch", "garden", false);
+        let room = Room::new(vec![hatch], vec![], HashMap::new());
+
+        // Not reachable by any compass direction...
+        for direction in DIRECTIONS {
+            assert_eq!(room.door_id(&input::GoTarget::Direction(direction)), None);
+        }
+        assert_eq!(room.exit_directions(), Vec::new());
+
+        // ...but still an ordinary room object, findable by id like any
+        // other — `Rules::on_go`'s `GoTarget::Named` path reaches it via
+        // `WorldState::object_info`, not through this room's direction
+        // index at all.
+        assert!(room.holds(&crate::objectId!("hatch")));
+    }
+
+    #[test]
+    fn a_door_with_a_direction_and_one_without_can_share_a_room() {
+        let compass = door_object("north-door", input::Direction::North, "b", false);
+        let named_only = door_object_no_direction("hatch", "garden", false);
+        let room = Room::new(vec![compass, named_only], vec![], HashMap::new());
+
+        assert_eq!(
+            room.door_id(&input::GoTarget::Direction(input::Direction::North)),
+            Some(crate::objectId!("north-door"))
+        );
+        assert!(room.holds(&crate::objectId!("hatch")));
+        assert_eq!(room.exit_directions(), vec![input::Direction::North]);
     }
 
     #[test]
     fn get_object_only_finds_visible_objects() {
         let room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
         assert_eq!(
-            room.get_object(&object::ObjectId::new("sword")),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            room.get_object(&crate::objectId!("sword")),
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
-            room.get_object(&object::ObjectId::new("chest")),
+            room.get_object(&crate::objectId!("chest")),
             object::ObjectResolution::NotFound
         );
     }
@@ -360,11 +404,11 @@ mod tests {
         let room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
         assert_eq!(
             room.find_object("sword"),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
             room.find_object("sword-alias"),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
             room.find_object("chest"),
@@ -375,27 +419,27 @@ mod tests {
     #[test]
     fn holds_checks_only_the_visible_list() {
         let room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
-        assert!(room.holds(&object::ObjectId::new("sword")));
-        assert!(!room.holds(&object::ObjectId::new("chest")));
+        assert!(room.holds(&crate::objectId!("sword")));
+        assert!(!room.holds(&crate::objectId!("chest")));
     }
 
     #[test]
     fn find_any_searches_visible_and_hidden_objects() {
         let room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
-        assert!(room.find_any(&object::ObjectId::new("sword")).is_some());
-        assert!(room.find_any(&object::ObjectId::new("chest")).is_some());
-        assert!(room.find_any(&object::ObjectId::new("nope")).is_none());
+        assert!(room.find_any(&crate::objectId!("sword")).is_some());
+        assert!(room.find_any(&crate::objectId!("chest")).is_some());
+        assert!(room.find_any(&crate::objectId!("nope")).is_none());
     }
 
     #[test]
     fn find_any_mut_allows_mutating_a_hidden_object() {
         let mut room = Room::new(vec![], vec![item("chest")], HashMap::new());
         let object = room
-            .find_any_mut(&object::ObjectId::new("chest"))
+            .find_any_mut(&crate::objectId!("chest"))
             .expect("chest present");
         object.primary_name = "renamed chest".to_string();
         assert_eq!(
-            room.find_any(&object::ObjectId::new("chest"))
+            room.find_any(&crate::objectId!("chest"))
                 .unwrap()
                 .primary_name,
             "renamed chest"
@@ -407,50 +451,47 @@ mod tests {
         let mut room = Room::default();
         room.add_object(item("sword"));
         room.add_hidden_object(item("chest"));
-        assert!(room.holds(&object::ObjectId::new("sword")));
-        assert!(!room.holds(&object::ObjectId::new("chest")));
-        assert!(room.find_any(&object::ObjectId::new("chest")).is_some());
+        assert!(room.holds(&crate::objectId!("sword")));
+        assert!(!room.holds(&crate::objectId!("chest")));
+        assert!(room.find_any(&crate::objectId!("chest")).is_some());
     }
 
     #[test]
     fn remove_object_takes_it_out_of_the_visible_list_only() {
         let mut room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
-        assert!(
-            room.remove_object(&object::ObjectId::new("chest"))
-                .is_none()
-        );
-        let removed = room.remove_object(&object::ObjectId::new("sword"));
-        assert_eq!(removed.map(|o| o.id), Some(object::ObjectId::new("sword")));
-        assert!(!room.holds(&object::ObjectId::new("sword")));
+        assert!(room.remove_object(&crate::objectId!("chest")).is_none());
+        let removed = room.remove_object(&crate::objectId!("sword"));
+        assert_eq!(removed.map(|o| o.id), Some(crate::objectId!("sword")));
+        assert!(!room.holds(&crate::objectId!("sword")));
     }
 
     #[test]
     fn remove_hidden_object_takes_it_out_of_the_hidden_list_only() {
         let mut room = Room::new(vec![item("sword")], vec![item("chest")], HashMap::new());
         assert!(
-            room.remove_hidden_object(&object::ObjectId::new("sword"))
+            room.remove_hidden_object(&crate::objectId!("sword"))
                 .is_none()
         );
-        let removed = room.remove_hidden_object(&object::ObjectId::new("chest"));
-        assert_eq!(removed.map(|o| o.id), Some(object::ObjectId::new("chest")));
-        assert!(room.find_any(&object::ObjectId::new("chest")).is_none());
+        let removed = room.remove_hidden_object(&crate::objectId!("chest"));
+        assert_eq!(removed.map(|o| o.id), Some(crate::objectId!("chest")));
+        assert!(room.find_any(&crate::objectId!("chest")).is_none());
     }
 
     #[test]
     fn reveal_object_moves_a_hidden_object_to_visible() {
         let mut room = Room::new(vec![], vec![item("chest")], HashMap::new());
         assert_eq!(
-            room.reveal_object(&object::ObjectId::new("chest")),
-            object::ObjectResolution::Found(object::ObjectId::new("chest"))
+            room.reveal_object(&crate::objectId!("chest")),
+            object::ObjectResolution::Found(crate::objectId!("chest"))
         );
-        assert!(room.holds(&object::ObjectId::new("chest")));
+        assert!(room.holds(&crate::objectId!("chest")));
     }
 
     #[test]
     fn reveal_object_not_hidden_returns_not_found() {
         let mut room = Room::default();
         assert_eq!(
-            room.reveal_object(&object::ObjectId::new("nope")),
+            room.reveal_object(&crate::objectId!("nope")),
             object::ObjectResolution::NotFound
         );
     }
@@ -459,18 +500,18 @@ mod tests {
     fn hide_object_moves_a_visible_object_to_hidden() {
         let mut room = Room::new(vec![item("sword")], vec![], HashMap::new());
         assert_eq!(
-            room.hide_object(&object::ObjectId::new("sword")),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            room.hide_object(&crate::objectId!("sword")),
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
-        assert!(!room.holds(&object::ObjectId::new("sword")));
-        assert!(room.find_any(&object::ObjectId::new("sword")).is_some());
+        assert!(!room.holds(&crate::objectId!("sword")));
+        assert!(room.find_any(&crate::objectId!("sword")).is_some());
     }
 
     #[test]
     fn hide_object_not_visible_returns_not_found() {
         let mut room = Room::default();
         assert_eq!(
-            room.hide_object(&object::ObjectId::new("nope")),
+            room.hide_object(&crate::objectId!("nope")),
             object::ObjectResolution::NotFound
         );
     }
@@ -479,7 +520,9 @@ mod tests {
     fn get_room_id_by_exit_direction_none_when_no_door() {
         let room = Room::default();
         assert_eq!(
-            room.get_room_id_by_exit_direction(input::Direction::North),
+            room.get_room_id_by_exit_direction(&input::GoTarget::Direction(
+                input::Direction::North
+            )),
             None
         );
     }
@@ -489,14 +532,18 @@ mod tests {
         let locked = door_object("locked-door", input::Direction::North, "b", true);
         let room = Room::new(vec![locked], vec![], HashMap::new());
         assert_eq!(
-            room.get_room_id_by_exit_direction(input::Direction::North),
+            room.get_room_id_by_exit_direction(&input::GoTarget::Direction(
+                input::Direction::North
+            )),
             None
         );
 
         let hidden = door_object("hidden-door", input::Direction::South, "c", false);
         let room = Room::new(vec![], vec![hidden], HashMap::new());
         assert_eq!(
-            room.get_room_id_by_exit_direction(input::Direction::South),
+            room.get_room_id_by_exit_direction(&input::GoTarget::Direction(
+                input::Direction::South
+            )),
             None
         );
     }
@@ -506,8 +553,8 @@ mod tests {
         let open = door_object("open-door", input::Direction::East, "study", false);
         let room = Room::new(vec![open], vec![], HashMap::new());
         assert_eq!(
-            room.get_room_id_by_exit_direction(input::Direction::East),
-            Some(RoomId::new("study"))
+            room.get_room_id_by_exit_direction(&input::GoTarget::Direction(input::Direction::East)),
+            Some(crate::roomId!("study"))
         );
     }
 
@@ -516,9 +563,9 @@ mod tests {
         let locked = door_object("locked-door", input::Direction::North, "b", true);
         let unlocked = door_object("open-door", input::Direction::East, "b", false);
         let room = Room::new(vec![locked, unlocked], vec![], HashMap::new());
-        assert!(room.is_exit_locked(input::Direction::North));
-        assert!(!room.is_exit_locked(input::Direction::East));
-        assert!(!room.is_exit_locked(input::Direction::South));
+        assert!(room.is_exit_locked(&input::GoTarget::Direction(input::Direction::North)));
+        assert!(!room.is_exit_locked(&input::GoTarget::Direction(input::Direction::East)));
+        assert!(!room.is_exit_locked(&input::GoTarget::Direction(input::Direction::South)));
     }
 
     #[test]
@@ -526,8 +573,8 @@ mod tests {
         let visible = door_object("open-door", input::Direction::East, "b", false);
         let hidden = door_object("hidden-door", input::Direction::North, "b", false);
         let room = Room::new(vec![visible], vec![hidden], HashMap::new());
-        assert!(room.is_exit_hidden(input::Direction::North));
-        assert!(!room.is_exit_hidden(input::Direction::East));
+        assert!(room.is_exit_hidden(&input::GoTarget::Direction(input::Direction::North)));
+        assert!(!room.is_exit_hidden(&input::GoTarget::Direction(input::Direction::East)));
     }
 
     #[test]
@@ -549,14 +596,23 @@ mod tests {
         let mut open = door_object("open-door", input::Direction::East, "b", false);
         open.extra = extra.clone();
         let room = Room::new(vec![open], vec![], HashMap::new());
-        assert_eq!(room.exit_extra(input::Direction::East), Some(extra));
-        assert_eq!(room.exit_extra(input::Direction::North), None);
+        assert_eq!(
+            room.exit_extra(&input::GoTarget::Direction(input::Direction::East)),
+            Some(extra)
+        );
+        assert_eq!(
+            room.exit_extra(&input::GoTarget::Direction(input::Direction::North)),
+            None
+        );
     }
 
     #[test]
     fn door_in_direction_info_returns_none_for_a_missing_direction() {
         let room = Room::default();
-        assert_eq!(room.door_in_direction_info(input::Direction::North), None);
+        assert_eq!(
+            room.door_info(&input::GoTarget::Direction(input::Direction::North)),
+            None
+        );
     }
 
     #[test]
@@ -564,13 +620,13 @@ mod tests {
         let open = door_object("open-door", input::Direction::East, "b", false);
         let mut room = Room::new(vec![open], vec![], HashMap::new());
         assert_eq!(
-            room.lock_exit(input::Direction::East),
-            input::DirectionResolution::Found(input::Direction::East)
+            room.lock_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::Found(input::GoTarget::Direction(input::Direction::East))
         );
-        assert!(room.is_exit_locked(input::Direction::East));
+        assert!(room.is_exit_locked(&input::GoTarget::Direction(input::Direction::East)));
         assert_eq!(
-            room.lock_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.lock_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -578,8 +634,8 @@ mod tests {
     fn lock_exit_missing_direction_is_not_found() {
         let mut room = Room::default();
         assert_eq!(
-            room.lock_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.lock_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -588,13 +644,13 @@ mod tests {
         let locked = door_object("locked-door", input::Direction::East, "b", true);
         let mut room = Room::new(vec![locked], vec![], HashMap::new());
         assert_eq!(
-            room.unlock_exit(input::Direction::East),
-            input::DirectionResolution::Found(input::Direction::East)
+            room.unlock_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::Found(input::GoTarget::Direction(input::Direction::East))
         );
-        assert!(!room.is_exit_locked(input::Direction::East));
+        assert!(!room.is_exit_locked(&input::GoTarget::Direction(input::Direction::East)));
         assert_eq!(
-            room.unlock_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.unlock_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -603,13 +659,13 @@ mod tests {
         let open = door_object("open-door", input::Direction::East, "b", false);
         let mut room = Room::new(vec![open], vec![], HashMap::new());
         assert_eq!(
-            room.hide_exit(input::Direction::East),
-            input::DirectionResolution::Found(input::Direction::East)
+            room.hide_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::Found(input::GoTarget::Direction(input::Direction::East))
         );
-        assert!(room.is_exit_hidden(input::Direction::East));
+        assert!(room.is_exit_hidden(&input::GoTarget::Direction(input::Direction::East)));
         assert_eq!(
-            room.hide_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.hide_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -617,8 +673,8 @@ mod tests {
     fn hide_exit_missing_direction_is_not_found() {
         let mut room = Room::default();
         assert_eq!(
-            room.hide_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.hide_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -627,13 +683,13 @@ mod tests {
         let hidden = door_object("hidden-door", input::Direction::East, "b", false);
         let mut room = Room::new(vec![], vec![hidden], HashMap::new());
         assert_eq!(
-            room.reveal_exit(input::Direction::East),
-            input::DirectionResolution::Found(input::Direction::East)
+            room.reveal_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::Found(input::GoTarget::Direction(input::Direction::East))
         );
-        assert!(!room.is_exit_hidden(input::Direction::East));
+        assert!(!room.is_exit_hidden(&input::GoTarget::Direction(input::Direction::East)));
         assert_eq!(
-            room.reveal_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.reveal_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 
@@ -641,8 +697,8 @@ mod tests {
     fn reveal_exit_missing_direction_is_not_found() {
         let mut room = Room::default();
         assert_eq!(
-            room.reveal_exit(input::Direction::East),
-            input::DirectionResolution::NotFound
+            room.reveal_exit(input::GoTarget::Direction(input::Direction::East)),
+            input::GoTargetResolution::NotFound
         );
     }
 }

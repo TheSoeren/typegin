@@ -1,6 +1,8 @@
 use serde::Deserialize;
 use std::fmt;
 
+use crate::input::GoTarget;
+
 /// A compass direction the player can move in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -21,9 +23,9 @@ pub enum Direction {
 /// copy of the one passed in), signalling success; [`NotFound`](Self::NotFound)
 /// means no exit was present to act on.
 #[derive(Debug, PartialEq, Eq)]
-pub enum DirectionResolution {
+pub enum GoTargetResolution {
     /// An exit was present in `direction` and was revealed/hidden.
-    Found(Direction),
+    Found(GoTarget),
     /// There was no exit in that direction to act on.
     NotFound,
 }

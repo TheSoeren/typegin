@@ -76,7 +76,7 @@ impl NpcData {
 
         for (node_id, node) in &self.dialogue.nodes {
             for choice in &node.choices {
-                if choice.next != DialogueNodeId::new(".end")
+                if choice.next != crate::dialogueNodeId!(".end")
                     && !self.dialogue.nodes.contains_key(&choice.next)
                 {
                     return Err(WorldDataError::Validation(format!(

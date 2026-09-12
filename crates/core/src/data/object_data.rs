@@ -6,7 +6,6 @@ use crate::data::ExtraValue;
 use crate::data::door_data::DoorData;
 use crate::data::{WorldData, WorldDataError};
 use crate::keys::object_id::ObjectId;
-use crate::keys::room_id::RoomId;
 
 /// The two object kinds of the Visionaire model:
 ///
@@ -48,7 +47,7 @@ impl ObjectData {
     /// Returns a [`WorldDataError::Validation`] naming the first unknown key.
     pub(crate) fn validate_references(&self, data: &WorldData) -> Result<(), WorldDataError> {
         if let Some(door) = &self.door {
-            data.find_room(&RoomId::new(&door.to)).ok_or_else(|| {
+            data.find_room(&crate::roomId!(&door.to)).ok_or_else(|| {
                 WorldDataError::Validation(format!(
                     "door `{}` references unknown room key `{}`",
                     self.id, door.to

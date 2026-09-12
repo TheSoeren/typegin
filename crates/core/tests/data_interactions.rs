@@ -3,8 +3,8 @@ mod common;
 use core::ActionContext;
 use core::{
     DataCondition, DataEffect, DataTarget, Direction, Event, GameEngine, Interaction,
-    InteractionData, ObjectId, ObjectResolution, RoomId, Rules, Target, TargetFilter, TargetKind,
-    Verb, WorldData, WorldDataError, WorldState,
+    InteractionData, ObjectResolution, Rules, Target, TargetFilter, TargetKind, Verb, WorldData,
+    WorldDataError, WorldState,
 };
 
 use common::{
@@ -17,7 +17,7 @@ fn iron_key_in_study(engine: &mut GameEngine) {
     assert_eq!(
         engine.handle_input("take iron key"),
         vec![Event::Took {
-            object_id: ObjectId::new("iron-key"),
+            object_id: core::objectId!("iron-key"),
             object: "iron key".to_string(),
         }]
     );
@@ -25,6 +25,8 @@ fn iron_key_in_study(engine: &mut GameEngine) {
 }
 
 mod parse {
+    use core::input::GoTarget;
+
     use super::*;
 
     #[test]
@@ -56,16 +58,16 @@ mod parse {
             vec![
                 InteractionData {
                     verb: Verb::Use,
-                    item: Some(ObjectId::new("iron-key")),
+                    item: Some(core::objectId!("iron-key")),
                     target: Some(DataTarget::Kind {
                         kind: TargetKind::Scene
                     }),
                     condition: vec![
                         DataCondition::Room {
-                            room: RoomId::new("study")
+                            room: core::roomId!("study")
                         },
                         DataCondition::ExitLocked {
-                            exit_locked: Direction::East
+                            exit_locked: GoTarget::Direction(Direction::East)
                         },
                         DataCondition::IsDoor { is_door: true },
                     ],
@@ -74,24 +76,24 @@ mod parse {
                             emit: "door-unlocked".to_string()
                         },
                         DataEffect::UnlockExit {
-                            unlock_exit: Direction::East
+                            unlock_exit: GoTarget::Direction(Direction::East)
                         },
                     ],
                 },
                 InteractionData {
                     verb: Verb::Take,
-                    item: Some(ObjectId::new("stale-bread")),
+                    item: Some(core::objectId!("stale-bread")),
                     target: None,
                     condition: vec![],
                     effect: vec![
                         DataEffect::Take {
-                            take: ObjectId::new("stale-bread")
+                            take: core::objectId!("stale-bread")
                         },
                         DataEffect::Drop {
-                            drop: ObjectId::new("stale-bread")
+                            drop: core::objectId!("stale-bread")
                         },
                         DataEffect::RevealObject {
-                            reveal_object: ObjectId::new("stale-bread")
+                            reveal_object: core::objectId!("stale-bread")
                         },
                     ],
                 },
@@ -99,7 +101,7 @@ mod parse {
                     verb: Verb::Examine,
                     item: None,
                     target: Some(DataTarget::Object {
-                        object: ObjectId::new("rusty-lamp")
+                        object: core::objectId!("rusty-lamp")
                     }),
                     condition: vec![],
                     effect: vec![],
@@ -134,10 +136,10 @@ mod parse {
             interaction.effect,
             vec![
                 DataEffect::Grant {
-                    grant: ObjectId::new("rusty-nail"),
+                    grant: core::objectId!("rusty-nail"),
                 },
                 DataEffect::Discard {
-                    discard: ObjectId::new("rusty-nail"),
+                    discard: core::objectId!("rusty-nail"),
                 },
             ]
         );
@@ -159,6 +161,8 @@ mod parse {
 }
 
 mod dispatch {
+    use core::input::GoTarget;
+
     use super::*;
 
     #[test]
@@ -175,19 +179,25 @@ mod dispatch {
     - emit: door-unlocked",
         );
         iron_key_in_study(&mut engine);
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
             vec![
-                Event::UnlockedExit {
-                    direction: Direction::East
-                },
+                Event::UnlockedExit(GoTarget::Direction(Direction::East)),
                 Event::Custom {
                     name: "door-unlocked".to_string()
                 },
             ]
         );
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
     }
 
     #[test]
@@ -208,7 +218,11 @@ mod dispatch {
             }]
         );
         // The lock stays: the stock UnlockedExit never ran.
-        assert!(engine.world().is_exit_locked(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
     }
 
     #[test]
@@ -268,7 +282,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
@@ -292,7 +306,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take rusty lamp"),
             vec![Event::Took {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
             }]
         );
@@ -308,9 +322,9 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("use rusty lamp on iron key"),
             vec![Event::Used {
-                object_id: ObjectId::new("rusty-lamp"),
+                object_id: core::objectId!("rusty-lamp"),
                 object: "rusty lamp".to_string(),
-                target_id: Some(Target::Object(ObjectId::new("iron-key"))),
+                target_id: Some(Target::Object(core::objectId!("iron-key"))),
                 target: Some("iron key".to_string()),
             }]
         );
@@ -330,7 +344,7 @@ mod dispatch {
         assert_eq!(
             in_cellar.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -371,7 +385,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine oak door"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("oak-door")),
+                target: Target::Object(core::objectId!("oak-door")),
                 target_name: "oak door".to_string(),
             }]
         );
@@ -379,9 +393,7 @@ mod dispatch {
         // Unlock, and the beat fires.
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
+            vec![Event::UnlockedExit(GoTarget::Direction(Direction::East))]
         );
         assert_eq!(
             engine.handle_input("examine oak door"),
@@ -433,7 +445,7 @@ mod dispatch {
         assert_eq!(engine.handle_input("look"), vec![Event::Looked]);
         assert_eq!(
             engine.handle_input("go north"),
-            vec![Event::Went(Direction::North)]
+            vec![Event::Went(GoTarget::Direction(Direction::North))]
         );
         // But the query still reports both verbs, in declaration order.
         let listed = engine.interactions_for(None, None);
@@ -444,7 +456,7 @@ mod dispatch {
 }
 
 mod effects {
-    use core::world::object::TargetResolution;
+    use core::{input::GoTarget, world::object::TargetResolution};
 
     use super::*;
 
@@ -458,14 +470,22 @@ mod effects {
     - reveal_exit: north",
         );
         enter_study(&mut engine);
-        assert!(engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
 
         // The effect runs silently — no stock Examined, no Custom beat.
         assert_eq!(engine.handle_input("examine oak door"), vec![]);
-        assert!(!engine.world().is_exit_hidden(Direction::North));
+        assert!(
+            !engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::North))
+        );
         assert_eq!(
             engine.world().resolve_target("secret passage"),
-            TargetResolution::Found(Target::Object(ObjectId::new("secret-passage")))
+            TargetResolution::Found(Target::Object(core::objectId!("secret-passage")))
         );
     }
 
@@ -481,7 +501,7 @@ mod effects {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -492,12 +512,12 @@ mod effects {
                     name: "key-discarded".to_string()
                 },
                 Event::Dropped {
-                    object_id: ObjectId::new("iron-key"),
+                    object_id: core::objectId!("iron-key"),
                     object: "iron key".to_string(),
                 },
             ]
         );
-        assert!(!engine.world().player_holds(&ObjectId::new("iron-key")));
+        assert!(!engine.world().player_holds(&core::objectId!("iron-key")));
         assert!(
             engine
                 .world()
@@ -520,15 +540,29 @@ mod effects {
     - hide_exit: east",
         );
         iron_key_in_study(&mut engine);
-        engine.world_mut().unlock_exit(Direction::East);
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        engine
+            .world_mut()
+            .unlock_exit(GoTarget::Direction(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
 
         assert_eq!(engine.handle_input("use iron key on oak door"), vec![]);
-        assert!(engine.world().is_exit_locked(Direction::East));
-        assert!(engine.world().is_exit_hidden(Direction::East));
+        assert!(
+            engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
+        assert!(
+            engine
+                .world()
+                .is_exit_hidden(&GoTarget::Direction(Direction::East))
+        );
         assert_eq!(
             engine.handle_input("go east"),
-            vec![Event::WentExitHidden(Direction::East)]
+            vec![Event::WentExitHidden(GoTarget::Direction(Direction::East))]
         );
     }
 
@@ -545,7 +579,7 @@ mod effects {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -554,11 +588,11 @@ mod effects {
         assert_eq!(
             engine.handle_input("use iron key on cellar stairs"),
             vec![Event::Granted {
-                object_id: ObjectId::new("rusty-nail"),
+                object_id: core::objectId!("rusty-nail"),
                 object: "rusty nail".to_string(),
             }]
         );
-        assert!(engine.world().player_holds(&ObjectId::new("rusty-nail")));
+        assert!(engine.world().player_holds(&core::objectId!("rusty-nail")));
         assert!(
             !engine
                 .world()
@@ -581,14 +615,14 @@ mod effects {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
@@ -624,18 +658,18 @@ mod effects {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
         assert_eq!(
             engine.handle_input("use iron key on cellar stairs"),
             vec![Event::Discarded {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
-        assert!(!engine.world().player_holds(&ObjectId::new("iron-key")));
+        assert!(!engine.world().player_holds(&core::objectId!("iron-key")));
         assert!(
             !engine
                 .world()
@@ -664,7 +698,7 @@ mod effects {
         assert_eq!(
             engine.handle_input("take brass key"),
             vec![Event::Took {
-                object_id: ObjectId::new("brass-key"),
+                object_id: core::objectId!("brass-key"),
                 object: "brass key".to_string(),
             }]
         );
@@ -676,7 +710,7 @@ mod effects {
         // iron-key stayed in the cellar; it was not consumed from the room.
         assert_eq!(
             engine.world().resolve_target("iron key"),
-            TargetResolution::Found(Target::Object(ObjectId::new("iron-key")))
+            TargetResolution::Found(Target::Object(core::objectId!("iron-key")))
         );
     }
 }
@@ -709,7 +743,7 @@ mod precedence_and_rules {
         let world = world_with(DATA_WINS_YAML);
         let closure = vec![Interaction::build(
             Verb::Use,
-            Some(ObjectId::new("iron-key")),
+            Some(core::objectId!("iron-key")),
             TargetFilter::Kind(TargetKind::Scene),
             Some(Box::new(|world: &WorldState, context: &ActionContext| {
                 context
@@ -788,8 +822,8 @@ mod interactions_for {
         let mut engine = engine_with(QUERY_USE_YAML);
         iron_key_in_study(&mut engine);
         let listed = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(listed.len(), 1);
         assert_eq!(listed[0].verb(), Verb::Use);
@@ -797,8 +831,8 @@ mod interactions_for {
         assert!(
             engine
                 .interactions_for(
-                    Some(ObjectId::new("brass-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
+                    Some(core::objectId!("brass-key")),
+                    Some(Target::Object(core::objectId!("oak-door")))
                 )
                 .is_empty()
         );
@@ -825,11 +859,11 @@ mod interactions_for {
         // item-agnostic closure interaction, and both are reported: the
         // closure's `item: None` matches any carried item, including this one.
         let listed = engine.interactions_for(
-            Some(ObjectId::new("iron-key")),
-            Some(Target::Object(ObjectId::new("oak-door"))),
+            Some(core::objectId!("iron-key")),
+            Some(Target::Object(core::objectId!("oak-door"))),
         );
         assert_eq!(listed.len(), 2);
-        assert_eq!(listed[0].item(), Some(ObjectId::new("iron-key")));
+        assert_eq!(listed[0].item(), Some(core::objectId!("iron-key")));
         assert_eq!(listed[1].item(), None);
     }
 }

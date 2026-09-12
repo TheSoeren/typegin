@@ -49,7 +49,7 @@
 
 mod common;
 
-use core::{DataCondition, DataEffect, Direction, Event, GameEngine, ObjectId, Target, WorldData};
+use core::{DataCondition, DataEffect, Direction, Event, GameEngine, GoTarget, Target, WorldData};
 
 use common::{
     KEYED_WORLD_YAML, base_world, engine_with_interactions as engine_with, enter_study, merge_yaml,
@@ -210,7 +210,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -218,7 +218,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -230,7 +230,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -252,7 +252,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -278,7 +278,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -303,7 +303,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -319,7 +319,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -340,7 +340,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -348,7 +348,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -357,7 +357,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -386,7 +386,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -395,7 +395,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("examine iron key"),
             vec![Event::Examined {
-                target: Target::Object(ObjectId::new("iron-key")),
+                target: Target::Object(core::objectId!("iron-key")),
                 target_name: "iron key".to_string(),
             }]
         );
@@ -425,7 +425,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -453,7 +453,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -497,7 +497,7 @@ mod dispatch {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );
@@ -510,16 +510,20 @@ mod dispatch {
             }]
         );
         // Reset the lock for the next attempt
-        engine.world_mut().lock_exit(Direction::East);
+        engine
+            .world_mut()
+            .lock_exit(GoTarget::Direction(Direction::East));
         engine.world_mut().set_flag("override-stock");
         // Flag set → data interaction fires instead of stock
         assert_eq!(
             engine.handle_input("use iron key on oak door"),
-            vec![Event::UnlockedExit {
-                direction: Direction::East
-            }]
+            vec![Event::UnlockedExit(GoTarget::Direction(Direction::East))]
         );
-        assert!(!engine.world().is_exit_locked(Direction::East));
+        assert!(
+            !engine
+                .world()
+                .is_exit_locked(&GoTarget::Direction(Direction::East))
+        );
     }
 }
 
@@ -536,14 +540,14 @@ mod interactions_for {
         // Flag not set → query returns nothing
         assert!(
             engine
-                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
+                .interactions_for(None, Some(Target::Object(core::objectId!("iron-key"))))
                 .is_empty()
         );
         // Set the flag → query returns the interaction
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
-                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
+                .interactions_for(None, Some(Target::Object(core::objectId!("iron-key"))))
                 .len(),
             1
         );
@@ -555,7 +559,7 @@ mod interactions_for {
         engine.world_mut().set_flag("query-gate");
         assert_eq!(
             engine
-                .interactions_for(None, Some(Target::Object(ObjectId::new("iron-key"))))
+                .interactions_for(None, Some(Target::Object(core::objectId!("iron-key"))))
                 .len(),
             1
         );
@@ -563,8 +567,8 @@ mod interactions_for {
         assert!(
             engine
                 .interactions_for(
-                    Some(ObjectId::new("iron-key")),
-                    Some(Target::Object(ObjectId::new("oak-door")))
+                    Some(core::objectId!("iron-key")),
+                    Some(Target::Object(core::objectId!("oak-door")))
                 )
                 .is_empty()
         );
@@ -603,7 +607,7 @@ mod initial_flags {
         assert_eq!(
             engine.handle_input("take iron key"),
             vec![Event::Took {
-                object_id: ObjectId::new("iron-key"),
+                object_id: core::objectId!("iron-key"),
                 object: "iron key".to_string(),
             }]
         );

@@ -57,7 +57,7 @@ mod tests {
 
     fn item(id: &str) -> object::Object {
         object::Object {
-            id: object::ObjectId::new(id),
+            id: crate::objectId!(id),
             primary_name: id.to_string(),
             aliases: vec![format!("{id}-alias")],
             kind: ObjectKind::Item,
@@ -76,7 +76,7 @@ mod tests {
     fn add_object_makes_it_held() {
         let mut player = Player::new();
         player.add_object(item("sword"));
-        assert!(player.holds(&object::ObjectId::new("sword")));
+        assert!(player.holds(&crate::objectId!("sword")));
         assert_eq!(player.objects().len(), 1);
     }
 
@@ -85,11 +85,11 @@ mod tests {
         let mut player = Player::new();
         player.add_object(item("sword"));
         assert_eq!(
-            player.get_object(&object::ObjectId::new("sword")),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            player.get_object(&crate::objectId!("sword")),
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
-            player.get_object(&object::ObjectId::new("shield")),
+            player.get_object(&crate::objectId!("shield")),
             object::ObjectResolution::NotFound
         );
     }
@@ -99,16 +99,10 @@ mod tests {
         let mut player = Player::new();
         player.add_object(item("sword"));
         assert_eq!(
-            player
-                .find_by_id(&object::ObjectId::new("sword"))
-                .map(|o| &o.id),
-            Some(&object::ObjectId::new("sword"))
+            player.find_by_id(&crate::objectId!("sword")).map(|o| &o.id),
+            Some(&crate::objectId!("sword"))
         );
-        assert!(
-            player
-                .find_by_id(&object::ObjectId::new("shield"))
-                .is_none()
-        );
+        assert!(player.find_by_id(&crate::objectId!("shield")).is_none());
     }
 
     #[test]
@@ -117,11 +111,11 @@ mod tests {
         player.add_object(item("sword"));
         assert_eq!(
             player.find_object("sword"),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
             player.find_object("sword-alias"),
-            object::ObjectResolution::Found(object::ObjectId::new("sword"))
+            object::ObjectResolution::Found(crate::objectId!("sword"))
         );
         assert_eq!(
             player.find_object("shield"),
@@ -132,27 +126,23 @@ mod tests {
     #[test]
     fn holds_is_false_before_adding_and_true_after() {
         let mut player = Player::new();
-        assert!(!player.holds(&object::ObjectId::new("sword")));
+        assert!(!player.holds(&crate::objectId!("sword")));
         player.add_object(item("sword"));
-        assert!(player.holds(&object::ObjectId::new("sword")));
+        assert!(player.holds(&crate::objectId!("sword")));
     }
 
     #[test]
     fn remove_object_takes_it_out_of_the_inventory() {
         let mut player = Player::new();
         player.add_object(item("sword"));
-        let removed = player.remove_object(&object::ObjectId::new("sword"));
-        assert_eq!(removed.map(|o| o.id), Some(object::ObjectId::new("sword")));
-        assert!(!player.holds(&object::ObjectId::new("sword")));
+        let removed = player.remove_object(&crate::objectId!("sword"));
+        assert_eq!(removed.map(|o| o.id), Some(crate::objectId!("sword")));
+        assert!(!player.holds(&crate::objectId!("sword")));
     }
 
     #[test]
     fn remove_object_not_held_returns_none() {
         let mut player = Player::new();
-        assert!(
-            player
-                .remove_object(&object::ObjectId::new("sword"))
-                .is_none()
-        );
+        assert!(player.remove_object(&crate::objectId!("sword")).is_none());
     }
 }

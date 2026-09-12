@@ -1,9 +1,42 @@
+use std::collections::HashSet;
+
 use crate::data::interactions_data::DataEffect;
-use crate::input::action;
+use crate::input::{GoTarget, action};
 use crate::interaction::{ActionContext, Interaction, Verb, dispatch_data};
 use crate::world::object::{ObjectResolution, TargetResolution};
 use crate::{Event, event, object_data};
-use crate::{Target, world};
+use crate::{NpcId, ObjectId, Target, world};
+
+/// Move the player through the door object `id` (a resolved target already
+/// known to be present): locked, or entered.
+///
+/// Shared by [`Rules::on_go`]'s [`GoTarget::Named`] and [`GoTarget::Id`] arms
+/// — both eventually reduce to "I have a door's id in scope, act on it,"
+/// they just differ in how they got there (name resolution vs. a caller
+/// supplying the id directly).
+fn enter_door(world: &mut world::WorldState, id: ObjectId, name: String) -> Vec<event::Event> {
+    if !world.object_is_door(&id) {
+        return vec![event::Event::CantEnter { target: name }];
+    }
+    let door = world
+        .object_info(&id)
+        .and_then(|info| info.door)
+        .expect("object_is_door confirmed door data is present");
+    if door.locked {
+        vec![event::Event::EnteredExitLocked {
+            object_id: id,
+            object: name,
+        }]
+    } else {
+        match world.move_to_room(door.to) {
+            action::Outcome::Success => vec![event::Event::Entered {
+                object_id: id,
+                object: name,
+            }],
+            action::Outcome::Fail => vec![event::Event::EnteredTargetNotFound { target: name }],
+        }
+    }
+}
 
 mod basic;
 
@@ -36,27 +69,57 @@ pub trait Rules {
         vec![event::Event::Looked]
     }
 
-    /// Decide what happens when the player moves in a direction.
+    /// Decide what happens when the player moves in a direction, enters a
+    /// named/clicked exit, or enters a door referenced directly by id.
     ///
-    /// The default refuses a locked exit (`WentExitLocked`), reports a hidden
-    /// one via `WentExitHidden` (how that reads to the player is the
-    /// consumer's call), and otherwise follows the door.
-    fn on_go(
-        &mut self,
-        world: &mut world::WorldState,
-        direction: crate::input::Direction,
-    ) -> Vec<event::Event> {
-        if world.is_exit_hidden(direction) {
-            vec![event::Event::WentExitHidden(direction)]
-        } else if world.is_exit_locked(direction) {
-            vec![event::Event::WentExitLocked(direction)]
-        } else {
-            match world.get_room_id_by_exit_direction(direction) {
-                Some(room_id) => match world.move_to_room(room_id) {
-                    action::Outcome::Success => vec![event::Event::Went(direction)],
-                    action::Outcome::Fail => vec![event::Event::WentInvalidDirection(direction)],
-                },
-                None => vec![event::Event::WentInvalidDirection(direction)],
+    /// `GoTarget::Direction` refuses a locked exit (`WentExitLocked`),
+    /// reports a hidden one via `WentExitHidden` (how that reads to the
+    /// player is the consumer's call), and otherwise follows the door.
+    ///
+    /// `GoTarget::Named` and `GoTarget::Id` reach doors that have no compass
+    /// direction at all (or any door, by a point-and-click front-end that
+    /// already has its id) — full name/id resolution against everything in
+    /// scope (objects and NPCs), so entering an NPC or a non-door object is
+    /// reported distinctly (`CantEnter`) from no such target at all.
+    fn on_go(&mut self, world: &mut world::WorldState, target: GoTarget) -> Vec<event::Event> {
+        match target {
+            GoTarget::Direction(_) => {
+                if world.is_exit_hidden(&target) {
+                    vec![event::Event::WentExitHidden(target)]
+                } else if world.is_exit_locked(&target) {
+                    vec![event::Event::WentExitLocked(target)]
+                } else {
+                    match world.get_room_id_by_go_target(&target) {
+                        Some(room_id) => match world.move_to_room(room_id) {
+                            action::Outcome::Success => vec![event::Event::Went(target)],
+                            action::Outcome::Fail => vec![event::Event::WentExitNotFound(target)],
+                        },
+                        None => vec![event::Event::WentExitNotFound(target)],
+                    }
+                }
+            }
+            GoTarget::Named(name) => match world.resolve_target(&name) {
+                TargetResolution::Found(Target::Object(id)) => enter_door(world, id, name),
+                TargetResolution::Found(Target::Npc(_)) => {
+                    vec![event::Event::CantEnter { target: name }]
+                }
+                TargetResolution::Ambiguous { ids, alias } => {
+                    vec![event::Event::EnteredTargetAmbiguous {
+                        target_ids: ids,
+                        target: alias,
+                    }]
+                }
+                TargetResolution::NotFound => {
+                    vec![event::Event::EnteredTargetNotFound { target: name }]
+                }
+            },
+            GoTarget::Id(id) => {
+                let name = world.object_display_name(&id);
+                if world.target_in_scope(&id) {
+                    enter_door(world, id, name)
+                } else {
+                    vec![event::Event::EnteredTargetNotFound { target: name }]
+                }
             }
         }
     }
@@ -274,12 +337,20 @@ pub trait Rules {
         }
     }
 
-    /// Decide what happens when the player talks to an NPC by name.
+    /// Decide what happens when the player talks to an NPC (already resolved
+    /// to `npc_id` by name or by a caller-supplied id; `name` is the display
+    /// name to attribute to a not-found event).
     ///
     /// Start (or advance) the NPC's conversation: show the current dialogue
     /// node, and end the conversation when the node has no choices.
-    fn on_talk(&mut self, world: &mut world::WorldState, name: &str) -> Vec<event::Event> {
-        let Some(npc) = world.resolve_npc(name) else {
+    fn on_talk(
+        &mut self,
+        world: &mut world::WorldState,
+        name: &str,
+        npc_id: Option<NpcId>,
+    ) -> Vec<event::Event> {
+        let Some(npc) = npc_id.and_then(|id| world.npcs().iter().find(|npc| npc.id() == &id))
+        else {
             return vec![Event::TalkNpcNotFound {
                 npc: name.to_string(),
             }];
@@ -390,12 +461,60 @@ pub trait Rules {
         vec![event::Event::UnknownEvent { name: phrase }]
     }
 
-    /// Verbs that work on `target` unconditionally, unioned into
-    /// [`GameEngine::verbs_for`](crate::GameEngine::verbs_for) alongside
-    /// whatever item-agnostic interactions currently apply. Entirely the
-    /// consumer's call — a game might return every verb for every hotspot;
-    /// another might return none. The default always offers `Examine`.
-    fn default_verbs(&self, _target: Target, _world: &world::WorldState) -> Vec<Verb> {
-        vec![Verb::Examine]
+    /// Decide the final set of verbs `GameEngine::verbs_for` reports for
+    /// `target`, given `interaction_verbs` (every verb a currently-live
+    /// item-agnostic interaction reports for it). This hook has the final
+    /// say — whatever it returns *is* the coin's contents, so an override
+    /// that wants to keep `interaction_verbs` around must fold them back in
+    /// itself.
+    ///
+    /// The default mirrors what the other stock `on_*` hooks would actually
+    /// do, so the coin never claims a verb the engine would then refuse (or
+    /// omit one it would honour):
+    ///
+    /// * An open (unlocked) exit collapses the coin to `Go` alone — no
+    ///   verb-coin at all, matching the "just a walk cursor" convention
+    ///   modern point-and-click adventures use for an exit that needs no
+    ///   further interaction — deliberately discarding `interaction_verbs`
+    ///   to keep it that way. A consumer wanting an authored interaction to
+    ///   still show up alongside `Go` on an open door overrides this hook
+    ///   and unions `interaction_verbs` in itself.
+    /// * A non-`Scene` object currently in the room gets `Take` (mirrors
+    ///   `on_take`'s only gate: `Scene` objects refuse with `CantTake`).
+    /// * An object currently in inventory gets `Drop` (mirrors `on_drop`,
+    ///   which only succeeds for a carried object).
+    /// * Everything else (a locked exit, an NPC, ...) just gets the ordinary
+    ///   default: `interaction_verbs` plus `Examine`.
+    fn verbs_for(
+        &self,
+        target: Target,
+        interaction_verbs: &HashSet<Verb>,
+        world: &world::WorldState,
+    ) -> HashSet<Verb> {
+        let Target::Object(id) = &target else {
+            let mut verbs = interaction_verbs.clone();
+            verbs.insert(Verb::Examine);
+            return verbs;
+        };
+
+        let is_open_exit = world
+            .object_info(id)
+            .and_then(|info| info.door)
+            .is_some_and(|door| !door.locked);
+        if is_open_exit {
+            return HashSet::from([Verb::Go]);
+        }
+
+        let mut verbs = interaction_verbs.clone();
+        verbs.insert(Verb::Examine);
+        if !world.object_is_scene(id)
+            && matches!(world.get_object_from_room(id), ObjectResolution::Found(_))
+        {
+            verbs.insert(Verb::Take);
+        }
+        if world.player_holds(id) {
+            verbs.insert(Verb::Drop);
+        }
+        verbs
     }
 }

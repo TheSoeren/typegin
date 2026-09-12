@@ -1,3 +1,5 @@
+use typegin_core::input::GoTarget;
+
 /// Default player-facing wording for the game.
 ///
 /// Keeping the wording here (instead of in the engine) means you can change
@@ -17,39 +19,33 @@ impl typegin_core::View for TextView {
         render_look(world)
     }
 
-    fn render_went(
-        &mut self,
-        direction: &typegin_core::Direction,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You go {direction:?}."))]
+    fn render_went(&mut self, go_target: &GoTarget) -> Vec<typegin_core::RenderCommand> {
+        vec![line(format!("You go {go_target:?}."))]
     }
 
     fn render_went_invalid_direction(
         &mut self,
-        direction: &typegin_core::Direction,
+        go_target: &GoTarget,
     ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You can't go that way ({direction:?})."))]
+        vec![line(format!("You can't go that way ({go_target:?})."))]
     }
 
     fn render_went_exit_hidden(
         &mut self,
-        direction: &typegin_core::Direction,
+        go_target: &GoTarget,
     ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {direction:?} door is hidden."))]
+        vec![line(format!("The {go_target:?} door is hidden."))]
     }
 
     fn render_went_exit_locked(
         &mut self,
-        direction: &typegin_core::Direction,
+        go_target: &GoTarget,
     ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {direction:?} door is locked."))]
+        vec![line(format!("The {go_target:?} door is locked."))]
     }
 
-    fn render_unlocked_exit(
-        &mut self,
-        direction: &typegin_core::Direction,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {direction:?} door swings open."))]
+    fn render_unlocked_exit(&mut self, go_target: &GoTarget) -> Vec<typegin_core::RenderCommand> {
+        vec![line(format!("The {go_target:?} door swings open."))]
     }
 
     fn render_cannot_use(&mut self, item: &str, target: &str) -> Vec<typegin_core::RenderCommand> {
@@ -231,21 +227,15 @@ fn render_look(world: &typegin_core::WorldState) -> Vec<typegin_core::RenderComm
 }
 
 fn visible_exits(world: &typegin_core::WorldState) -> Vec<String> {
-    const COMPASS: [typegin_core::Direction; 4] = [
-        typegin_core::Direction::North,
-        typegin_core::Direction::East,
-        typegin_core::Direction::South,
-        typegin_core::Direction::West,
-    ];
-
-    COMPASS
+    world
+        .exit_directions()
         .into_iter()
         .filter_map(|direction| {
-            if world.is_exit_hidden(direction) {
+            if world.is_exit_hidden(&GoTarget::Direction(direction)) {
                 return None;
             }
-            let exit = world.exit_info(direction)?;
-            let state = if world.is_exit_locked(direction) {
+            let exit = world.exit_info(&GoTarget::Direction(direction))?;
+            let state = if world.is_exit_locked(&GoTarget::Direction(direction)) {
                 " (locked)"
             } else {
                 ""

@@ -89,34 +89,40 @@ impl GameEngine {
     pub fn execute_action(&mut self, action: Action) -> Vec<Event> {
         let mut events = match action {
             Action::Look => self.rules.on_look(&mut self.world),
-            Action::Go(direction) => self.rules.on_go(&mut self.world, direction),
-            Action::Examine(name) => {
-                let resolution = self.world.resolve_target(&name);
+            Action::Go(go_target) => self.rules.on_go(&mut self.world, go_target),
+            Action::Examine(locator) => {
+                let (name, resolution) = self.world.resolve_target_locator(locator);
                 self.rules.on_examine(&mut self.world, &name, resolution)
             }
-            Action::Take(name) => {
-                let resolution = self.world.resolve_room_object(&name);
+            Action::Take(locator) => {
+                let (name, resolution) = self.world.resolve_room_object_locator(locator);
                 self.rules.on_take(&mut self.world, &name, resolution)
             }
-            Action::Drop(name) => {
-                let resolution = self.world.resolve_player_object(&name);
+            Action::Drop(locator) => {
+                let (name, resolution) = self.world.resolve_player_object_locator(locator);
                 self.rules.on_drop(&mut self.world, &name, resolution)
             }
             Action::Use { item, target } => {
-                let item_res = self.world.resolve_player_object(&item);
-                let target_res = match target {
-                    Some(ref name) => self.world.resolve_target(name),
-                    None => object::TargetResolution::NotFound,
+                let (item_name, item_res) = self.world.resolve_player_object_locator(item);
+                let (target_name, target_res) = match target {
+                    Some(locator) => {
+                        let (name, resolution) = self.world.resolve_target_locator(locator);
+                        (Some(name), resolution)
+                    }
+                    None => (None, object::TargetResolution::NotFound),
                 };
                 self.rules.on_use(
                     &mut self.world,
-                    &item,
-                    target.as_deref(),
+                    &item_name,
+                    target_name.as_deref(),
                     item_res,
                     target_res,
                 )
             }
-            Action::Talk(name) => self.rules.on_talk(&mut self.world, &name),
+            Action::Talk(locator) => {
+                let (name, npc_id) = self.world.resolve_npc_locator(locator);
+                self.rules.on_talk(&mut self.world, &name, npc_id)
+            }
             Action::Choose(choice) => self.rules.on_choose(&mut self.world, &choice),
             Action::Unknown(phrase) => self.rules.on_unknown(&mut self.world, phrase),
         };
@@ -153,26 +159,28 @@ impl GameEngine {
     /// Query every verb currently applicable to `target`, for a
     /// point-and-click front-end's verb coin.
     ///
-    /// The union of every [`Verb`] a currently-live *item-agnostic*
-    /// interaction reports for `target` (`interactions_for(None,
-    /// Some(target))` — this also picks up the NPC-hotspot `Verb::Talk` when
-    /// `target` names a present NPC) with [`Rules::default_verbs`],
-    /// deduplicated. An interaction gated on a specific carried item never
-    /// contributes here, regardless of what the player holds: the coin is a
-    /// pure function of the target and world state, never inventory-reactive
-    /// (see AGENTS.md's north star item 4). Discovering that a specific
-    /// carried item does something to `target` is a separate query —
-    /// `interactions_for(Some(item), Some(target))` — fired when that item is
-    /// actually used against it.
+    /// [`Rules::verbs_for`] has the final say: it receives every `Verb` a
+    /// currently-live *item-agnostic* interaction reports for `target`
+    /// (`interactions_for(None, Some(target))` — this also picks up the
+    /// NPC-hotspot `Verb::Talk` when `target` names a present NPC) and
+    /// decides what to do with it — union it into its own default (the
+    /// ordinary case), or discard it entirely (an open exit's `Go`
+    /// collapses the coin to just `Go`, by design). An interaction gated on
+    /// a specific carried item never contributes here, regardless of what
+    /// the player holds: the coin is a pure function of the target and
+    /// world state, never inventory-reactive (see AGENTS.md's north star
+    /// item 4). Discovering that a specific carried item does something to
+    /// `target` is a separate query — `interactions_for(Some(item),
+    /// Some(target))` — fired when that item is actually used against it.
     #[must_use]
     pub fn verbs_for(&self, target: Target) -> HashSet<Verb> {
-        let mut verbs: HashSet<Verb> = self
+        let interaction_verbs: HashSet<Verb> = self
             .interactions_for(None, Some(target.clone()))
             .iter()
             .map(|interaction| interaction.verb())
             .collect();
-        verbs.extend(self.rules.default_verbs(target, self.world()));
-        verbs
+        self.rules
+            .verbs_for(target, &interaction_verbs, self.world())
     }
 
     /// Serialize the current game's *progress* (not the authored content)
@@ -192,8 +200,10 @@ impl GameEngine {
     /// [`GameEngine::get_with_rules`] would, with fresh compiled
     /// interactions, fresh trigger definitions, and fresh NPC dialogue trees
     /// — then restore the progress captured by [`GameEngine::save`] on top
-    /// of it: flags, player inventory, each room's object membership, door
-    /// lock state, fired triggers, and NPC dialogue progress.
+    /// of it: flags, player inventory, each room's object membership,
+    /// objects discarded out of the world entirely, door lock state, and
+    /// fired triggers. Never in-progress dialogue: a reload never resumes
+    /// the player mid-conversation.
     ///
     /// `data` may be a different (patched) version of the world than `save`
     /// was taken against: static content always comes from `data`, never

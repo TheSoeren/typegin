@@ -94,11 +94,11 @@ mod tests {
 
     fn npc(aliases: Vec<&str>) -> Npc {
         Npc {
-            id: NpcId::new("guard"),
+            id: crate::npcId!("guard"),
             primary_name: "guard".to_string(),
             aliases: aliases.into_iter().map(String::from).collect(),
-            room: RoomId::new("corridor"),
-            root: DialogueNodeId::new("start"),
+            room: crate::roomId!("corridor"),
+            root: crate::dialogueNodeId!("start"),
             dialogue: DialogueGraph::new(),
         }
     }
@@ -116,17 +116,20 @@ mod tests {
     fn dialogue_node_looks_up_by_id_in_the_graph() {
         let mut npc = npc(vec![]);
         npc.dialogue.insert(
-            DialogueNodeId::new("start"),
+            crate::dialogueNodeId!("start"),
             DialogueNode {
                 text: "Halt!".to_string(),
                 choices: Vec::new(),
             },
         );
         assert_eq!(
-            npc.dialogue_node(&DialogueNodeId::new("start"))
+            npc.dialogue_node(&crate::dialogueNodeId!("start"))
                 .map(DialogueNode::text),
             Some("Halt!")
         );
-        assert!(npc.dialogue_node(&DialogueNodeId::new("missing")).is_none());
+        assert!(
+            npc.dialogue_node(&crate::dialogueNodeId!("missing"))
+                .is_none()
+        );
     }
 }
