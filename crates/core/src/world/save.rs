@@ -1,21 +1,32 @@
 //! Save/load: persisting and restoring only the *dynamic* slice of a running
 //! game onto an already freshly-built [`WorldState`] — flags, room/inventory
-//! object placement, door lock state, fired triggers, and dialogue progress.
+//! object placement, objects discarded out of the world entirely, door lock
+//! state, and fired triggers.
 //!
 //! Never the *static* authored content (`data_interactions`, `triggers`,
 //! `object_templates`, NPC dialogue trees): that always comes from
 //! `WorldData`, rebuilt fresh on every load, so a content patch between save
 //! and load is picked up rather than shadowed by a stale copy baked into the
-//! save. See `crates/core/tests/save_load.rs` for the full contract.
+//! save.
+//!
+//! Deliberately also never in-progress dialogue (`dialogue_state`,
+//! `active_npc`): a save never resumes the player mid-conversation. All
+//! three front-end modalities dispatch dialogue as an immediate `Action` in
+//! response to the player's last input (a `talk`/`choose` command, or a
+//! point-and-click click); there is no modality that needs a *load* to land
+//! back inside a conversation turn, and doing so would additionally let an
+//! old save replay dialogue against an NPC's tree after a content patch
+//! changed it out from under the save. `load` always starts with no active
+//! conversation, full stop. See `crates/core/tests/save_load.rs` for the
+//! full contract.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::keys::dialogue_node_id::DialogueNodeId;
 use crate::keys::object_id::ObjectId;
 use crate::keys::trigger_id::TriggerId;
-use crate::world::{WorldState, npc, object, room};
+use crate::world::{WorldState, object, room};
 
 /// An error saving or loading a game's progress.
 #[derive(Debug)]
@@ -41,8 +52,9 @@ impl std::error::Error for SaveError {
 }
 
 /// A serializable snapshot of only the *dynamic* slice of a running game:
-/// flags, room/inventory object placement, door lock state, fired triggers,
-/// and dialogue progress.
+/// flags, room/inventory object placement, objects discarded out of the
+/// world entirely, door lock state, and fired triggers. Deliberately no
+/// dialogue progress — see the module doc comment.
 ///
 /// Ordered maps/sets throughout, not `HashMap`/`HashSet`: `WorldState`'s
 /// internal collections are hash-based (fine for that use — order is never
@@ -58,9 +70,20 @@ struct WorldSnapshot {
     inventory: Vec<ObjectId>,
     rooms: BTreeMap<room::RoomId, RoomSnapshot>,
     locked_doors: BTreeSet<ObjectId>,
+    /// Known object ids (every key of `object_templates` at save time) that
+    /// are placed in neither a room nor inventory — most commonly a `discard`
+    /// effect's target (`DataEffect::Discard`), consumed out of the game
+    /// entirely. Without this bucket, `apply_snapshot` would have no record
+    /// that these ids should stay gone: a freshly-built `WorldState` places
+    /// every authored object back into its default room, and the room/
+    /// inventory loops below only ever *add* objects they're told about, so
+    /// a discarded object would silently reappear in its original room.
+    /// `#[serde(default)]` so a save written before this field existed still
+    /// loads (as "nothing was discarded", the correct reading of its
+    /// absence).
+    #[serde(default)]
+    discarded: BTreeSet<ObjectId>,
     fired_triggers: BTreeSet<TriggerId>,
-    dialogue_state: BTreeMap<npc::NpcId, DialogueNodeId>,
-    active_npc: Option<npc::NpcId>,
 }
 
 /// A single room's object placement within a [`WorldSnapshot`].
@@ -73,7 +96,7 @@ struct RoomSnapshot {
 /// Save/load: persisting and restoring only the dynamic slice of the game.
 impl WorldState {
     fn snapshot(&self) -> WorldSnapshot {
-        let rooms = self
+        let rooms: BTreeMap<room::RoomId, RoomSnapshot> = self
             .rooms
             .iter()
             .map(|(room_id, room)| {
@@ -93,19 +116,28 @@ impl WorldState {
             .map(|object| object.id.clone())
             .collect();
 
+        let inventory: Vec<ObjectId> = self.player.objects().iter().map(|o| o.id.clone()).collect();
+
+        let placed: BTreeSet<&ObjectId> = rooms
+            .values()
+            .flat_map(|room| room.visible.iter().chain(room.hidden.iter()))
+            .chain(inventory.iter())
+            .collect();
+        let discarded: BTreeSet<ObjectId> = self
+            .object_templates
+            .keys()
+            .filter(|id| !placed.contains(id))
+            .cloned()
+            .collect();
+
         WorldSnapshot {
             flags: self.flags.clone(),
             current_room: self.current_room_id.clone(),
-            inventory: self.player.objects().iter().map(|o| o.id.clone()).collect(),
+            inventory,
             rooms,
             locked_doors,
+            discarded,
             fired_triggers: self.fired_triggers.iter().cloned().collect(),
-            dialogue_state: self
-                .dialogue_state
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect(),
-            active_npc: self.active_npc.clone(),
         }
     }
 
@@ -136,12 +168,15 @@ impl WorldState {
     /// `WorldState`. An id the snapshot mentions that no longer exists (a
     /// content patch removed it) is silently skipped; an object the
     /// snapshot never mentions keeps the placement `from_data` just gave it
-    /// (e.g. new content added since the save was made).
+    /// (e.g. new content added since the save was made); an id in
+    /// `snapshot.discarded` is removed from that default placement instead
+    /// of relocated, so a consumed object stays gone. `dialogue_state` and
+    /// `active_npc` are left exactly as `from_data` set them (empty, no
+    /// active conversation) — never restored from a save, by design (see
+    /// the module doc comment).
     fn apply_snapshot(&mut self, snapshot: WorldSnapshot) {
         self.flags = snapshot.flags;
         self.fired_triggers = snapshot.fired_triggers.into_iter().collect();
-        self.dialogue_state = snapshot.dialogue_state.into_iter().collect();
-        self.active_npc = snapshot.active_npc;
 
         for (room_id, room_snapshot) in snapshot.rooms {
             for id in &room_snapshot.visible {
@@ -164,6 +199,13 @@ impl WorldState {
             if let Some(object) = self.take_object_anywhere(id) {
                 self.player.add_object(object);
             }
+        }
+
+        // Pull every discarded id back out of wherever the fresh
+        // `from_data` build placed it (its default room) and drop it —
+        // deliberately not re-placed anywhere, so it stays gone.
+        for id in &snapshot.discarded {
+            self.take_object_anywhere(id);
         }
 
         for room in self.rooms.values_mut() {

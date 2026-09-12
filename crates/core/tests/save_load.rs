@@ -12,13 +12,15 @@
 //!
 //! * `GameEngine::save(&self) -> Result<String, _>` serializes only the
 //!   *dynamic* slice of the game: flags, player inventory, each room's
-//!   current visible/hidden object membership, door lock state, fired
-//!   triggers, and NPC dialogue progress (`dialogue_state` +
-//!   `active_npc`). Human-readable text (YAML, via the `serde_yaml_ng`
-//!   dependency `core` already has for `WorldData::from_yaml` — no new
-//!   dependency needed), but the exact format is not part of this contract:
-//!   nothing here parses the string itself, only round-trips it through
-//!   `save`/`load`.
+//!   current visible/hidden object membership, objects discarded out of the
+//!   world entirely, door lock state, and fired triggers. Deliberately
+//!   *not* in-progress dialogue (`dialogue_state`/`active_npc`) — a reload
+//!   never resumes the player mid-conversation, see
+//!   `a_reload_never_resumes_mid_conversation` below. Human-readable text
+//!   (YAML, via the `serde_yaml_ng` dependency `core` already has for
+//!   `WorldData::from_yaml` — no new dependency needed), but the exact
+//!   format is not part of this contract: nothing here parses the string
+//!   itself, only round-trips it through `save`/`load`.
 //! * `GameEngine::load(data: &WorldData, rules: impl Rules + 'static, save:
 //!   &str) -> Result<GameEngine, _>` rebuilds a `GameEngine` from `data` and
 //!   `rules` exactly as `get_with_rules` would (fresh `data_interactions`,
@@ -48,9 +50,7 @@ use common::{
     base_world, enter_corridor, enter_study, world_with_interactions as world_with,
     world_with_npcs, world_with_triggers,
 };
-use core::{
-    BasicRules, DialogueNodeId, Direction, Event, GameEngine, NpcId, ObjectId, RoomId, WorldData,
-};
+use core::{BasicRules, Direction, Event, GameEngine, ObjectId, RoomId, WorldData};
 
 // ---------------------------------------------------------------------------
 // Round-tripping the dynamic slice of the game
@@ -113,6 +113,78 @@ mod round_trip {
         let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
         assert!(reloaded.world().player_holds(&ObjectId::new("rusty-nail")));
+    }
+
+    #[test]
+    fn a_discarded_object_stays_out_of_the_world_after_reload() {
+        // `brass-key` starts placed in `cellar`'s `visible_objects`. Taking
+        // it and then discarding it removes it from the game entirely: not
+        // in any room, not in inventory. A freshly-built `WorldState` (what
+        // `load` starts from) places `brass-key` back into `cellar` by
+        // default, so this only round-trips correctly if the save records
+        // that the key was discarded and `load` undoes that default
+        // placement again.
+        let data = world_with(
+            r"- verb: use
+  item: brass-key
+  target:
+    object: brass-key
+  effect:
+    - discard: brass-key",
+        );
+        let mut engine = GameEngine::get(&data);
+        engine.handle_input("take brass key");
+        engine.handle_input("use brass key on brass key");
+        assert!(!engine.world().player_holds(&ObjectId::new("brass-key")));
+        assert!(
+            !engine
+                .world()
+                .room_object_names()
+                .contains(&"brass key".to_string())
+        );
+
+        let saved = engine.save().expect("save succeeds");
+        let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
+
+        assert!(!reloaded.world().player_holds(&ObjectId::new("brass-key")));
+        assert!(
+            !reloaded
+                .world()
+                .room_object_names()
+                .contains(&"brass key".to_string())
+        );
+    }
+
+    #[test]
+    fn a_discarded_grant_only_object_stays_out_of_the_world_after_reload() {
+        // `rusty-nail` has no authored room placement at all (see the
+        // grant-only test above); granting then discarding it exercises the
+        // same "materialise from `object_templates`, then drop" fallback
+        // path in `take_object_anywhere` for an object that was never
+        // placed by `from_data` in the first place.
+        let data = world_with(
+            r"- verb: use
+  target:
+    object: rusty-lamp
+  effect:
+    - grant: rusty-nail
+- verb: use
+  item: rusty-nail
+  target:
+    object: rusty-nail
+  effect:
+    - discard: rusty-nail",
+        );
+        let mut engine = GameEngine::get(&data);
+        engine.handle_input("take rusty lamp");
+        engine.handle_input("use rusty lamp on rusty lamp");
+        engine.handle_input("use rusty nail on rusty nail");
+        assert!(!engine.world().player_holds(&ObjectId::new("rusty-nail")));
+
+        let saved = engine.save().expect("save succeeds");
+        let reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
+
+        assert!(!reloaded.world().player_holds(&ObjectId::new("rusty-nail")));
     }
 
     #[test]
@@ -207,7 +279,15 @@ mod round_trip {
           text: "Pass, friend.""#;
 
     #[test]
-    fn round_trips_mid_conversation_dialogue_progress() {
+    fn a_reload_never_resumes_mid_conversation() {
+        // Deliberate, not an oversight: no front-end modality needs `load`
+        // to land the player back inside a conversation turn (dialogue is
+        // always dispatched as an immediate `Action` off the player's last
+        // input), and resuming one would let a save replay dialogue against
+        // an NPC tree a content patch may have changed since. `load` always
+        // starts with no active conversation, so continuing one after a
+        // reload resolves as unknown rather than picking the guard's
+        // dialogue back up.
         let data = world_with_npcs(GUARD_WITH_CHOICE_YAML);
         let mut engine = GameEngine::get(&data);
         enter_corridor(&mut engine);
@@ -216,24 +296,11 @@ mod round_trip {
         let saved = engine.save().expect("save succeeds");
         let mut reloaded = GameEngine::load(&data, BasicRules, &saved).expect("load succeeds");
 
-        // Continuing the conversation only works if `dialogue_state` and
-        // `active_npc` came back with the save, not reset to "no active
-        // conversation".
         assert_eq!(
             reloaded.handle_input("choose 1"),
-            vec![
-                Event::Talked {
-                    npc_id: NpcId::new("guard"),
-                    npc: "guard".to_string(),
-                    node_id: DialogueNodeId::new("friend-response"),
-                    text: "Pass, friend.".to_string(),
-                    choices: Vec::new(),
-                },
-                Event::DialogueEnded {
-                    npc_id: NpcId::new("guard"),
-                    npc: "guard".to_string(),
-                },
-            ]
+            vec![Event::UnknownEvent {
+                name: "1".to_string()
+            }]
         );
     }
 }

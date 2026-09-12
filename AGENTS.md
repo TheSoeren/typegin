@@ -87,11 +87,16 @@ tackled:
    every NPC's dialogue tree), so serializing it wholesale would duplicate
    that content into every save and let an old save pin a stale copy of it
    past a content patch. `save` persists only the dynamic slice (flags,
-   inventory, room object membership, door lock state, fired triggers,
-   dialogue progress); `load(data, rules, save)` rebuilds fresh static
-   content from `data` (which may differ from what `save` was taken
-   against — a content patch between save and load must be picked up) and
-   restores the dynamic slice on top. See `crates/core/tests/save_load.rs`.
+   inventory, room object membership, objects discarded out of the world
+   entirely, door lock state, fired triggers); `load(data, rules, save)`
+   rebuilds fresh static content from `data` (which may differ from what
+   `save` was taken against — a content patch between save and load must be
+   picked up) and restores the dynamic slice on top. Deliberately excluded:
+   in-progress dialogue (`dialogue_state`/`active_npc`) — a reload never
+   resumes the player mid-conversation; every front-end modality dispatches
+   dialogue as an immediate `Action` off the player's last input, none of
+   them need `load` to land back inside a conversation turn. See
+   `crates/core/tests/save_load.rs`.
 6. **Multiple playable/controllable characters** — not started.
    `WorldState` has exactly one `Player`
    (`crates/core/src/world/player.rs`); there is no second controllable
