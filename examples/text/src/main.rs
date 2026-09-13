@@ -5,9 +5,10 @@ use std::process::ExitCode;
 
 mod view;
 
-/// The engine only ever parses one YAML document, so the shipped
-/// `crates/cli/data/*.yaml` files (kept separate purely for authoring
-/// convenience) are concatenated here before handing the result to
+/// The engine only ever parses one YAML document, so the shared
+/// `examples/data/*.yaml` files (kept separate purely for authoring
+/// convenience, and shared with `examples/pnc` — see AGENTS.md) are
+/// concatenated here before handing the result to
 /// [`typegin_core::WorldData::from_yaml`] — each file contributes disjoint
 /// top-level keys, so concatenation is a lossless merge.
 fn read_world_yaml(data_dir: &Path) -> Result<String, typegin_core::WorldDataError> {
@@ -29,11 +30,11 @@ fn read_world_yaml(data_dir: &Path) -> Result<String, typegin_core::WorldDataErr
 fn main() -> ExitCode {
     env_logger::init();
 
-    // Defaults to the data shipped alongside this crate (not the invoking
-    // shell's current directory), so `cargo run` works the same regardless
-    // of where it's invoked from; pass a path argument to override.
+    // Defaults to the shared example data (not the invoking shell's current
+    // directory), so `cargo run` works the same regardless of where it's
+    // invoked from; pass a path argument to override.
     let data_dir = env::args_os().nth(1).map_or_else(
-        || PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/data")),
+        || PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../data")),
         PathBuf::from,
     );
 

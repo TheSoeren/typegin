@@ -1,0 +1,12 @@
+[package]
+name = "pnc-sample"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+macroquad = "0.4.16"
+render = { path = "../../crates/render" }
+typegin-core = { package = "core", path = "../../crates/core" }

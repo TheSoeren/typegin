@@ -13,6 +13,8 @@ objects:
     kind: Scene
     extra:
       description: A plain wooden chair. Its front-left leg is loose.
+      gui:
+        hotspot: { x: 80, y: 380, w: 90, h: 140 }
 
   - key: chair-leg
     primary_name: Chair leg
@@ -34,6 +36,8 @@ objects:
     kind: Scene
     extra:
       description: A plain table, with a surface made for breaking things over.
+      gui:
+        hotspot: { x: 220, y: 400, w: 140, h: 110 }
 
   - key: padding
     primary_name: Padded wall
@@ -41,6 +45,8 @@ objects:
     kind: Scene
     extra:
       description: Endless layers of soft padding. The third pad from the top, on the left of the back wall, is where the air conditioning disguises the way out.
+      gui:
+        hotspot: { x: 40, y: 40, w: 720, h: 200 }
 
   - key: door-grate
     primary_name: Door grate
@@ -48,6 +54,8 @@ objects:
     kind: Scene
     extra:
       description: A small grate high in the cell door, the only window to the guard corridor.
+      gui:
+        hotspot: { x: 660, y: 290, w: 40, h: 40 }
 
   - key: cell-door
     primary_name: Cell door
@@ -55,6 +63,8 @@ objects:
     kind: Scene
     extra:
       description: The cell door, solidly locked. Up high, a grate.
+      gui:
+        hotspot: { x: 620, y: 260, w: 120, h: 280 }
 
   - key: airy-gap
     primary_name: Airy gap

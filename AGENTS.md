@@ -2,15 +2,49 @@
 
 ## Project
 
-Text-adventure engine in Rust. Workspace with two crates:
+Text-adventure engine in Rust. Workspace with two engine crates plus a
+workspace-level `examples/` directory holding the front-ends:
 
 - `crates/core` — library (parsing, world state, rules, data-driven
-  interactions, NPC dialogue, view trait). Everything gameplay-relevant lives
-  here; it has no I/O, terminal, or GUI code.
-- `crates/cli` (binary name `typegin`) — terminal front-end
-  (`src/main.rs`, `src/view.rs`). Reads the shipped `data/*.yaml` files,
-  concatenates them into one YAML document, and hands that to
-  `core::WorldData::from_yaml`.
+  interactions, NPC dialogue). Everything gameplay-relevant lives here; it
+  has no I/O, terminal, or GUI/rendering code of any kind — not even a
+  `View` trait. It hands a front-end a typed `Event` stream and read-only
+  `WorldState` queries and has no further opinion; rendering is entirely
+  each front-end's own concern.
+- `crates/render` — a reusable point-and-click **rendering engine** for
+  `core`, built on `macroquad`. It is not a game and not a prototype of one:
+  like `core` never embeds a specific game's rooms/items/puzzles, `render`
+  never embeds a specific game's assets, hotspot coordinates, or content —
+  it must stay reusable across multiple different PnC games, and carries no
+  `src/main.rs` of its own. It reacts to `core`'s `Event` stream (animation,
+  movement, ...) and is driven by whatever `WorldState`/`extra` data a
+  consuming game supplies, plus an asset-provider extension point a
+  specific game implements (design not finalized yet). Unlike `examples/text`,
+  `render` doesn't need to serve all three front-end modalities (see
+  "Non-negotiable" below) — it's free to build whatever a PnC UI
+  specifically needs (hotspots, a radial verb coin, drag interactions)
+  using `GameEngine::interactions_for`/`verbs_for`, without worrying about
+  staying parser-compatible.
+- `examples/` — a **workspace-level** directory (ordinary sibling crates
+  grouped here, not cargo's per-crate `examples/` convention):
+  - `examples/data/*.yaml` — the actual shipped game content (an *Edna &
+    Harvey: The Breakout* homage), the single source of truth every
+    front-end below reads. One world, one copy, so a change to it is
+    visible from every consumer at once.
+  - `examples/text` (binary `text-proto`) — the maintained terminal
+    front-end (`src/main.rs`, `src/view.rs`). Reads `examples/data/*.yaml`,
+    concatenates it into one YAML document, and hands that to
+    `core::WorldData::from_yaml`. Matches `Event`s directly against
+    hand-written prose (no shared rendering trait — core doesn't define
+    one, and this is the only maintained text consumer, so there's nothing
+    to share it with).
+  - `examples/pnc` (binary `pnc-example`) — a minimal, throwaway macroquad
+    binary exercising `crates/render` against the same shared content:
+    boots a `GameEngine`, draws hotspots from each object's authored
+    `extra.gui.hotspot`, shows a verb coin on hover, executes a verb on
+    click. Plain rectangles and `Debug`-printed verb labels, not real art —
+    proves the render engine's wiring, not what a shipped game should look
+    like.
 
 `core`'s public surface is one flat re-export list from `crates/core/src/lib.rs`
 — when exploring, start there rather than guessing module paths.
@@ -112,6 +146,16 @@ adventure game, not just something shaped like Deponia. In particular:
   not products to embed. A feature is only worth adding insofar as it
   generalizes to any adventure (dialogue trees, flags, triggers, verb-coin
   queries, ...).
+- **The same rule extends to `crates/render`: it stays a reusable rendering
+  engine, never a specific game.** No room/item/interaction data, no
+  hardcoded object ids, no specific game's assets anywhere in its `src/`,
+  and no `src/main.rs` at all — a library crate with a `main.rs` reads as
+  "this crate is the game," which is exactly what it must not be. Anything
+  demonstrating it against real or placeholder content belongs in the
+  workspace-level `examples/` directory (`examples/pnc`), a separate crate
+  outside `crates/render` entirely. A specific PnC game is likewise its own
+  separate crate that supplies its own `WorldData`, assets, and
+  hotspot/`extra` content, and depends on both `core` and `render`.
 - **Preserve the consumer's freedom to pick between the three front-end
   modalities.** A consumer always chooses exactly _one_ modality for their
   actual game — this is not a claim that every game must ship as all three
@@ -122,22 +166,25 @@ adventure game, not just something shaped like Deponia. In particular:
   2. **text-in / GUI-out** (parser drives commands, GUI renders events/state),
   3. **full point-and-click** (no parser needed at all: a GUI synthesizes
      `Action`s from clicks, using `interactions_for`/`verbs_for`, and renders
-     via `RenderCommand` or by reading `Event`s/`WorldState` directly).
+     by reading `Event`s/`WorldState` directly — core has no rendering
+     contract of its own for it to render _via_).
      No design choice may assume one modality or silently close the door on
      another — that includes convenience queries like the verb-coin primitives
      above: `verbs_for` exists _in addition to_ the parser path, an option a
      point-and-click consumer can lean on, never a replacement the other two
      modalities are forced through. Anything that would force a specific input
      source or output rendering is a defect. Guard this when adding verbs, the
-     `interactions_for`/`verbs_for` queries, `Event`/`RenderCommand` shapes, and
-     the `View`/`Rules` traits.
+     `interactions_for`/`verbs_for` queries, and `Event`/`Rules` shapes — and
+     never add a rendering-facing type (a `View` trait, a render-command enum,
+     ...) back into core; that's each front-end's own crate's job now
+     (`examples/text`, `crates/render`).
 - **Core parses exactly one YAML document.** `WorldData::from_yaml`/`load`
   take a single string/path, not a fixed set of named files — how a
   consumer organizes authored content across files (one file, five files,
-  one per room) is entirely their call. `crates/cli` happens to read the
-  conventional `data/{globals,items,rooms,interactions,npcs}.yaml` split and
-  concatenates them before calling `from_yaml`, but that convention lives in
-  the CLI, not in core.
+  one per room) is entirely their call. `examples/text` happens to read
+  the conventional `data/{globals,items,rooms,interactions,npcs}.yaml` split
+  and concatenates them before calling `from_yaml`, but that convention lives
+  in that crate, not in core.
 
 ## Working style (important)
 
@@ -185,7 +232,8 @@ diff` if unsure what's mid-flight). Never touch `crates/core/tests/triggers.rs` 
 | Task                  | Command                                                                                                                                                                                                                                                            |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Build                 | `cargo build`                                                                                                                                                                                                                                                      |
-| Run                   | `cargo run`                                                                                                                                                                                                                                                        |
+| Run (text front-end)  | `cargo run -p text-proto`                                                                                                                                                                                                                                          |
+| Run (PnC example)     | `cargo run -p pnc-example`                                                                                                                                                                                                                                         |
 | Test (all)            | `cargo test`                                                                                                                                                                                                                                                       |
 | Test (unit tier only) | `cargo test -p core --lib`                                                                                                                                                                                                                                         |
 | Test (single suite)   | `cargo test --test <name>` (names: `combine`, `data_interactions`, `default_rules`, `doors`, `drop`, `extras`, `flags`, `hidden`, `input`, `interactions`, `navigation`, `npcs`, `rules_override`, `save_load`, `symbolic_keys`, `triggers`, `verb_coin`, `world`) |
