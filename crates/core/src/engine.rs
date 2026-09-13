@@ -18,8 +18,9 @@ use crate::{Verb, world};
 ///
 /// Create one with [`GameEngine::get`] or [`GameEngine::get_with_rules`] (to
 /// inject custom [`Rules`]), feed it text via [`GameEngine::handle_input`],
-/// and render the resulting [`Event`]s with a [`View`](crate::view::View). A
-/// point-and-click front-end can instead query what is currently possible via
+/// and render the resulting [`Event`]s however the front-end sees fit — the
+/// engine has no rendering contract of its own. A point-and-click front-end
+/// can instead query what is currently possible via
 /// [`GameEngine::interactions_for`] and [`GameEngine::verbs_for`], without
 /// executing anything.
 #[derive(Getters, MutGetters)]

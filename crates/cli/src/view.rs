@@ -1,232 +1,118 @@
 use typegin_core::input::GoTarget;
+use typegin_core::{Event, WorldState};
 
 /// Default player-facing wording for the game.
 ///
 /// Keeping the wording here (instead of in the engine) means you can change
-/// every sentence in the game without touching game logic, or provide your
-/// own `View` for custom flavour.
+/// every sentence in the game without touching game logic. `typegin_core`
+/// has no rendering contract of its own (no `View` trait) — this is just a
+/// plain function over `Event`, the simplest thing that works for a single
+/// first-party text front-end.
 ///
-/// Only events it phrases are overridden; an engine event nobody has written
-/// prose for yet silently produces no output, so a future event never breaks
-/// this view.
-pub struct TextView;
+/// Only the events matched here produce output; anything else silently
+/// produces nothing, so a new engine `Event` never breaks this front-end —
+/// it just needs an arm added here when you want it voiced.
+pub fn render(events: &[Event], world: &WorldState) -> Vec<String> {
+    events
+        .iter()
+        .flat_map(|event| render_event(event, world))
+        .collect()
+}
 
-impl typegin_core::View for TextView {
-    fn render_looked(
-        &mut self,
-        world: &typegin_core::WorldState,
-    ) -> Vec<typegin_core::RenderCommand> {
-        render_look(world)
-    }
-
-    fn render_went(&mut self, go_target: &GoTarget) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You go {go_target:?}."))]
-    }
-
-    fn render_went_invalid_direction(
-        &mut self,
-        go_target: &GoTarget,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You can't go that way ({go_target:?})."))]
-    }
-
-    fn render_went_exit_hidden(
-        &mut self,
-        go_target: &GoTarget,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {go_target:?} door is hidden."))]
-    }
-
-    fn render_went_exit_locked(
-        &mut self,
-        go_target: &GoTarget,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {go_target:?} door is locked."))]
-    }
-
-    fn render_unlocked_exit(&mut self, go_target: &GoTarget) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("The {go_target:?} door swings open."))]
-    }
-
-    fn render_cannot_use(&mut self, item: &str, target: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
+fn render_event(event: &Event, world: &WorldState) -> Vec<String> {
+    match event {
+        Event::Looked => render_look(world),
+        Event::Went(go_target) => vec![format!("You go {go_target:?}.")],
+        Event::WentExitNotFound(go_target) => {
+            vec![format!("You can't go that way ({go_target:?}).")]
+        }
+        Event::WentExitHidden(go_target) => vec![format!("The {go_target:?} door is hidden.")],
+        Event::WentExitLocked(go_target) => vec![format!("The {go_target:?} door is locked.")],
+        Event::UnlockedExit(go_target) => vec![format!("The {go_target:?} door swings open.")],
+        Event::CannotUse { item, target } => vec![format!(
             "That doesn't work with the {item} on the {target}."
-        ))]
-    }
-
-    fn render_custom(&mut self, name: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(name.to_string())]
-    }
-
-    fn render_took(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You take the {object}."))]
-    }
-
-    fn render_took_object_not_found(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("I don't see any {object} here."))]
-    }
-
-    fn render_took_object_ambiguous(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
-            "Which {object} do you mean? Be more specific."
-        ))]
-    }
-
-    fn render_cant_take(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You can't carry the {object}."))]
-    }
-
-    fn render_dropped(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You dropped the {object}."))]
-    }
-
-    fn render_dropped_object_not_found(
-        &mut self,
-        object: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You aren't carrying any {object}."))]
-    }
-
-    fn render_dropped_object_ambiguous(
-        &mut self,
-        object: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
-            "Which {object} do you mean? Be more specific."
-        ))]
-    }
-
-    fn render_used(
-        &mut self,
-        object: &str,
-        target: Option<&str>,
-    ) -> Vec<typegin_core::RenderCommand> {
-        let text = match target {
+        )],
+        Event::Custom { name } => vec![name.clone()],
+        Event::Took { object, .. } => vec![format!("You take the {object}.")],
+        Event::TookObjectNotFound { object } => vec![format!("I don't see any {object} here.")],
+        Event::CantTake { object } => vec![format!("You can't carry the {object}.")],
+        Event::Dropped { object, .. } => vec![format!("You dropped the {object}.")],
+        Event::DroppedObjectNotFound { object } => {
+            vec![format!("You aren't carrying any {object}.")]
+        }
+        Event::Used { object, target, .. } => vec![match target {
             Some(target) => format!("You use the {object} on the {target}."),
             None => format!("You use the {object}."),
-        };
-        vec![line(text)]
-    }
-
-    fn render_used_object_not_found(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You don't have a {object}."))]
-    }
-
-    fn render_used_object_ambiguous(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
-            "Which {object} do you mean? Be more specific."
-        ))]
-    }
-
-    fn render_used_target_needed(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You need to use the {object} on something."))]
-    }
-
-    fn render_used_target_not_found(
-        &mut self,
-        object: &str,
-        target: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You can't use the {object} on {target}."))]
-    }
-
-    fn render_used_target_ambiguous(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
-            "Which target do you want to use the {object} on?"
-        ))]
-    }
-
-    fn render_examined(&mut self, object: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("You examine the {object}."))]
-    }
-
-    fn render_examined_object_not_found(
-        &mut self,
-        object: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("There is no {object}."))]
-    }
-
-    fn render_examined_object_ambiguous(
-        &mut self,
-        object: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!(
-            "Which {object} do you mean? Be more specific."
-        ))]
-    }
-
-    fn render_unknown_event(&mut self, name: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("I don't understand \"{name}\"."))]
-    }
-
-    fn render_talked(
-        &mut self,
-        npc: &str,
-        text: &str,
-        choices: &[typegin_core::DialogueChoice],
-    ) -> Vec<typegin_core::RenderCommand> {
-        let mut out = vec![line(format!("{npc}: {text}"))];
-        for (i, choice) in choices.iter().enumerate() {
-            out.push(line(format!("  {}. {}", i + 1, choice.label)));
+        }],
+        Event::UsedObjectNotFound { object } => vec![format!("You don't have a {object}.")],
+        Event::UsedTargetNeeded { object, .. } => {
+            vec![format!("You need to use the {object} on something.")]
         }
-        out
-    }
-
-    fn render_dialogue_ended(&mut self, npc: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("({npc} falls silent.)"))]
-    }
-
-    fn render_talk_npc_not_found(&mut self, npc: &str) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("There is no {npc} here."))]
-    }
-
-    fn render_dialogue_invalid_choice(
-        &mut self,
-        _npc: &str,
-        choice: &str,
-    ) -> Vec<typegin_core::RenderCommand> {
-        vec![line(format!("\"{choice}\" isn't an option."))]
+        Event::UsedTargetNotFound { object, target, .. } => {
+            vec![format!("You can't use the {object} on {target}.")]
+        }
+        Event::UsedTargetAmbiguous { object, .. } => {
+            vec![format!("Which target do you want to use the {object} on?")]
+        }
+        Event::Examined {
+            target_name: object,
+            ..
+        } => vec![format!("You examine the {object}.")],
+        Event::ExaminedTargetNotFound { target: object } => vec![format!("There is no {object}.")],
+        Event::TookObjectAmbiguous { object, .. }
+        | Event::DroppedObjectAmbiguous { object, .. }
+        | Event::UsedObjectAmbiguous { object, .. }
+        | Event::ExaminedTargetAmbiguous { target: object, .. } => {
+            vec![format!("Which {object} do you mean? Be more specific.")]
+        }
+        Event::UnknownEvent { name } => vec![format!("I don't understand \"{name}\".")],
+        Event::Talked {
+            npc, text, choices, ..
+        } => {
+            let mut out = vec![format!("{npc}: {text}")];
+            for (i, choice) in choices.iter().enumerate() {
+                out.push(format!("  {}. {}", i + 1, choice.label));
+            }
+            out
+        }
+        Event::DialogueEnded { npc, .. } => vec![format!("({npc} falls silent.)")],
+        Event::TalkNpcNotFound { npc } => vec![format!("There is no {npc} here.")],
+        Event::DialogueInvalidChoice { choice, .. } => {
+            vec![format!("\"{choice}\" isn't an option.")]
+        }
+        _ => Vec::new(),
     }
 }
 
-fn line(text: String) -> typegin_core::RenderCommand {
-    typegin_core::RenderCommand::Line(text)
-}
-
-fn render_look(world: &typegin_core::WorldState) -> Vec<typegin_core::RenderCommand> {
+fn render_look(world: &WorldState) -> Vec<String> {
     let room_items = world.room_object_names();
     let inventory = world.player_object_names();
 
-    let mut parts = vec![line(room_description(world))];
+    let mut lines = vec![room_description(world)];
 
     if room_items.is_empty() {
-        parts.push(line("There is nothing notable here.".to_string()));
+        lines.push("There is nothing notable here.".to_string());
     } else {
-        let items = join_list(&room_items);
-        parts.push(line(format!("You can see: {items}.")));
+        lines.push(format!("You can see: {}.", join_list(&room_items)));
     }
 
     if inventory.is_empty() {
-        parts.push(line("You are carrying nothing.".to_string()));
+        lines.push("You are carrying nothing.".to_string());
     } else {
-        let carried = join_list(&inventory);
-        parts.push(line(format!("You are carrying: {carried}.")));
+        lines.push(format!("You are carrying: {}.", join_list(&inventory)));
     }
 
     let exits = visible_exits(world);
     if exits.is_empty() {
-        parts.push(line("There are no visible exits here.".to_string()));
+        lines.push("There are no visible exits here.".to_string());
     } else {
-        let listed = join_list(&exits);
-        parts.push(line(format!("Exits: {listed}.")));
+        lines.push(format!("Exits: {}.", join_list(&exits)));
     }
 
-    // Yield one line per sentence so each is a distinct message.
-    parts
+    lines
 }
 
-fn visible_exits(world: &typegin_core::WorldState) -> Vec<String> {
+fn visible_exits(world: &WorldState) -> Vec<String> {
     world
         .exit_directions()
         .into_iter()
@@ -245,7 +131,7 @@ fn visible_exits(world: &typegin_core::WorldState) -> Vec<String> {
         .collect()
 }
 
-fn room_description(world: &typegin_core::WorldState) -> String {
+fn room_description(world: &WorldState) -> String {
     match world
         .current_room_extra()
         .get("description")

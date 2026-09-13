@@ -1,5 +1,5 @@
 use std::env;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -48,8 +48,6 @@ fn main() -> ExitCode {
     };
 
     let mut engine = typegin_core::GameEngine::get(&world_data);
-
-    let mut view = view::TextView;
 
     println!(
         "You wake up in a padded cell of the sanatorium. Harvey is in your hands, chin tucked against you."
@@ -113,15 +111,8 @@ fn main() -> ExitCode {
         }
 
         let events = engine.handle_input(&input);
-        for command in typegin_core::View::render(&mut view, &events, engine.world()) {
-            match command {
-                typegin_core::RenderCommand::Line(text) => println!("{text}"),
-                typegin_core::RenderCommand::ClearScreen => {
-                    print!("\u{1b}[2J\u{1b}[H");
-                    let _ = io::stdout().flush();
-                }
-                _ => {}
-            }
+        for line in view::render(&events, engine.world()) {
+            println!("{line}");
         }
     }
 

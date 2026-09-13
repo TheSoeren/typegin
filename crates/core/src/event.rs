@@ -9,10 +9,10 @@ use crate::world::object::ObjectId;
 
 /// Structured result of executing an `Action` against the world.
 ///
-/// A UI consumes these events and decides how to present them. The engine
-/// never produces prose — that is the job of a `View`. Keeping this as a
-/// typed enum is what lets a text UI, a GUI, or any other front-end share
-/// the same game logic.
+/// A front-end consumes these events and decides how to present them — the
+/// engine never produces prose or any other rendering output itself. Keeping
+/// this as a typed enum is what lets a text UI, a GUI, or any other
+/// front-end share the same game logic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
     UnknownEvent {
