@@ -27,7 +27,7 @@ use render::{coin, tween::Tween};
 /// Avatar walk speed, in pixels per second - this example's own concern
 /// (`render`'s `Tween` has no notion of speed, only "reach `target` in
 /// `duration` seconds"; a specific game picks its own pacing).
-const WALK_SPEED: f32 = 220.0;
+const WALK_SPEED: f32 = 320.0;
 
 const DATA_FILES: [&str; 6] = [
     "globals.yaml",
@@ -153,7 +153,9 @@ async fn main() {
     // throwaway, plain shapes not real art) that walks - leg by leg - along
     // a `render::pathfinding::find_path` route before a clicked verb
     // actually executes, rather than executing instantly on click.
-    let mut avatar_position = Tween::settled((400.0_f32, 550.0_f32));
+    // (530, 440) sits inside the padded cell's walkable area
+    // (y: 300-580), clear of the chair/table holes and the cell-door.
+    let mut avatar_position = Tween::settled((530.0_f32, 440.0_f32));
     let mut remaining_path: VecDeque<(f32, f32)> = VecDeque::new();
     let mut pending_action: Option<Action> = None;
 
@@ -206,7 +208,7 @@ async fn main() {
             begin_walk_or_execute(
                 Some(action),
                 walkable.as_ref(),
-                avatar_position.current(),
+                &mut avatar_position,
                 mouse,
                 &mut remaining_path,
                 &mut pending_action,
@@ -222,7 +224,7 @@ async fn main() {
             begin_walk_or_execute(
                 None,
                 walkable.as_ref(),
-                avatar_position.current(),
+                &mut avatar_position,
                 mouse,
                 &mut remaining_path,
                 &mut pending_action,
@@ -248,17 +250,34 @@ fn advance_avatar(
     if !avatar_position.is_settled() {
         return;
     }
-    if let Some(next_waypoint) = remaining_path.pop_front() {
-        let current = avatar_position.current();
-        let leg_distance =
-            vec2(current.0, current.1).distance(vec2(next_waypoint.0, next_waypoint.1));
-        avatar_position.set_target(next_waypoint, (leg_distance / WALK_SPEED).max(0.05));
-    } else if let Some(action) = pending_action.take() {
+    if start_next_leg(avatar_position, remaining_path) {
+        return;
+    }
+    if let Some(action) = pending_action.take() {
         let events = engine.execute_action(action);
         for event in events {
             println!("{event:?}");
         }
     }
+}
+
+/// Pop the next waypoint off `remaining_path` and retarget `avatar_position`
+/// toward it (from wherever the avatar currently is, which may be
+/// mid-flight along a previous leg — see `begin_walk_or_execute`), so a
+/// fresh path always starts moving the same frame it's set, rather than
+/// waiting for whatever leg was already in progress to finish first.
+/// Returns whether there was a next waypoint to start toward.
+fn start_next_leg(
+    avatar_position: &mut Tween<(f32, f32)>,
+    remaining_path: &mut VecDeque<(f32, f32)>,
+) -> bool {
+    let Some(next_waypoint) = remaining_path.pop_front() else {
+        return false;
+    };
+    let current = avatar_position.current();
+    let leg_distance = vec2(current.0, current.1).distance(vec2(next_waypoint.0, next_waypoint.1));
+    avatar_position.set_target(next_waypoint, (leg_distance / WALK_SPEED).max(0.05));
+    true
 }
 
 /// Draw every hotspot's sprite (or a plain gray fallback), its hover-aware
@@ -360,17 +379,21 @@ fn draw_verb_coin_and_detect_click(
 fn begin_walk_or_execute(
     action: Option<Action>,
     walkable: Option<&pathfinding::WalkableArea>,
-    avatar_position: (f32, f32),
+    avatar_position: &mut Tween<(f32, f32)>,
     destination: (f32, f32),
     remaining_path: &mut VecDeque<(f32, f32)>,
     pending_action: &mut Option<Action>,
     engine: &mut GameEngine,
 ) {
-    if let Some(waypoints) =
-        walkable.and_then(|area| pathfinding::find_path(area, avatar_position, destination))
+    if let Some(waypoints) = walkable
+        .and_then(|area| pathfinding::find_path(area, avatar_position.current(), destination))
     {
         *remaining_path = waypoints.into_iter().collect();
         *pending_action = action;
+        // Retarget right away rather than leaving whatever leg was already
+        // in flight to finish first — a new click should redirect the
+        // avatar this same frame, not queue up behind the old destination.
+        start_next_leg(avatar_position, remaining_path);
     } else if let Some(action) = action {
         let events = engine.execute_action(action);
         for event in events {

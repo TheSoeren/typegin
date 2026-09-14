@@ -90,15 +90,64 @@ fn is_walkable(point: (f32, f32), area: &WalkableArea) -> bool {
 /// inside exactly one hole - never both, and never fully walkable already.
 fn nearest_walkable_point(point: (f32, f32), area: &WalkableArea) -> (f32, f32) {
     if !point_in_polygon(point, &area.boundary) {
-        return nearest_point_on_polygon(point, &area.boundary);
+        let nearest = nearest_point_on_polygon(point, &area.boundary);
+        // Nudge just clear of the boundary line itself, not merely onto
+        // it: `point_in_polygon`'s crossing-number test classifies an
+        // exactly-on-the-edge point as inside on some edges and outside on
+        // others (a documented, deliberate asymmetry - see its own doc
+        // comment), so landing a walker exactly on the line can leave it
+        // standing somewhere `is_walkable` itself disagrees is walkable,
+        // permanently refusing every future move from there.
+        return move_toward(nearest, centroid(&area.boundary), CLEARANCE);
     }
     let containing_hole = area.holes.iter().find(|hole| point_in_polygon(point, hole));
     match containing_hole {
-        Some(hole) => nearest_point_on_polygon(point, hole),
+        // Same reasoning as above, mirrored: nudge away from the hole's
+        // own centroid instead of toward it, to clear its edge outward
+        // rather than the boundary's edge inward.
+        Some(hole) => {
+            let nearest = nearest_point_on_polygon(point, hole);
+            move_toward(nearest, centroid(hole), -CLEARANCE)
+        }
         // Defensive only: per this function's contract, `point` is always
         // inside `area.boundary` and inside some hole by this point.
         None => point,
     }
+}
+
+/// How far [`nearest_walkable_point`] nudges a clamped point clear of the
+/// boundary/hole edge line it landed on. Small enough to be visually
+/// imperceptible at this crate's typical room scale, large enough to
+/// reliably clear `point_in_polygon`'s exact-on-the-line ambiguity.
+const CLEARANCE: f32 = 0.5;
+
+/// The average of `polygon`'s vertices - a rough "which way is inward"
+/// reference for [`nearest_walkable_point`]'s nudge, not a precise
+/// geometric centroid (which, for a strongly concave polygon, might not
+/// even land inside it). Harmless here since it only steers a tiny nudge
+/// direction, never the clamped point's actual position.
+#[allow(clippy::cast_precision_loss)]
+fn centroid(polygon: &[(f32, f32)]) -> (f32, f32) {
+    let count = polygon.len() as f32;
+    let sum = polygon.iter().fold((0.0, 0.0), |acc, vertex| {
+        (acc.0 + vertex.0, acc.1 + vertex.1)
+    });
+    (sum.0 / count, sum.1 / count)
+}
+
+/// Move `point` a small `amount` toward `target` (or away from it, for a
+/// negative `amount`).
+#[allow(clippy::float_cmp)]
+fn move_toward(point: (f32, f32), target: (f32, f32), amount: f32) -> (f32, f32) {
+    let gap = distance(point, target);
+    if gap == 0.0 {
+        return point;
+    }
+    let direction = ((target.0 - point.0) / gap, (target.1 - point.1) / gap);
+    (
+        point.0 + direction.0 * amount,
+        point.1 + direction.1 * amount,
+    )
 }
 
 /// The closest point on any edge of `polygon` to `point` - the minimum
@@ -588,14 +637,43 @@ mod tests {
 
     #[test]
     fn nearest_walkable_point_projects_onto_the_boundary_when_point_is_outside_it() {
+        // The raw projection onto the top edge would be (5.0, 10.0), but
+        // the result is nudged CLEARANCE (0.5) further in, toward the
+        // boundary's centroid, to clear the edge itself (see
+        // nearest_walkable_point's doc comment).
         let nearest = nearest_walkable_point((5.0, 50.0), &square_room());
-        assert_eq!(nearest, (5.0, 10.0));
+        assert_eq!(nearest, (5.0, 9.5));
     }
 
     #[test]
     fn nearest_walkable_point_projects_onto_the_containing_holes_edge() {
+        // The raw projection onto the hole's right edge would be
+        // (6.0, 5.0), but the result is nudged CLEARANCE (0.5) further
+        // out, away from the hole's centroid, to clear that edge.
         let nearest = nearest_walkable_point((5.2, 5.0), &square_with_center_hole_room());
-        assert_eq!(nearest, (6.0, 5.0));
+        assert_eq!(nearest, (6.5, 5.0));
+    }
+
+    #[test]
+    fn nearest_walkable_point_result_is_itself_walkable() {
+        // Regression test: a clamped point that lands exactly on a
+        // boundary/hole edge line can be mis-classified by
+        // point_in_polygon's crossing-number test (see
+        // nearest_walkable_point's doc comment) - if that ever happens,
+        // the avatar gets stranded on a point it can never walk away from
+        // again, since find_path's own is_walkable(start, ...) guard would
+        // reject every future move.
+        let hole_area = square_with_center_hole_room();
+        assert!(is_walkable(
+            nearest_walkable_point((5.2, 5.0), &hole_area),
+            &hole_area
+        ));
+
+        let boundary_area = square_room();
+        assert!(is_walkable(
+            nearest_walkable_point((5.0, 50.0), &boundary_area),
+            &boundary_area
+        ));
     }
 
     #[test]
@@ -657,22 +735,25 @@ mod tests {
     fn find_path_clamps_a_goal_outside_the_boundary_to_the_nearest_edge_point() {
         let area = square_room();
         // (5.0, 50.0) is far above the room; the nearest walkable point is
-        // directly below it on the top edge, (5.0, 10.0) - directly visible
-        // from the center, so a single-waypoint path.
+        // just inside the top edge, (5.0, 9.5) (see
+        // nearest_walkable_point_projects_onto_the_boundary_... for the
+        // 0.5 clearance nudge) - directly visible from the center, so a
+        // single-waypoint path.
         let path = find_path(&area, (5.0, 5.0), (5.0, 50.0));
-        assert_eq!(path, Some(vec![(5.0, 10.0)]));
+        assert_eq!(path, Some(vec![(5.0, 9.5)]));
     }
 
     #[test]
     fn find_path_clamps_a_goal_inside_a_hole_to_the_holes_nearest_edge_point() {
         let area = square_with_center_hole_room();
-        // (5.2, 5.0) is inside the hole, closer to its right edge (x = 6.0)
-        // than any other edge; starting from the right of the hole, that
-        // clamped point (6.0, 5.0) is directly visible - no bend needed -
-        // keeping this test focused on clamping alone, not also on
-        // path-bending (see path_routes_around_a_hole for that).
+        // (5.2, 5.0) is inside the hole, closer to its right edge than any
+        // other edge; clamped (with its 0.5 clearance nudge, see
+        // nearest_walkable_point_projects_onto_the_containing_holes_edge)
+        // to (6.5, 5.0), directly visible from the right of the hole - no
+        // bend needed - keeping this test focused on clamping alone, not
+        // also on path-bending (see path_routes_around_a_hole for that).
         let path = find_path(&area, (8.0, 5.0), (5.2, 5.0));
-        assert_eq!(path, Some(vec![(6.0, 5.0)]));
+        assert_eq!(path, Some(vec![(6.5, 5.0)]));
     }
 
     fn square_boundary_points() -> Vec<ExtraValue> {

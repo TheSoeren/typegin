@@ -14,7 +14,7 @@ objects:
     extra:
       description: A plain wooden chair. Its front-left leg is loose.
       gui:
-        hotspot: { x: 80, y: 380, w: 90, h: 140 }
+        hotspot: { x: 80, y: 370, w: 90, h: 140 }
         sprite: chair_default
 
   - key: chair-leg
@@ -38,7 +38,7 @@ objects:
     extra:
       description: A plain table, with a surface made for breaking things over.
       gui:
-        hotspot: { x: 220, y: 400, w: 140, h: 110 }
+        hotspot: { x: 300, y: 385, w: 140, h: 110 }
         sprite: table_default
 
   - key: padding
@@ -48,7 +48,7 @@ objects:
     extra:
       description: Endless layers of soft padding. The third pad from the top, on the left of the back wall, is where the air conditioning disguises the way out.
       gui:
-        hotspot: { x: 40, y: 40, w: 720, h: 200 }
+        hotspot: { x: 40, y: 50, w: 720, h: 250 }
         sprite: padding_default
 
   - key: door-grate
@@ -58,7 +58,7 @@ objects:
     extra:
       description: A small grate high in the cell door, the only window to the guard corridor.
       gui:
-        hotspot: { x: 660, y: 290, w: 40, h: 40 }
+        hotspot: { x: 660, y: 110, w: 40, h: 40 }
         sprite: door_grate_default
 
   - key: cell-door
@@ -68,7 +68,7 @@ objects:
     extra:
       description: The cell door, solidly locked. Up high, a grate.
       gui:
-        hotspot: { x: 620, y: 260, w: 120, h: 280 }
+        hotspot: { x: 620, y: 80, w: 120, h: 220 }
         sprite: cell_door_default
 
   - key: airy-gap
