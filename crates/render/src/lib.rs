@@ -7,4 +7,5 @@ pub mod asset;
 pub mod coin;
 mod extra;
 pub mod hotspot;
+pub mod pathfinding;
 pub mod tween;

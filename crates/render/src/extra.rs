@@ -18,6 +18,13 @@ pub(crate) fn as_table(value: &ExtraValue) -> Option<&HashMap<String, ExtraValue
     }
 }
 
+pub(crate) fn as_array(value: &ExtraValue) -> Option<&Vec<ExtraValue>> {
+    match value {
+        ExtraValue::Array(arr) => Some(arr),
+        _ => None,
+    }
+}
+
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 pub(crate) fn as_number(value: &ExtraValue) -> Option<f32> {
     match value {
