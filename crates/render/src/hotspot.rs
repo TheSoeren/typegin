@@ -12,6 +12,9 @@ use std::collections::HashMap;
 
 use typegin_core::ExtraValue;
 
+use crate::extra::as_number;
+use crate::extra::as_table;
+
 /// An axis-aligned clickable region, in room-local coordinates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
@@ -45,22 +48,6 @@ pub fn hotspot_rect(extra: &HashMap<String, ExtraValue>) -> Option<Rect> {
         w: as_number(hotspot.get("w")?)?,
         h: as_number(hotspot.get("h")?)?,
     })
-}
-
-fn as_table(value: &ExtraValue) -> Option<&HashMap<String, ExtraValue>> {
-    match value {
-        ExtraValue::Table(table) => Some(table),
-        _ => None,
-    }
-}
-
-#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-fn as_number(value: &ExtraValue) -> Option<f32> {
-    match value {
-        ExtraValue::Int(n) => Some(*n as f32),
-        ExtraValue::Float(n) => Some(*n as f32),
-        _ => None,
-    }
 }
 
 #[cfg(test)]

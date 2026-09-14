@@ -12,9 +12,12 @@
 //! comment on it) and would own its own asset lookup instead of drawing
 //! plain rectangles.
 
+use std::collections::HashMap;
+
 use macroquad::prelude::*;
 use typegin_core::{Action, GameEngine, Locator, ObjectId, ObjectResolution, Target, WorldData};
 
+use render::asset::{self, AssetProvider};
 use render::hotspot::{self, Rect};
 use render::{coin, tween::Tween};
 
@@ -57,13 +60,42 @@ struct SceneHotspot {
     target: Target,
     rect: Rect,
     label: String,
+    sprite: Option<Texture2D>,
+}
+
+/// Load this example's placeholder art (see `examples/pnc/assets/`) into an
+/// `AssetProvider` keyed by the `extra.gui.sprite` values authored in
+/// `examples/data/items.yaml` — proves `render::asset`'s wiring end to end,
+/// even though these are flat-color placeholders, not real art (see
+/// AGENTS.md: this crate stays throwaway).
+async fn load_assets() -> HashMap<String, Texture2D> {
+    let asset_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/assets");
+    let sprite_keys = [
+        "chair_default",
+        "table_default",
+        "padding_default",
+        "door_grate_default",
+        "cell_door_default",
+    ];
+    let mut assets = HashMap::new();
+    for key in sprite_keys {
+        let path = format!("{asset_dir}/{key}.png");
+        let texture = load_texture(&path)
+            .await
+            .unwrap_or_else(|err| panic!("failed to load placeholder asset {path}: {err}"));
+        assets.insert(key.to_string(), texture);
+    }
+    assets
 }
 
 /// Every candidate object that's both currently in the room and has
 /// authored `gui.hotspot` data. Anything currently in the room *without*
 /// hotspot data is returned separately, so it stays visible (as a text
 /// fallback) instead of silently vanishing.
-fn visible_hotspots(engine: &GameEngine) -> (Vec<SceneHotspot>, Vec<String>) {
+fn visible_hotspots(
+    engine: &GameEngine,
+    assets: &HashMap<String, Texture2D>,
+) -> (Vec<SceneHotspot>, Vec<String>) {
     let world = engine.world();
     let mut placed = Vec::new();
     let mut unplaced = Vec::new();
@@ -75,11 +107,15 @@ fn visible_hotspots(engine: &GameEngine) -> (Vec<SceneHotspot>, Vec<String>) {
             continue;
         };
         match hotspot::hotspot_rect(&info.extra) {
-            Some(rect) => placed.push(SceneHotspot {
-                target: Target::Object(id),
-                rect,
-                label: info.name,
-            }),
+            Some(rect) => {
+                let sprite = asset::sprite_key(&info.extra).and_then(|key| assets.asset(key));
+                placed.push(SceneHotspot {
+                    target: Target::Object(id),
+                    rect,
+                    label: info.name,
+                    sprite,
+                });
+            }
             None => unplaced.push(info.name),
         }
     }
@@ -102,12 +138,13 @@ fn room_description(engine: &GameEngine) -> String {
 async fn main() {
     let world_data = load_shared_world();
     let mut engine = GameEngine::get(&world_data);
+    let assets = load_assets().await;
     let mut coin_alpha = Tween::settled(0.0_f32);
 
     loop {
         clear_background(Color::from_rgba(20, 20, 24, 255));
 
-        let (hotspots, unplaced) = visible_hotspots(&engine);
+        let (hotspots, unplaced) = visible_hotspots(&engine, &assets);
         let mouse = mouse_position();
         let hovered = hotspots.iter().position(|h| h.rect.contains(mouse));
 
@@ -117,14 +154,27 @@ async fn main() {
         draw_text(&room_description(&engine), 20.0, 30.0, 20.0, WHITE);
 
         for (i, spot) in hotspots.iter().enumerate() {
-            let color = if hovered == Some(i) { YELLOW } else { GRAY };
+            match &spot.sprite {
+                Some(texture) => draw_texture_ex(
+                    texture,
+                    spot.rect.x,
+                    spot.rect.y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some(vec2(spot.rect.w, spot.rect.h)),
+                        ..Default::default()
+                    },
+                ),
+                None => draw_rectangle(spot.rect.x, spot.rect.y, spot.rect.w, spot.rect.h, GRAY),
+            }
+            let border_color = if hovered == Some(i) { YELLOW } else { GRAY };
             draw_rectangle_lines(
                 spot.rect.x,
                 spot.rect.y,
                 spot.rect.w,
                 spot.rect.h,
                 2.0,
-                color,
+                border_color,
             );
             draw_text(&spot.label, spot.rect.x, spot.rect.y - 6.0, 16.0, WHITE);
         }
