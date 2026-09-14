@@ -1,0 +1,12 @@
+[package]
+name = "editor"
+version = "0.1.0"
+edition = "2024"
+
+[lints]
+workspace = true
+
+[dependencies]
+render = { path = "../render" }
+typegin-core = { package = "core", path = "../core" }
+serde_yaml_ng = "0.10"

@@ -2,6 +2,7 @@
 members = [
     "crates/core",
     "crates/render",
+    "crates/editor",
     "examples/text",
     "examples/pnc",
 ]
