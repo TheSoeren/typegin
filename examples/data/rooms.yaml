@@ -8,6 +8,8 @@ rooms:
     hidden_objects: [chair-leg, airy-gap, vent-grille, fan, shaft-entrance]
     extra:
       description: A padded cell in the sanatorium. It is oppressively hot — the air conditioning is off.
+      gui:
+        walkable: [[20, 250], [780, 250], [780, 590], [20, 590]]
 
   - key: air-chute
     name: The Ventilation Shaft
