@@ -3,7 +3,7 @@
 //! Game- and front-end-specific data (sprites, weights, puzzle hints, ...)
 //! travels through the engine untouched. It is declared as a TOML table on an
 //! item or room, mirrored on the public `ObjectInfo`/`WorldState`, and readable
-//! by custom `Rules` — without the engine ever interpreting the keys. Key
+//! by custom `Rules` - without the engine ever interpreting the keys. Key
 //! namespacing (`gui.*`, `mechanics.*`) is a convention, not engine knowledge.
 
 mod common;

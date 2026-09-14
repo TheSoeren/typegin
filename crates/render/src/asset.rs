@@ -1,14 +1,14 @@
 //! The asset-provider extension point: how a specific game hands `render`
 //! the textures/backgrounds/sprites it draws, without `render` ever knowing
 //! about that game's actual content (see AGENTS.md's "Non-negotiable"
-//! section — `render` stays a reusable engine, never a specific game).
+//! section - `render` stays a reusable engine, never a specific game).
 //!
 //! Mirrors `hotspot.rs`'s split: `render` owns a convention for finding an
 //! opaque *key* inside an object's `extra` data (`extra.gui.sprite`, read by
 //! [`sprite_key`]), and a specific game owns turning that key into an actual
 //! drawable handle, by implementing [`AssetProvider`]. `render` never
-//! interprets `AssetProvider::Handle` itself — it only ever hands the handle
-//! back to the same game's own drawing code — so it can be a `macroquad`
+//! interprets `AssetProvider::Handle` itself - it only ever hands the handle
+//! back to the same game's own drawing code - so it can be a `macroquad`
 //! `Texture2D`, an atlas index, or anything else a consuming game's asset
 //! pipeline produces.
 
@@ -21,13 +21,13 @@ use crate::extra::{as_string, as_table};
 /// Implemented by a specific game to resolve an opaque sprite `key`
 /// (authored per-object via `extra.gui.sprite`, see [`sprite_key`]) to a
 /// drawable asset handle. `render` calls this at draw time; it never caches,
-/// loads, or otherwise owns the underlying asset itself — that stays the
+/// loads, or otherwise owns the underlying asset itself - that stays the
 /// game's responsibility, same as it owns the `Handle` type.
 pub trait AssetProvider {
     type Handle: Clone;
 
     /// Resolve `key` to a handle, or `None` if this provider has nothing
-    /// for it (an unauthored or not-yet-loaded key) — a caller decides what
+    /// for it (an unauthored or not-yet-loaded key) - a caller decides what
     /// a missing asset means (skip drawing, draw a placeholder, ...).
     fn asset(&self, key: &str) -> Option<Self::Handle>;
 }
@@ -46,7 +46,7 @@ impl<H: Clone> AssetProvider for HashMap<String, H> {
 
 /// Read this crate's `gui.sprite` convention out of an object's `extra`
 /// data. Returns `None` for anything not yet authored (missing `gui` key,
-/// missing `sprite` key, or a non-string value) — same contract as
+/// missing `sprite` key, or a non-string value) - same contract as
 /// [`crate::hotspot::hotspot_rect`], never panics on incomplete content.
 #[must_use]
 #[allow(clippy::implicit_hasher)]

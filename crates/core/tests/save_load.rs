@@ -3,7 +3,7 @@
 //!
 //! ## Design: a *progress* snapshot, not a `WorldState` dump
 //!
-//! `WorldState` is not purely "mutable progress" — it also holds a full copy
+//! `WorldState` is not purely "mutable progress" - it also holds a full copy
 //! of the *static* authored content (`data_interactions`, `triggers`,
 //! `object_templates`, and every NPC's complete dialogue tree). Serializing
 //! `WorldState` wholesale would duplicate that content into every save file
@@ -14,11 +14,11 @@
 //!   *dynamic* slice of the game: flags, player inventory, each room's
 //!   current visible/hidden object membership, objects discarded out of the
 //!   world entirely, door lock state, and fired triggers. Deliberately
-//!   *not* in-progress dialogue (`dialogue_state`/`active_npc`) — a reload
+//!   *not* in-progress dialogue (`dialogue_state`/`active_npc`) - a reload
 //!   never resumes the player mid-conversation, see
 //!   `a_reload_never_resumes_mid_conversation` below. Human-readable text
 //!   (YAML, via the `serde_yaml_ng` dependency `core` already has for
-//!   `WorldData::from_yaml` — no new dependency needed), but the exact
+//!   `WorldData::from_yaml` - no new dependency needed), but the exact
 //!   format is not part of this contract: nothing here parses the string
 //!   itself, only round-trips it through `save`/`load`.
 //! * `GameEngine::load(data: &WorldData, rules: impl Rules + 'static, save:
@@ -34,7 +34,7 @@
 //!   the new data.
 //! * The concrete error type `save`/`load` return is an implementation
 //!   choice (a dedicated error enum, reusing `WorldDataError`'s shape,
-//!   `Box<dyn std::error::Error>`, ...) — this suite only ever checks
+//!   `Box<dyn std::error::Error>`, ...) - this suite only ever checks
 //!   `is_ok()`/`is_err()`, never a specific variant.
 //!
 //! No new `Action`, `Event`, or YAML authoring schema: `save`/`load` are a
@@ -97,7 +97,7 @@ mod round_trip {
     #[test]
     fn round_trips_a_grant_only_object_never_placed_in_any_room() {
         // `rusty-nail` is declared in the shared fixture but never listed in
-        // any room's `visible_objects`/`hidden_objects` — the only way it
+        // any room's `visible_objects`/`hidden_objects` - the only way it
         // ever exists is via a `grant` effect, so a freshly-built
         // `WorldState` has no placed instance of it anywhere to relocate.
         let data = world_with(

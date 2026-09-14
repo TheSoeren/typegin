@@ -476,7 +476,7 @@ mod effects {
                 .is_exit_hidden(&GoTarget::Direction(Direction::North))
         );
 
-        // The effect runs silently — no stock Examined, no Custom beat.
+        // The effect runs silently - no stock Examined, no Custom beat.
         assert_eq!(engine.handle_input("examine oak door"), vec![]);
         assert!(
             !engine

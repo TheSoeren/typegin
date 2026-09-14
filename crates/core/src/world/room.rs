@@ -317,7 +317,7 @@ mod tests {
         }
     }
 
-    /// A door with no compass direction at all — a point-and-click-only
+    /// A door with no compass direction at all - a point-and-click-only
     /// exit, reached by name (`Rules::on_go`'s `GoTarget::Named` path) and
     /// never by `go <direction>`.
     fn door_object_no_direction(id: &str, to: &str, locked: bool) -> object::Object {
@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(room.exit_directions(), Vec::new());
 
         // ...but still an ordinary room object, findable by id like any
-        // other — `Rules::on_go`'s `GoTarget::Named` path reaches it via
+        // other - `Rules::on_go`'s `GoTarget::Named` path reaches it via
         // `WorldState::object_info`, not through this room's direction
         // index at all.
         assert!(room.holds(&crate::objectId!("hatch")));

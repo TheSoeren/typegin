@@ -1,6 +1,6 @@
 //! Front-end-agnostic text-adventure engine: parsing, world state, and a
 //! data-driven interaction system. The engine only ever hands a front-end a
-//! typed [`Event`] stream and read-only [`WorldState`] queries — it has no
+//! typed [`Event`] stream and read-only [`WorldState`] queries - it has no
 //! opinion on rendering (no `View` trait, no output type of any kind), so a
 //! text UI, a GUI, or a full point-and-click front-end each build whatever
 //! rendering layer suits them, entirely outside this crate.

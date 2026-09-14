@@ -150,7 +150,7 @@ mod world_state_navigation {
 
 // ---------------------------------------------------------------------------
 // Named exits: `Action::Go(GoTarget::Named(..))` reaches a door by name
-// instead of by compass direction — the point-and-click-friendly path, and
+// instead of by compass direction - the point-and-click-friendly path, and
 // the only way to reach a door that has no `direction` at all. A standalone
 // world, not the shared `multi_room_world_data()` fixture: every door there
 // already has a direction, and forking a per-scenario copy of the shared

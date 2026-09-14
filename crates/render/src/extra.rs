@@ -2,7 +2,7 @@
 //! tree. Every reader of this crate's `extra.gui.*` convention (see
 //! `hotspot.rs`, `asset.rs`) needs to step into an `ExtraValue::Table` the
 //! same way, so that one step lives here instead of being copied per reader.
-//! Not part of this crate's public API — a specific `gui.*` key's reader
+//! Not part of this crate's public API - a specific `gui.*` key's reader
 //! (`hotspot_rect`, `sprite_key`, ...) is the public surface, not this.
 
 use std::collections::HashMap;
@@ -23,6 +23,19 @@ pub(crate) fn as_array(value: &ExtraValue) -> Option<&Vec<ExtraValue>> {
         ExtraValue::Array(arr) => Some(arr),
         _ => None,
     }
+}
+
+/// Parse a `gui.walkable`-style polygon: a flat array of `[x, y]` pairs.
+/// Shared by [`crate::pathfinding::walkable_area`] to parse both the outer
+/// `boundary` and each entry of `holes` the same way.
+pub(crate) fn as_polygon(value: &ExtraValue) -> Option<Vec<(f32, f32)>> {
+    as_array(value)?
+        .iter()
+        .map(|vertex| {
+            let pair = as_array(vertex)?;
+            Some((as_number(pair.first()?)?, as_number(pair.get(1)?)?))
+        })
+        .collect()
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]

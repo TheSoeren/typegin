@@ -5,12 +5,12 @@ use typegin_core::{Event, WorldState};
 ///
 /// Keeping the wording here (instead of in the engine) means you can change
 /// every sentence in the game without touching game logic. `typegin_core`
-/// has no rendering contract of its own (no `View` trait) — this is just a
+/// has no rendering contract of its own (no `View` trait) - this is just a
 /// plain function over `Event`, the simplest thing that works for a single
 /// first-party text front-end.
 ///
 /// Only the events matched here produce output; anything else silently
-/// produces nothing, so a new engine `Event` never breaks this front-end —
+/// produces nothing, so a new engine `Event` never breaks this front-end -
 /// it just needs an arm added here when you want it voiced.
 pub fn render(events: &[Event], world: &WorldState) -> Vec<String> {
     events

@@ -1,7 +1,7 @@
 //! Spec for "combine two carried items" (AGENTS.md engine gap #4, second
 //! half): scoping an authored interaction to a *carried* target, distinct
 //! from a *scene* (room) target, on the existing `Action::Use { item, target
-//! }` path. No new `Verb`, `Action`, or `Event` — "combine key with string"
+//! }` path. No new `Verb`, `Action`, or `Event` - "combine key with string"
 //! is just `use key on string` where `string` happens to resolve to a
 //! carried object instead of a room object, a path
 //! `WorldState::resolve_target` already supports (it searches room objects
@@ -10,7 +10,7 @@
 //! ## Schema additions
 //!
 //! `TargetKind` (shared, like `Verb`, between the authored schema and the
-//! compiled runtime filter — see `crates/core/src/interaction/target.rs`)
+//! compiled runtime filter - see `crates/core/src/interaction/target.rs`)
 //! gains a `Carried` variant alongside the existing `Scene`:
 //!
 //! ```yaml
@@ -24,20 +24,20 @@
 //! ```
 //!
 //! `target: kind: carried` matches *any* currently-carried object, the way
-//! `target: kind: scene` already matches any room object — it authors a
+//! `target: kind: scene` already matches any room object - it authors a
 //! reaction that should fire regardless of *which* carried object the item
 //! was used on, not a fixed two-item recipe. A specific recipe ("brass key +
 //! rusty lamp -> rusty nail") is instead authored the way it already works
 //! today: a fixed `target: object: <id>` naming the second item by key,
 //! assembling the result from the existing `Discard`/`Grant` effects (no new
-//! effect kind) — this suite pins that already-working path down too, since
+//! effect kind) - this suite pins that already-working path down too, since
 //! it was previously untested.
 //!
 //! ## Dispatch contract
 //!
 //! 1. `use <item> on <target>` resolves `target` via
 //!    `WorldState::resolve_target`, which searches the current room *and*
-//!    the player's inventory — unchanged by this feature.
+//!    the player's inventory - unchanged by this feature.
 //! 2. An interaction scoped `target: kind: carried`
 //!    (`TargetFilter::Kind(TargetKind::Carried)`) matches only when the
 //!    resolved target is `Target::Object(id)` and `world.player_holds(id)`;
@@ -46,11 +46,11 @@
 //!    matching a carried object.
 //! 3. When no authored interaction matches (target not carried, or nothing
 //!    authored at all), dispatch falls through to the stock `on_use`
-//!    fallback exactly as for any other `use` — a carried target is not a
+//!    fallback exactly as for any other `use` - a carried target is not a
 //!    distinct code path, only a distinct *filter* an author opts into.
 //! 4. Item/target resolution failures continue to report through the
 //!    existing `UsedObjectNotFound` / `UsedObjectAmbiguous` /
-//!    `UsedTargetNotFound` / `UsedTargetAmbiguous` events — no new event
+//!    `UsedTargetNotFound` / `UsedTargetAmbiguous` events - no new event
 //!    vocabulary for combine.
 //!
 //! Run with: `cargo test --test combine`.
@@ -434,7 +434,7 @@ mod not_found_and_ambiguous {
                 object: "brass key".to_string(),
             }]
         );
-        // Both keys share the alias "key", so the *target* is ambiguous —
+        // Both keys share the alias "key", so the *target* is ambiguous -
         // this has no precedent test elsewhere since it only arises for a
         // carried target.
         assert_eq!(

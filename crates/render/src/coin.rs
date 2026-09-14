@@ -2,7 +2,7 @@
 //! layout: an ordered, angularly-spaced list a renderer can draw as a ring
 //! of labels/icons around a hotspot.
 //!
-//! `verbs_for` returns a `HashSet<Verb>` — iteration order unspecified — so
+//! `verbs_for` returns a `HashSet<Verb>` - iteration order unspecified - so
 //! a coin needs its own fixed convention for "which slot" a verb lands in.
 //! That's this crate's concern, not core's: core doesn't order verbs
 //! because it doesn't render them.
@@ -33,7 +33,7 @@ pub struct CoinEntry {
 }
 
 /// Lay `verbs` out evenly around a circle, in [`VERB_ORDER`]. Empty input
-/// yields an empty coin — the caller decides whether "no verbs" should even
+/// yields an empty coin - the caller decides whether "no verbs" should even
 /// be reachable (e.g. by not opening a coin at all when there's only one).
 #[must_use]
 #[allow(clippy::cast_precision_loss, clippy::implicit_hasher)]

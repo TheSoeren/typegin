@@ -43,8 +43,8 @@ impl RoomData {
     /// Verify that no two of this room's doors (visible or hidden) occupy the
     /// same compass direction.
     ///
-    /// Unknown object keys are not reported here — `validate_references`
-    /// (run first, in `WorldData::validate`) already reports those — so a
+    /// Unknown object keys are not reported here - `validate_references`
+    /// (run first, in `WorldData::validate`) already reports those - so a
     /// reference that doesn't resolve is silently skipped. An unparsable or
     /// absent direction string doesn't occupy a compass slot at all (it's a
     /// direction-less, point-and-click-only exit, per

@@ -36,20 +36,20 @@
 //!
 //! ### Actions
 //!
-//! * `Action::Talk(Locator<NpcId>)` — `talk to <npc>` / `talk <npc>` (stop-word
+//! * `Action::Talk(Locator<NpcId>)` - `talk to <npc>` / `talk <npc>` (stop-word
 //!   "to" is stripped by the tokenizer) resolves to `Locator::Name`; a
 //!   point-and-click front-end may instead supply `Locator::Id` directly.
-//! * `Action::Choose(String)` — `choose <label>` / `choose <index>` where
+//! * `Action::Choose(String)` - `choose <label>` / `choose <index>` where
 //!   index is 1-based.
 //!
 //! ### Events
 //!
 //! * `Event::Talked { npc_id, npc, node_id: DialogueNodeId, text, choices }`
-//!   — the NPC's dialogue line plus the player's available choices.
-//! * `Event::DialogueEnded { npc_id, npc }` — conversation ended (a node
+//!   - the NPC's dialogue line plus the player's available choices.
+//! * `Event::DialogueEnded { npc_id, npc }` - conversation ended (a node
 //!   with no choices, or a `.end` choice).
-//! * `Event::TalkNpcNotFound { npc }` — no NPC by that name in the room.
-//! * `Event::DialogueInvalidChoice { npc, choice }` — choice didn't match.
+//! * `Event::TalkNpcNotFound { npc }` - no NPC by that name in the room.
+//! * `Event::DialogueInvalidChoice { npc, choice }` - choice didn't match.
 //!
 //! ## Dispatch flow
 //!
@@ -546,7 +546,7 @@ mod parse {
 // `talk_with_no_target_is_unknown`, `choose_joins_remaining_tokens`,
 // `choose_with_no_payload_is_unknown`) plus the stop-word stripping proven by
 // `crates/core/src/input/tokenizer.rs`'s
-// `stop_word_inside_a_longer_phrase_is_dropped` — together the same coverage
+// `stop_word_inside_a_longer_phrase_is_dropped` - together the same coverage
 // this module gave through the public `parse_input` entry point.
 // ---------------------------------------------------------------------------
 
@@ -984,7 +984,7 @@ mod integration {
 
 /// NPCs live in the open `interactions_for(None, None)` query as `Talk`
 /// hotspots, so a point-and-click front-end renders every clickable thing in
-/// one listing — NPCs and objects alike — without coercing NPCs into objects.
+/// one listing - NPCs and objects alike - without coercing NPCs into objects.
 mod interactions_for_talk {
     use super::*;
     use core::{Target, TargetFilter, Verb};

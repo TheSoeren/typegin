@@ -1,4 +1,4 @@
-//! A generic value that chases a target over time — the presentational
+//! A generic value that chases a target over time - the presentational
 //! state a render loop mutates every frame, kept separate from
 //! `typegin_core::WorldState` (the only source of truth for what's actually
 //! true). `WorldState`/`Event` decide *what* changed; a [`Tween`] only ever

@@ -9,7 +9,7 @@
 //!   order (not first-match-wins, unlike `Interaction` dispatch);
 //! - the "ready" set for a pass is a snapshot taken before any trigger in
 //!   that pass runs, so one trigger's effect cannot make another trigger in
-//!   the same pass newly eligible — a chain resolves over multiple player
+//!   the same pass newly eligible - a chain resolves over multiple player
 //!   turns, never within one;
 //! - each trigger fires at most once, ever (no re-arm).
 

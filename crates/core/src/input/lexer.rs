@@ -249,7 +249,7 @@ mod tests {
     // only exits), by name, exactly like `examine`/`take`/`drop` reach any
     // other object. See `crates/core/tests/navigation.rs`'s `named_exits`
     // module for the end-to-end (resolution, locked, not-a-door, not-found,
-    // ambiguous) behavior — this only pins the parse.
+    // ambiguous) behavior - this only pins the parse.
     #[test]
     fn enter_joins_remaining_tokens() {
         assert_eq!(

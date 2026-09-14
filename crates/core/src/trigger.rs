@@ -1,13 +1,13 @@
 //! Runtime dispatch for authored [`TriggerData`](crate::data::trigger_data::TriggerData)
 //! (`data::trigger_data` is schema only, like every other `*_data` module):
-//! checked after *every* player action, not tied to a specific verb — the
+//! checked after *every* player action, not tied to a specific verb - the
 //! "World" hook the interaction system's verb-object dispatch doesn't cover.
 //!
 //! Dispatch contract (AGENTS.md engine gap #3, pinned down by
 //! `crates/core/tests/triggers.rs`): every action re-checks every
 //! not-yet-fired trigger; all whose conditions hold fire in one pass, in
 //! declaration order, against a readiness snapshot taken before any of them
-//! run in that pass — so one trigger's effect cannot make another trigger in
+//! run in that pass - so one trigger's effect cannot make another trigger in
 //! the same pass newly eligible (a chain resolves over multiple turns, never
 //! within one). Each trigger fires at most once, ever.
 

@@ -15,7 +15,7 @@ pub type ObjectResolution = crate::keys::Resolution<ObjectId>;
 pub use crate::interaction::TargetResolution;
 
 /// A world object: gameplay-flavoured "thing" that can be carried, examined
-/// and used. Contains only *facts* (identity, names, kind, opaque extras) — all
+/// and used. Contains only *facts* (identity, names, kind, opaque extras) - all
 /// behaviour (what happens when you use X on Y) lives in rules and
 /// interactions, not here.
 #[derive(Debug, Clone, PartialEq)]
@@ -29,7 +29,7 @@ pub struct Object {
 }
 
 /// Runtime door state of a scene object: the direction it occupies, its
-/// destination, and whether it is locked. Hidden-ness is *not* stored here —
+/// destination, and whether it is locked. Hidden-ness is *not* stored here -
 /// a hidden door is simply an object living in the room's `hidden_objects`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DoorState {
@@ -254,10 +254,10 @@ mod tests {
     fn from_data_treats_an_unparsable_direction_as_direction_less_not_as_no_door() {
         // Previously a typo'd `direction:` string silently dropped the
         // *entire* door (losing `to`/`locked` along with it, discarding an
-        // authoring mistake into a much more confusing one — an object that
+        // authoring mistake into a much more confusing one - an object that
         // looks like a door in YAML but isn't one at runtime). Now that
         // `direction` is optional, an unparsable one degrades no further
-        // than "no compass direction" — `to`/`locked` stay intact.
+        // than "no compass direction" - `to`/`locked` stay intact.
         let data = object_data::ObjectData {
             id: crate::objectId!("door"),
             primary_name: "door".to_string(),

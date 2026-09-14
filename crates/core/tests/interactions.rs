@@ -246,7 +246,7 @@ mod interactions_for {
         );
 
         // Now unlocked: the `use` interaction's condition no longer holds, so
-        // the query drops it — but the unconditional `examine` interaction
+        // the query drops it - but the unconditional `examine` interaction
         // still matches.
         let after_unlock = engine.interactions_for(
             Some(core::objectId!("iron-key")),
@@ -288,7 +288,7 @@ mod interactions_for {
 ///
 /// Contract (the spec this suite pins down):
 /// 1. The default `on_examine`/`on_take`/`on_drop` run the *first* matching
-///    authored interaction before their stock spine — but only when the
+///    authored interaction before their stock spine - but only when the
 ///    object resolved (`Found`); bad names never reach interactions.
 /// 2. A matching interaction fully replaces stock behaviour: the effect owns
 ///    the world mutation (via `&mut WorldState`) and the returned events.
@@ -366,7 +366,7 @@ mod non_use_verbs {
     fn drop_interaction_replaces_stock_drop_and_owns_the_mutation() {
         let mut engine = GameEngine::get(&common::multi_room_world_data());
         // The interaction fires instead of `Dropped`, and the effect did not
-        // drop the map — full replacement, the map stays carried.
+        // drop the map - full replacement, the map stays carried.
         engine.handle_input("take iron key");
         engine.handle_input("go north");
         engine.handle_input("take old map");
@@ -430,7 +430,7 @@ mod non_use_verbs {
         engine.handle_input("go north");
         engine.handle_input("go east");
 
-        // Each item returns its matching interaction — verb-independent.
+        // Each item returns its matching interaction - verb-independent.
         let examine =
             engine.interactions_for(None, Some(Target::Object(core::objectId!("oak-door"))));
         assert_eq!(examine.len(), 1);

@@ -2,7 +2,7 @@
 //!
 //! These are exposed as *public* helper functions on `WorldState` so a
 //! front-end can decide when to reveal them. The engine itself never calls
-//! them — a `View` or a custom `Rules` implementation triggers the reveal.
+//! them - a `View` or a custom `Rules` implementation triggers the reveal.
 //!
 //! The multi-room fixture places hidden content in:
 //!   - cellar: hidden item `stale-bread`

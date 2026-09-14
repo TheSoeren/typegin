@@ -115,7 +115,7 @@ mod everything_overridden {
     #[test]
     fn on_go_override_wins_for_a_named_target_too() {
         // `on_go` is one hook regardless of how the destination was
-        // specified (`GoTarget::Direction` or `GoTarget::Named`) — an
+        // specified (`GoTarget::Direction` or `GoTarget::Named`) - an
         // override intercepts both the same way.
         let mut custom = setup_engine_with_rules(TestRules);
         assert_eq!(

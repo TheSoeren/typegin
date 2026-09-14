@@ -6,7 +6,7 @@ use common::{base_world, engine_with_interactions as engine_with, merge_yaml};
 
 /// The `objects:` and `rooms:` sections of the keyed world, split apart so
 /// `mod integrity` below can corrupt just one while keeping the other
-/// canonical. Kept in sync with `fixtures/keyed_world.yaml` by hand — this is
+/// canonical. Kept in sync with `fixtures/keyed_world.yaml` by hand - this is
 /// the one file that needs the two sections independently addressable.
 const ITEMS_YAML: &str = r"objects:
   - key: iron-key
@@ -434,8 +434,8 @@ mod integrity {
         // that used to sit here broke YAML parsing outright, before
         // validation ever ran; even fixing just that, `ROOMS_YAML`
         // references objects like `iron-key` that this test's minimal
-        // `items` doesn't declare, so the *room* reference check — which
-        // runs before the object reference check — would fail first
+        // `items` doesn't declare, so the *room* reference check - which
+        // runs before the object reference check - would fail first
         // instead of `bad-door`'s `to:`). A minimal, self-contained room
         // that only ever mentions `bad-door` isolates the actual check:
         // an object's own door `to:` is validated regardless of whether
@@ -504,7 +504,7 @@ mod integrity {
         // Two doors both claiming `direction: north` in the same room used
         // to silently clobber each other in `Room`'s direction index (the
         // second one insertion-order wins, the first becomes an orphaned
-        // room object with no compass exit at all) — now a room-authoring
+        // room object with no compass exit at all) - now a room-authoring
         // mistake, not silent data loss.
         let items = r"objects:
   - key: north-door-a

@@ -1,5 +1,5 @@
 //! Demonstration that `crates/render` (a reusable rendering engine, no game
-//! content of its own — see AGENTS.md) can drive the *same* shared example
+//! content of its own - see AGENTS.md) can drive the *same* shared example
 //! content `examples/text` and `crates/text-proto` use
 //! (`examples/data/`), through a real macroquad window: boot a
 //! `GameEngine`, draw the current room's hotspots, show a radial verb coin
@@ -8,7 +8,7 @@
 //! arrival.
 //!
 //! All the actual logic (hit-testing, coin layout, animation, pathfinding)
-//! lives in `render`'s library, not here — this file only wires it
+//! lives in `render`'s library, not here - this file only wires it
 //! together and draws. A real game would replace `candidate_object_ids`
 //! below with a proper "list this room's objects" query once core exposes
 //! one (see the comment on it) and would own its own asset lookup instead
@@ -24,7 +24,7 @@ use render::hotspot::{self, Rect};
 use render::pathfinding;
 use render::{coin, tween::Tween};
 
-/// Avatar walk speed, in pixels per second — this example's own concern
+/// Avatar walk speed, in pixels per second - this example's own concern
 /// (`render`'s `Tween` has no notion of speed, only "reach `target` in
 /// `duration` seconds"; a specific game picks its own pacing).
 const WALK_SPEED: f32 = 220.0;
@@ -49,7 +49,7 @@ fn load_shared_world() -> WorldData {
 }
 
 /// The example's fixed object list, since core doesn't yet expose a "list
-/// this room's objects with their full `ObjectInfo`" query — only names
+/// this room's objects with their full `ObjectInfo`" query - only names
 /// (`WorldState::room_object_names`) or a lookup by an id you already have.
 /// A real game built on `render` needs that query added to core; this
 /// example just hardcodes the ids the shared starting room happens to have,
@@ -73,7 +73,7 @@ struct SceneHotspot {
 
 /// Load this example's placeholder art (see `examples/pnc/assets/`) into an
 /// `AssetProvider` keyed by the `extra.gui.sprite` values authored in
-/// `examples/data/items.yaml` — proves `render::asset`'s wiring end to end,
+/// `examples/data/items.yaml` - proves `render::asset`'s wiring end to end,
 /// even though these are flat-color placeholders, not real art (see
 /// AGENTS.md: this crate stays throwaway).
 async fn load_assets() -> HashMap<String, Texture2D> {
@@ -150,7 +150,7 @@ async fn main() {
     let mut coin_alpha = Tween::settled(0.0_f32);
 
     // A placeholder player avatar (see AGENTS.md: this crate stays
-    // throwaway, plain shapes not real art) that walks — leg by leg — along
+    // throwaway, plain shapes not real art) that walks - leg by leg - along
     // a `render::pathfinding::find_path` route before a clicked verb
     // actually executes, rather than executing instantly on click.
     let mut avatar_position = Tween::settled((400.0_f32, 550.0_f32));
@@ -217,7 +217,7 @@ async fn main() {
             && pending_action.is_none()
         {
             // Clicking empty floor (no hotspot hovered, so no verb coin to
-            // choose from) just walks the avatar there — same mechanism,
+            // choose from) just walks the avatar there - same mechanism,
             // but with nothing to execute on arrival.
             begin_walk_or_execute(
                 None,
@@ -235,8 +235,8 @@ async fn main() {
 }
 
 /// Advance the avatar's walk-in-progress by `dt` seconds: once the current
-/// leg settles, either start the next waypoint's leg or — once the whole
-/// path is walked — execute whatever verb triggered the walk.
+/// leg settles, either start the next waypoint's leg or - once the whole
+/// path is walked - execute whatever verb triggered the walk.
 fn advance_avatar(
     dt: f32,
     avatar_position: &mut Tween<(f32, f32)>,
@@ -310,9 +310,9 @@ fn draw_walkable_and_avatar(
 }
 
 /// Draw the radial verb coin over the hovered hotspot (if any), and report
-/// the clicked verb — the highest-priority entry — when the player clicks
+/// the clicked verb - the highest-priority entry - when the player clicks
 /// while `can_click` is true (gated on there being no walk already in
-/// flight — see `begin_walk_or_execute`/`advance_avatar`'s single
+/// flight - see `begin_walk_or_execute`/`advance_avatar`'s single
 /// `pending_action` slot).
 fn draw_verb_coin_and_detect_click(
     hotspots: &[SceneHotspot],
@@ -348,13 +348,13 @@ fn draw_verb_coin_and_detect_click(
     }
 }
 
-/// Walk to `destination` before executing `action` (if any) — the
+/// Walk to `destination` before executing `action` (if any) - the
 /// authentic `PnC` "walk-then-interact" feel. `action` is `None` for a
 /// plain click-to-walk on empty floor (nothing to execute on arrival), and
 /// `Some` for a click on a hotspot's verb coin.
 ///
-/// Falls back to instant execution — or, for a plain walk, to doing
-/// nothing at all — when there's nowhere to walk: no `gui.walkable`
+/// Falls back to instant execution - or, for a plain walk, to doing
+/// nothing at all - when there's nowhere to walk: no `gui.walkable`
 /// authored for this room yet, or `destination` landed outside it (e.g. on
 /// a wall-mounted hotspot like the padding).
 fn begin_walk_or_execute(

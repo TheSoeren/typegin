@@ -53,7 +53,7 @@ impl InteractionData {
 /// *target*) and every `condition` holds, run every `effect` in order.
 ///
 /// Matching and dispatch mirror the closure
-/// [`Interaction`](crate::interaction::Interaction) surface — data
+/// [`Interaction`](crate::interaction::Interaction) surface - data
 /// interactions run *before* `Rules::interactions()` closures and before the
 /// stock fallback; that runtime behaviour lives in `interaction::data_interactions`,
 /// not here. This module is schema and structural validation only, like every
@@ -71,7 +71,7 @@ pub struct InteractionData {
     pub effect: Vec<DataEffect>,
 }
 
-/// A target spec for a data interaction. `target` is optional — omitted it
+/// A target spec for a data interaction. `target` is optional - omitted it
 /// matches any target, including a self-use (`use X` with no target).
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]

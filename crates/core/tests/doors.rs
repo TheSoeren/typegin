@@ -2,7 +2,7 @@
 //!
 //! A door is a Scene object in the room's object list carrying optional door
 //! data: a destination plus a `locked` flag. An exit's *hidden* flag no longer
-//! lives on the door — hidden-ness is list membership: a hidden door is an
+//! lives on the door - hidden-ness is list membership: a hidden door is an
 //! object sitting in the room's `hidden_objects` until revealed. Both locked
 //! and hidden refuse movement; the engine reports the reason
 //! (`WentExitHidden` vs `WentExitLocked`) so the consumer decides how a

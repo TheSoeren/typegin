@@ -70,7 +70,7 @@ mod tests {
 
     #[test]
     fn go_maps_to_the_same_verb_by_direction_or_by_name() {
-        // A compass move and a named-door move are the same verb category —
+        // A compass move and a named-door move are the same verb category -
         // `Rules::on_go` is one hook for both, matching how `Use` is one
         // verb regardless of whether a target was given.
         assert_eq!(

@@ -171,7 +171,7 @@ impl From<serde_yaml_ng::Error> for WorldDataError {
 ///
 /// A consumer authoring content across multiple files (as the shipped
 /// `data/*.yaml` files do) concatenates them into one string before calling
-/// [`WorldData::from_yaml`] — each file already contributes disjoint
+/// [`WorldData::from_yaml`] - each file already contributes disjoint
 /// top-level keys, so concatenation is a lossless merge with no deep-merge
 /// logic required. The core crate only ever sees one document; it has no
 /// opinion on how many files a consumer's content is split across.

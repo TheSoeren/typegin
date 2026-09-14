@@ -40,7 +40,7 @@
 //! * Flag names are free-form strings; no validation against declared data.
 //! * `set_flag` / `clear_flag` effects are silent (no event emitted). Pair
 //!   with an `emit` effect if you need a visible beat.
-//! * Flags are mutable world state — the only way to change them is through
+//! * Flags are mutable world state - the only way to change them is through
 //!   interaction effects (or custom `Rules` closures via `WorldState`).
 //! * `interactions_for` re-evaluates flag conditions live, so setting a flag
 //!   immediately makes gated interactions appear (and vice versa).

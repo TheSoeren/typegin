@@ -9,7 +9,10 @@ rooms:
     extra:
       description: A padded cell in the sanatorium. It is oppressively hot — the air conditioning is off.
       gui:
-        walkable: [[20, 250], [780, 250], [780, 590], [20, 590]]
+        walkable:
+          boundary: [[20, 250], [780, 250], [780, 590], [20, 590]]
+          holes:
+            - [[220, 400], [360, 400], [360, 510], [220, 510]] # table
 
   - key: air-chute
     name: The Ventilation Shaft

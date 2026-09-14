@@ -24,14 +24,14 @@ pub type InteractionEffect = dyn Fn(&mut WorldState, &ActionContext) -> Vec<crat
 /// [`GameEngine::interactions_for`](crate::GameEngine::interactions_for)) to
 /// build verb menus or drop-targets for a point-and-click UI. Both closures
 /// must route any state mutation through the `&mut WorldState` they are
-/// given — the world is the only mutable state in the engine.
+/// given - the world is the only mutable state in the engine.
 pub struct Interaction {
     verb: Verb,
     item: Option<ObjectId>,
     target: TargetFilter,
     condition: Option<Box<InteractionCondition>>,
     effect: Box<InteractionEffect>,
-    /// When `Some`, this interaction denotes "talk to this NPC" — an NPC
+    /// When `Some`, this interaction denotes "talk to this NPC" - an NPC
     /// hotspot in the `interactions_for` query rather than an object verb.
     /// Dispatch of `Talk` still routes through `Rules::on_talk`; the entry
     /// exists so a point-and-click front-end sees the NPC as a live target.
@@ -41,14 +41,14 @@ pub struct Interaction {
 impl Interaction {
     /// Build an interaction from its parts.
     ///
-    /// * `verb` — which action triggers it.
-    /// * `item` — the object the player must be using/carrying, or `None` to
+    /// * `verb` - which action triggers it.
+    /// * `item` - the object the player must be using/carrying, or `None` to
     ///   match any.
-    /// * `target` — coarse target kind filter.
-    /// * `condition` — optional gate; runs before `effect` and (importantly)
+    /// * `target` - coarse target kind filter.
+    /// * `condition` - optional gate; runs before `effect` and (importantly)
     ///   also when a front-end *queries* available interactions, so the query
     ///   only reports things that currently make sense.
-    /// * `effect` — the behaviour; returns the events to emit.
+    /// * `effect` - the behaviour; returns the events to emit.
     #[must_use]
     pub fn build(
         verb: Verb,
@@ -76,7 +76,7 @@ impl Interaction {
     /// any item), and also the fully open "what is clickable right now" query
     /// (`item: None, target: None`) a point-and-click UI uses to enumerate
     /// hotspots. It never matches a query targeted at something else. The
-    /// effect is inert — a `Talk` action dispatches through `Rules::on_talk`,
+    /// effect is inert - a `Talk` action dispatches through `Rules::on_talk`,
     /// not through `Interaction` effects.
     #[must_use]
     pub fn talk_npc(npc: NpcId) -> Self {

@@ -9,7 +9,7 @@ use crate::world::object::ObjectId;
 
 /// Structured result of executing an `Action` against the world.
 ///
-/// A front-end consumes these events and decides how to present them — the
+/// A front-end consumes these events and decides how to present them - the
 /// engine never produces prose or any other rendering output itself. Keeping
 /// this as a typed enum is what lets a text UI, a GUI, or any other
 /// front-end share the same game logic.

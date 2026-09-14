@@ -18,7 +18,7 @@ use crate::{Verb, world};
 ///
 /// Create one with [`GameEngine::get`] or [`GameEngine::get_with_rules`] (to
 /// inject custom [`Rules`]), feed it text via [`GameEngine::handle_input`],
-/// and render the resulting [`Event`]s however the front-end sees fit — the
+/// and render the resulting [`Event`]s however the front-end sees fit - the
 /// engine has no rendering contract of its own. A point-and-click front-end
 /// can instead query what is currently possible via
 /// [`GameEngine::interactions_for`] and [`GameEngine::verbs_for`], without
@@ -35,7 +35,7 @@ pub struct GameEngine {
     data_interactions: Vec<Interaction>,
     /// One synthetic [`Interaction::talk_npc`] hotspot per NPC in the world,
     /// so `interactions_for` reports current-room NPCs as [`Verb::Talk`]
-    /// targets for a point-and-click front-end — both the open "what is
+    /// targets for a point-and-click front-end - both the open "what is
     /// clickable" query and a query targeted at that NPC specifically.
     /// Presence is a live condition (the NPC's room vs the player's current
     /// room), never a refresh.
@@ -162,17 +162,17 @@ impl GameEngine {
     ///
     /// [`Rules::verbs_for`] has the final say: it receives every `Verb` a
     /// currently-live *item-agnostic* interaction reports for `target`
-    /// (`interactions_for(None, Some(target))` — this also picks up the
+    /// (`interactions_for(None, Some(target))` - this also picks up the
     /// NPC-hotspot `Verb::Talk` when `target` names a present NPC) and
-    /// decides what to do with it — union it into its own default (the
+    /// decides what to do with it - union it into its own default (the
     /// ordinary case), or discard it entirely (an open exit's `Go`
     /// collapses the coin to just `Go`, by design). An interaction gated on
     /// a specific carried item never contributes here, regardless of what
     /// the player holds: the coin is a pure function of the target and
     /// world state, never inventory-reactive (see AGENTS.md's north star
     /// item 4). Discovering that a specific carried item does something to
-    /// `target` is a separate query — `interactions_for(Some(item),
-    /// Some(target))` — fired when that item is actually used against it.
+    /// `target` is a separate query - `interactions_for(Some(item),
+    /// Some(target))` - fired when that item is actually used against it.
     #[must_use]
     pub fn verbs_for(&self, target: Target) -> HashSet<Verb> {
         let interaction_verbs: HashSet<Verb> = self
@@ -197,10 +197,10 @@ impl GameEngine {
         self.world.save()
     }
 
-    /// Rebuild a `GameEngine` from `data` and `rules` — exactly as
+    /// Rebuild a `GameEngine` from `data` and `rules` - exactly as
     /// [`GameEngine::get_with_rules`] would, with fresh compiled
     /// interactions, fresh trigger definitions, and fresh NPC dialogue trees
-    /// — then restore the progress captured by [`GameEngine::save`] on top
+    /// - then restore the progress captured by [`GameEngine::save`] on top
     /// of it: flags, player inventory, each room's object membership,
     /// objects discarded out of the world entirely, door lock state, and
     /// fired triggers. Never in-progress dialogue: a reload never resumes

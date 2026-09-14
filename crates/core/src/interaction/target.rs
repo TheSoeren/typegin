@@ -7,8 +7,8 @@ use crate::world::object::ObjectId;
 /// A resolved `Use`-with target: either a world object or an NPC in the
 /// current room.
 ///
-/// NPCs are deliberately *not* objects — there is no coercion between the two
-/// types — but a use-with target may be either. `Target` is what lets an item
+/// NPCs are deliberately *not* objects - there is no coercion between the two
+/// types - but a use-with target may be either. `Target` is what lets an item
 /// be used on a character ("use mallet on guard") and what lets a
 /// point-and-click front-end offer NPCs as drop-targets in
 /// [`GameEngine::interactions_for`](crate::GameEngine::interactions_for).
@@ -25,12 +25,12 @@ pub enum Target {
 pub type TargetResolution = crate::keys::Resolution<Target>;
 
 /// A structural *world-position* class a use-with target can belong to.
-/// Properties of a target — door-ness, lock state, ... — are expressed as
+/// Properties of a target - door-ness, lock state, ... - are expressed as
 /// conditions, not kinds.
 ///
 /// Deserialized directly from authored YAML (`target: kind: scene`) as
 /// [`DataTarget::Kind`](crate::data::interactions_data::DataTarget::Kind),
-/// and reused as-is by [`TargetFilter::Kind`] at runtime — one type spans the
+/// and reused as-is by [`TargetFilter::Kind`] at runtime - one type spans the
 /// authored schema and the compiled shape, the same way
 /// [`Verb`](crate::interaction::Verb) does.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]

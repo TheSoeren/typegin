@@ -1,8 +1,8 @@
 //! Spec for the verb-coin UI primitives: `GameEngine::verbs_for` and
 //! `Rules::verbs_for`. A point-and-click front-end (Deponia-style: a
 //! static per-hotspot verb coin, not a menu that grows and shrinks as
-//! inventory changes) needs one query — "what verbs are possible for this
-//! target, on its own" — to populate that coin.
+//! inventory changes) needs one query - "what verbs are possible for this
+//! target, on its own" - to populate that coin.
 //!
 //! No new YAML schema, `Action`, or `Event`: this is a pure read-only query
 //! layered on the existing `interactions_for`/dispatch machinery, so (unlike
@@ -10,15 +10,15 @@
 //!
 //! ## New API
 //!
-//! * `GameEngine::verbs_for(&self, target: Target) -> HashSet<Verb>` — computes
+//! * `GameEngine::verbs_for(&self, target: Target) -> HashSet<Verb>` - computes
 //!   every `Verb` a currently-live *item-agnostic* interaction reports for
-//!   `target` (`interactions_for(None, Some(target))` — including the
+//!   `target` (`interactions_for(None, Some(target))` - including the
 //!   NPC-hotspot's `Verb::Talk` when `target` names a present NPC), then hands
 //!   that off to `Rules::verbs_for`, which has the final say over what the
 //!   coin actually holds.
 //!
 //!   An interaction that requires a specific carried item (`item: <id>`)
-//!   never contributes here, no matter what the player is holding — whether
+//!   never contributes here, no matter what the player is holding - whether
 //!   combining an item with `target` does anything is discovered separately,
 //!   at the moment a specific item is actually used against it
 //!   (`interactions_for(Some(item), Some(target))`, e.g. dragging an
@@ -27,21 +27,21 @@
 //!   state*: a hotspot's available verbs never change just because the
 //!   player happened to pick something up, matching how the "reveal
 //!   hotspots" affordance and the verb coin behave in modern point-and-click
-//!   UIs (Deponia included) — both are static per room state, never
+//!   UIs (Deponia included) - both are static per room state, never
 //!   inventory-reactive.
 //! * `Rules::verbs_for(&self, target: Target, interaction_verbs: &HashSet<Verb>,
-//!   world: &WorldState) -> HashSet<Verb>` — decides the coin's final
+//!   world: &WorldState) -> HashSet<Verb>` - decides the coin's final
 //!   contents, entirely the consumer's call: whatever this returns *is* the
 //!   result, so an override that wants to keep `interaction_verbs` around has
 //!   to fold them back in itself (see `default_verbs_hook`'s
 //!   `AllVerbsEverywhere` for one that doesn't, and `door_targets`'s
 //!   `MergeInteractionsOntoExits` for one that does). The trait default
 //!   (see `crates/core/src/rules/mod.rs`) folds `interaction_verbs` in plus
-//!   `Verb::Examine` — except for an open (unlocked) exit, where it
+//!   `Verb::Examine` - except for an open (unlocked) exit, where it
 //!   deliberately discards `interaction_verbs` and returns `Verb::Go` alone.
 //!   Inherited by `BasicRules` as-is, so `verbs_for` is never empty under
 //!   `BasicRules` even with zero authored interactions. Exercised only
-//!   through `verbs_for` here — `default_rules.rs`'s own convention is to
+//!   through `verbs_for` here - `default_rules.rs`'s own convention is to
 //!   drive every hook through the public API, never call it directly, and
 //!   this suite follows suit rather than adding a one-off exception.
 //!
@@ -81,7 +81,7 @@ mod data_driven_aggregation {
         // `BasicRules` inherits `Rules::verbs_for`'s trait default
         // unmodified, which always offers `Examine` and mirrors what the
         // stock `on_take`/`on_drop` hooks would actually do (see
-        // `crates/core/src/rules/mod.rs`) — `rusty-lamp` is a non-`Scene`
+        // `crates/core/src/rules/mod.rs`) - `rusty-lamp` is a non-`Scene`
         // item currently in the room, so `on_take` would succeed on it,
         // and `verbs_for` reflects that with `Take` alongside `Examine`,
         // even with zero authored interactions.
@@ -191,7 +191,7 @@ mod closure_driven_aggregation {
 }
 
 // ---------------------------------------------------------------------------
-// `Rules::default_verbs` — the consumer's own "works everywhere" policy
+// `Rules::default_verbs` - the consumer's own "works everywhere" policy
 // ---------------------------------------------------------------------------
 
 mod default_verbs_hook {
@@ -300,7 +300,7 @@ mod npc_targets {
         // `BasicRules`'s inherited `default_verbs` still contributes
         // `Examine` unconditionally (see the equivalent note on
         // `no_interactions_still_includes_basic_rules_default_verbs`), so
-        // the coin isn't empty — only `Talk` must be gone.
+        // the coin isn't empty - only `Talk` must be gone.
         let engine = engine_with_npcs(VERB_COIN_GUARD_YAML);
         assert!(
             !engine
@@ -309,8 +309,8 @@ mod npc_targets {
         );
     }
 
-    /// An override always offers `Examine`, but — unlike the stock
-    /// default — has to fold `interaction_verbs` back in itself if it wants
+    /// An override always offers `Examine`, but - unlike the stock
+    /// default - has to fold `interaction_verbs` back in itself if it wants
     /// them to survive: `Rules::verbs_for` has the final say, so an override
     /// that ignores `interaction_verbs` loses them, `Talk` included.
     struct ExamineEverywhere;

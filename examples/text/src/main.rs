@@ -7,9 +7,9 @@ mod view;
 
 /// The engine only ever parses one YAML document, so the shared
 /// `examples/data/*.yaml` files (kept separate purely for authoring
-/// convenience, and shared with `examples/pnc` — see AGENTS.md) are
+/// convenience, and shared with `examples/pnc` - see AGENTS.md) are
 /// concatenated here before handing the result to
-/// [`typegin_core::WorldData::from_yaml`] — each file contributes disjoint
+/// [`typegin_core::WorldData::from_yaml`] - each file contributes disjoint
 /// top-level keys, so concatenation is a lossless merge.
 fn read_world_yaml(data_dir: &Path) -> Result<String, typegin_core::WorldDataError> {
     let mut yaml = String::new();

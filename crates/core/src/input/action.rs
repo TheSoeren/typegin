@@ -17,7 +17,7 @@ use super::direction::Direction;
 /// semantics; a point-and-click front-end that already knows the concrete id
 /// (from [`GameEngine::interactions_for`](crate::GameEngine::interactions_for)/
 /// [`GameEngine::verbs_for`](crate::GameEngine::verbs_for)) can supply it
-/// directly (`Locator::Id`) and skip name resolution — and the ambiguity
+/// directly (`Locator::Id`) and skip name resolution - and the ambiguity
 /// that makes sense for typed text but not for a click that already picked
 /// exactly one thing.
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -64,8 +64,8 @@ pub enum GoTarget {
     Direction(Direction),
     Named(String),
     /// An exit's door object, referenced directly by id (the point-and-click
-    /// counterpart to `Named`). Never produced by YAML content — an author
-    /// only ever has a symbolic name to write, never a runtime id — so this
+    /// counterpart to `Named`). Never produced by YAML content - an author
+    /// only ever has a symbolic name to write, never a runtime id - so this
     /// variant is unreachable from `#[serde(untagged)]` deserialization; it
     /// exists purely for a front-end to construct an `Action` directly.
     Id(ObjectId),
@@ -73,8 +73,8 @@ pub enum GoTarget {
 
 /// Outcome of a world mutation attempt: taking, granting, discarding, or
 /// dropping an object, or moving the player to another room. Every such
-/// attempt is a plain success-or-no-op — none carries payload data beyond
-/// that — so one shared type stands in for what were five identically-shaped
+/// attempt is a plain success-or-no-op - none carries payload data beyond
+/// that - so one shared type stands in for what were five identically-shaped
 /// per-operation enums.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Outcome {

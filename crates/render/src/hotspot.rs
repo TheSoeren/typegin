@@ -1,11 +1,11 @@
 //! Reading this crate's `gui.*` convention out of an object's opaque
-//! `extra` data (see `typegin_core::ExtraValue` — core never interprets
+//! `extra` data (see `typegin_core::ExtraValue` - core never interprets
 //! these keys itself; every front-end owns its own convention on top of
 //! them). `render`'s convention: `extra.gui.hotspot = {x, y, w, h}`.
 //!
 //! Bounding box is the starting shape for every hotspot; a specific object
 //! can upgrade to a polygon or a pixel mask later without this type, or
-//! anything that reads it, needing to change — hit-testing was never
+//! anything that reads it, needing to change - hit-testing was never
 //! coupled to how an object is actually drawn.
 
 use std::collections::HashMap;
@@ -34,7 +34,7 @@ impl Rect {
 
 /// Read this crate's `gui.hotspot` convention out of an object's `extra`
 /// data. Returns `None` for anything not yet authored (missing `gui` key,
-/// missing `hotspot` key, or a malformed shape) — a caller decides what a
+/// missing `hotspot` key, or a malformed shape) - a caller decides what a
 /// missing hotspot means (skip the object, draw a placeholder, ...); this
 /// function never panics on incomplete content.
 #[must_use]

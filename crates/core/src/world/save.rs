@@ -1,5 +1,5 @@
 //! Save/load: persisting and restoring only the *dynamic* slice of a running
-//! game onto an already freshly-built [`WorldState`] — flags, room/inventory
+//! game onto an already freshly-built [`WorldState`] - flags, room/inventory
 //! object placement, objects discarded out of the world entirely, door lock
 //! state, and fired triggers.
 //!
@@ -54,10 +54,10 @@ impl std::error::Error for SaveError {
 /// A serializable snapshot of only the *dynamic* slice of a running game:
 /// flags, room/inventory object placement, objects discarded out of the
 /// world entirely, door lock state, and fired triggers. Deliberately no
-/// dialogue progress — see the module doc comment.
+/// dialogue progress - see the module doc comment.
 ///
 /// Ordered maps/sets throughout, not `HashMap`/`HashSet`: `WorldState`'s
-/// internal collections are hash-based (fine for that use — order is never
+/// internal collections are hash-based (fine for that use - order is never
 /// observed), but a save is serialized text, and hash iteration order isn't
 /// stable across the independently-built collections two separate `save()`
 /// calls construct. Sorting here keeps two saves of the same unchanged state
@@ -71,7 +71,7 @@ struct WorldSnapshot {
     rooms: BTreeMap<room::RoomId, RoomSnapshot>,
     locked_doors: BTreeSet<ObjectId>,
     /// Known object ids (every key of `object_templates` at save time) that
-    /// are placed in neither a room nor inventory — most commonly a `discard`
+    /// are placed in neither a room nor inventory - most commonly a `discard`
     /// effect's target (`DataEffect::Discard`), consumed out of the game
     /// entirely. Without this bucket, `apply_snapshot` would have no record
     /// that these ids should stay gone: a freshly-built `WorldState` places
@@ -139,7 +139,7 @@ impl WorldState {
 
     /// Remove the object with `id` from wherever it currently lives (the
     /// player's inventory, or any room's visible or hidden list). Falling
-    /// that, materialise it fresh from `object_templates` — a `grant`-only
+    /// that, materialise it fresh from `object_templates` - a `grant`-only
     /// object (never listed in any room's `visible_objects`/`hidden_objects`,
     /// only ever willed into inventory by a `Grant` effect, e.g. `toenail`
     /// in `data/npcs.yaml`) has no placed instance to find at all until now.
@@ -168,7 +168,7 @@ impl WorldState {
     /// `snapshot.discarded` is removed from that default placement instead
     /// of relocated, so a consumed object stays gone. `dialogue_state` and
     /// `active_npc` are left exactly as `from_data` set them (empty, no
-    /// active conversation) — never restored from a save, by design (see
+    /// active conversation) - never restored from a save, by design (see
     /// the module doc comment).
     fn apply_snapshot(&mut self, snapshot: WorldSnapshot) {
         self.flags = snapshot.flags;
@@ -198,7 +198,7 @@ impl WorldState {
         }
 
         // Pull every discarded id back out of wherever the fresh
-        // `from_data` build placed it (its default room) and drop it —
+        // `from_data` build placed it (its default room) and drop it -
         // deliberately not re-placed anywhere, so it stays gone.
         for id in &snapshot.discarded {
             self.take_object_anywhere(id);

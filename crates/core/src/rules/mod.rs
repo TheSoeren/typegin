@@ -11,7 +11,7 @@ use crate::{NpcId, ObjectId, Target, world};
 /// known to be present): locked, or entered.
 ///
 /// Shared by [`Rules::on_go`]'s [`GoTarget::Named`] and [`GoTarget::Id`] arms
-/// — both eventually reduce to "I have a door's id in scope, act on it,"
+/// - both eventually reduce to "I have a door's id in scope, act on it,"
 /// they just differ in how they got there (name resolution vs. a caller
 /// supplying the id directly).
 fn enter_door(world: &mut world::WorldState, id: ObjectId, name: String) -> Vec<event::Event> {
@@ -49,9 +49,9 @@ pub use basic::BasicRules;
 /// method has a default, so a custom type only overrides what it changes. Two
 /// complementary customization surfaces exist:
 ///
-/// * **Per-verb defaults** — override an `on_*` hook to change a whole action
+/// * **Per-verb defaults** - override an `on_*` hook to change a whole action
 ///   category (`on_take`, `on_use`, ...).
-/// * **Per-interaction rules** — provide [`Interaction`]s via
+/// * **Per-interaction rules** - provide [`Interaction`]s via
 ///   [`Rules::interactions`], run before the default `on_use` fallback, so
 ///   bespoke puzzle logic authors as one interaction instead of a hook
 ///   rewrite. Front-ends can also enumerate them (see
@@ -78,7 +78,7 @@ pub trait Rules {
     ///
     /// `GoTarget::Named` and `GoTarget::Id` reach doors that have no compass
     /// direction at all (or any door, by a point-and-click front-end that
-    /// already has its id) — full name/id resolution against everything in
+    /// already has its id) - full name/id resolution against everything in
     /// scope (objects and NPCs), so entering an NPC or a non-door object is
     /// reported distinctly (`CantEnter`) from no such target at all.
     fn on_go(&mut self, world: &mut world::WorldState, target: GoTarget) -> Vec<event::Event> {
@@ -126,7 +126,7 @@ pub trait Rules {
 
     /// Decide what happens when the player tries to take an object.
     ///
-    /// Only [`Item`](crate::object_data::ObjectKind::Item) objects are portable — the default
+    /// Only [`Item`](crate::object_data::ObjectKind::Item) objects are portable - the default
     /// takes them into inventory. Scene objects (furniture, doors, ...) are a
     /// fixed part of the world and are refused with `CantTake`; authored
     /// interactions never get a say here (use flows through `on_use`).
@@ -227,7 +227,7 @@ pub trait Rules {
 
     /// Decide what happens when the player examines a thing.
     ///
-    /// Any object in scope — carried, in the room, or a door — can be examined.
+    /// Any object in scope - carried, in the room, or a door - can be examined.
     fn on_examine(
         &mut self,
         world: &mut world::WorldState,
@@ -464,7 +464,7 @@ pub trait Rules {
     /// Decide the final set of verbs `GameEngine::verbs_for` reports for
     /// `target`, given `interaction_verbs` (every verb a currently-live
     /// item-agnostic interaction reports for it). This hook has the final
-    /// say — whatever it returns *is* the coin's contents, so an override
+    /// say - whatever it returns *is* the coin's contents, so an override
     /// that wants to keep `interaction_verbs` around must fold them back in
     /// itself.
     ///
@@ -472,10 +472,10 @@ pub trait Rules {
     /// do, so the coin never claims a verb the engine would then refuse (or
     /// omit one it would honour):
     ///
-    /// * An open (unlocked) exit collapses the coin to `Go` alone — no
+    /// * An open (unlocked) exit collapses the coin to `Go` alone - no
     ///   verb-coin at all, matching the "just a walk cursor" convention
     ///   modern point-and-click adventures use for an exit that needs no
-    ///   further interaction — deliberately discarding `interaction_verbs`
+    ///   further interaction - deliberately discarding `interaction_verbs`
     ///   to keep it that way. A consumer wanting an authored interaction to
     ///   still show up alongside `Go` on an open door overrides this hook
     ///   and unions `interaction_verbs` in itself.
