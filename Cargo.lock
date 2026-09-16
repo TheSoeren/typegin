@@ -179,6 +179,7 @@ name = "editor"
 version = "0.1.0"
 dependencies = [
  "core",
+ "macroquad",
  "render",
  "serde_yaml_ng",
 ]
